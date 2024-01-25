@@ -2,14 +2,9 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 
-using D4BB.Comb;
-using static D4BB.Comb.IntegerCell;
 using System;
 using System.Linq;
-using D4BB.Geometry;
-using D4BB.Transforms;
 using D4BB.General;
-using System.Diagnostics;
 
 namespace D4BB.Comb {
 public class CombTests
@@ -294,38 +289,6 @@ public class CombTests
         IntegerCellTest(8);
     }
 
-    [Test] public void IntegerCell_clockwise() {
-        var ic = new IntegerCell(new int[] { 0,0,0});
-        var ibc = new IntegerBoundaryComplex(ic);
-        List<int[][]> ibcVertices = new List<int[][]>(); 
-        var faces2d = new HashSet<IPolyhedron>();
-        foreach (var cell in ibc.cells) {
-            ibcVertices.Add(cell.ClockwiseFromOutsideVertices2d());
-            faces2d.Add(Face2dBC.FromIntegerCell(cell));
-        }
-        var expected = new HashSet<Face2d>() {
-            new(new List<Point>() {new(0,0,1), new(1,0,1), new(1,1,1), new(0,1,1)}),
-            new(new List<Point>() {new(0,0,0), new(0,0,1), new(0,1,1), new(0,1,0)}),
-            new(new List<Point>() {new(0,0,0), new(1,0,0), new(1,0,1), new(0,0,1)}),
-            new(new List<Point>() {new(0,0,0), new(0,1,0), new(1,1,0), new(1,0,0)}),
-            new(new List<Point>() {new(1,0,0), new(1,1,0), new(1,1,1), new(1,0,1)}),
-            new(new List<Point>() {new(0,1,0), new(0,1,1), new(1,1,1), new(1,1,0)}),
-        };
-        Assert.That(faces2d.Count,Is.EqualTo(expected.Count));
-        Assert.That(faces2d,Is.EquivalentTo(expected));
-        var oFacets2d = new HashSet<OrientedFace2d>();
-        foreach (var face2d in faces2d) {
-            oFacets2d.Add(new OrientedFace2d((Face2d)face2d));
-        }
-        var oExpected = new HashSet<OrientedFace2d>();
-        foreach (var face2d in expected) {
-            var points = face2d.points;
-            oExpected.Add(new OrientedFace2d(new Face2d(points,true)));
-        }
-        Assert.That(oExpected.Except(oFacets2d),Is.Empty);
-        Assert.That(oFacets2d,Is.EquivalentTo(oExpected));
-
-    }
     [Test] public void Complex1d_1Edge() {
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(new IntegerCell(new int[]{0,0}, new HashSet<int>(){0}));
         Assert.That(compound.cells.Count,Is.EqualTo(2));

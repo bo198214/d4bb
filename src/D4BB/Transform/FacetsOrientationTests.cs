@@ -5,9 +5,42 @@ using System.Diagnostics;
 using D4BB.Geometry;
 using D4BB.Transforms;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace D4BB.Comb {
 public class FacetsOrientationTests {
+    [Test] public void IntegerCell_clockwise() {
+        var ic = new IntegerCell(new int[] { 0,0,0});
+        var ibc = new IntegerBoundaryComplex(ic);
+        List<int[][]> ibcVertices = new List<int[][]>(); 
+        var faces2d = new HashSet<IPolyhedron>();
+        foreach (var cell in ibc.cells) {
+            ibcVertices.Add(cell.ClockwiseFromOutsideVertices2d());
+            faces2d.Add(Face2dBC.FromIntegerCell(cell));
+        }
+        var expected = new HashSet<Face2d>() {
+            new(new List<Point>() {new(0,0,1), new(1,0,1), new(1,1,1), new(0,1,1)}),
+            new(new List<Point>() {new(0,0,0), new(0,0,1), new(0,1,1), new(0,1,0)}),
+            new(new List<Point>() {new(0,0,0), new(1,0,0), new(1,0,1), new(0,0,1)}),
+            new(new List<Point>() {new(0,0,0), new(0,1,0), new(1,1,0), new(1,0,0)}),
+            new(new List<Point>() {new(1,0,0), new(1,1,0), new(1,1,1), new(1,0,1)}),
+            new(new List<Point>() {new(0,1,0), new(0,1,1), new(1,1,1), new(1,1,0)}),
+        };
+        Assert.That(faces2d.Count,Is.EqualTo(expected.Count));
+        Assert.That(faces2d,Is.EquivalentTo(expected));
+        var oFacets2d = new HashSet<OrientedFace2d>();
+        foreach (var face2d in faces2d) {
+            oFacets2d.Add(new OrientedFace2d((Face2d)face2d));
+        }
+        var oExpected = new HashSet<OrientedFace2d>();
+        foreach (var face2d in expected) {
+            var points = face2d.points;
+            oExpected.Add(new OrientedFace2d(new Face2d(points,true)));
+        }
+        Assert.That(oExpected.Except(oFacets2d),Is.Empty);
+        Assert.That(oFacets2d,Is.EquivalentTo(oExpected));
+
+    }
     [Test] public void TakeOut1Of3Test() {
         Assert.That(new IntegerCell(new int[]{0,0,0}).Parity(2),Is.EqualTo(true));
         Assert.That(new IntegerCell(new int[]{0,0,0}).Parity(1),Is.EqualTo(false));

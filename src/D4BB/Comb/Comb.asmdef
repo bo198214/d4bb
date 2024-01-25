@@ -1,4 +1,8 @@
 {
 	"name": "Comb",
-	"references": [ "General" ]
+	"references": [ "General" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ]
 }
