@@ -24,10 +24,13 @@ public class Camera4dCentral : ICamera4d {
 	public Camera4dCentral() {
         eye = initialEye;
         v = initialV;
-   		SetPerspective(initialEye);
 	}
-	public void SetPerspective(Point4d point) {
-		eye = point;
+	public Camera4dCentral(Point4d eye) {
+        this.eye = eye;
+        v = initialV;
+	}
+	public void SetPerspective(Point4d eye) {
+		this.eye = eye;
 	}
 
 	public bool facedBy(HalfSpace oc) {

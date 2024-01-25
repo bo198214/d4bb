@@ -161,7 +161,12 @@ public class FacetsOrientationTests {
         var d1st = p1st.subtract(o).normalize();
         var d2nd = p2nd.subtract(o).normalize();
         var normal = AOP.cross(d1st,d2nd).normalize();
-        return o.clone().subtract(center).sc(normal)>0;
+        double d = o.clone().subtract(center).sc(normal);
+        if (cam.IsFacedBy(new Point4d(cell3d.origin),new Point4d(cell3d.Normal()))) {
+            return d>0;
+        } else {
+            return d<0;
+        }
     }
     private static void CheckClockwise3d(IntegerCell cell3d, OrientedIntegerCell cell2d) {
         var center = new Point(3);
@@ -280,14 +285,119 @@ public class FacetsOrientationTests {
             }
         }
     }
-    [Test] public void SingleCell_0s012() {
+    [Test] public void SingleCell_0s012_0s12() {
         var cell4d = new IntegerCell(new int[]{0,0,0,0});
         OrientedIntegerCell cell3d;
         cell4d.Facets().TryGetValue(
             new OrientedIntegerCell(new int[]{0,0,0,0}, new HashSet<int>{0,1,2},true,true),
             out cell3d);
         Assert.That(cell3d.Normal(),Is.EqualTo(new int[]{0,0,0,-1}));
+        Assert.That(cell3d.inverted,Is.EqualTo(true));
+        Assert.That(cell3d.parity,Is.EqualTo(true));
         CheckOrientation4d(cell4d,cell3d);
+        cell3d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,0}, new HashSet<int>{1,2},false,true),
+            out OrientedIntegerCell cell2d);
+
+        Assert.That(CheckOrientation3d(cell3d,cell2d));
+
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+    }
+    [Test] public void SingleCell_0s012_0s01() {
+        var cell4d = new IntegerCell(new int[]{0,0,0,0});
+        OrientedIntegerCell cell3d;
+        cell4d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,0}, new HashSet<int>{0,1,2},true,true),
+            out cell3d);
+        Assert.That(cell3d.Normal(),Is.EqualTo(new int[]{0,0,0,-1}));
+        Assert.That(cell3d.inverted,Is.EqualTo(true));
+        Assert.That(cell3d.parity,Is.EqualTo(true));
+        CheckOrientation4d(cell4d,cell3d);
+        cell3d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,0}, new HashSet<int>{0,1},false,true),
+            out OrientedIntegerCell cell2d);
+
+        Assert.That(CheckOrientation3d(cell3d,cell2d));
+
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+    }
+    [Test] public void SingleCell_0s012_0s02() {
+        var cell4d = new IntegerCell(new int[]{0,0,0,0});
+        OrientedIntegerCell cell3d;
+        cell4d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,0}, new HashSet<int>{0,1,2},true,true),
+            out cell3d);
+        Assert.That(cell3d.Normal(),Is.EqualTo(new int[]{0,0,0,-1}));
+        Assert.That(cell3d.inverted,Is.EqualTo(true));
+        Assert.That(cell3d.parity,Is.EqualTo(true));
+        CheckOrientation4d(cell4d,cell3d);
+        cell3d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,0}, new HashSet<int>{0,2},false,true),
+            out OrientedIntegerCell cell2d);
+
+        Assert.That(CheckOrientation3d(cell3d,cell2d));
+
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+    }
+    [Test] public void SingleCell_1s012_0s12() {
+        var cell4d = new IntegerCell(new int[]{0,0,0,0});
+        cell4d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{0,1,2},true,true),
+            out OrientedIntegerCell cell3d);
+        Assert.That(cell3d.inverted,Is.EqualTo(false));
+        Assert.That(cell3d.parity,Is.EqualTo(true));
+        var facets2d = cell3d.Facets();
+        facets2d.TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{1,2},true,true),
+            out OrientedIntegerCell cell2d);
+        Assert.That(cell2d.inverted,Is.EqualTo(true));
+
+        Assert.That(CheckOrientation3d(cell3d,cell2d), cell3d + "->" + cell2d);
+
+        Camera4dCentral cam = new();
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);
+
+    }
+    [Test] public void SingleCell_1s012_0s01() {
+        var cell4d = new IntegerCell(new int[]{0,0,0,0});
+        cell4d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{0,1,2},true,true),
+            out OrientedIntegerCell cell3d);
+        Assert.That(cell3d.inverted,Is.EqualTo(false));
+        Assert.That(cell3d.parity,Is.EqualTo(true));
+        var facets2d = cell3d.Facets();
+        facets2d.TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{0,1},true,true),
+            out OrientedIntegerCell cell2d);
+        Assert.That(cell2d.inverted,Is.EqualTo(true));
+
+        Assert.That(CheckOrientation3d(cell3d,cell2d), cell3d + "->" + cell2d);
+
+        Camera4dCentral cam = new();
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);
+
+    }
+    [Test] public void SingleCell_1s012_0s02() {
+        var cell4d = new IntegerCell(new int[]{0,0,0,0});
+        cell4d.Facets().TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{0,1,2},true,true),
+            out OrientedIntegerCell cell3d);
+        Assert.That(cell3d.inverted,Is.EqualTo(false));
+        Assert.That(cell3d.parity,Is.EqualTo(true));
+        var facets2d = cell3d.Facets();
+        facets2d.TryGetValue(
+            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{0,2},true,true),
+            out OrientedIntegerCell cell2d);
+        Assert.That(cell2d.inverted,Is.EqualTo(true));
+
+        Assert.That(CheckOrientation3d(cell3d,cell2d), cell3d + "->" + cell2d);
+
+        Camera4dCentral cam = new();
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);
+
     }
     [Test] public void SingleCell_1s123_0s23() {
         var cell4d = new IntegerCell(new int[]{0,0,0,0});
@@ -302,7 +412,8 @@ public class FacetsOrientationTests {
 
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral()));
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
     }
 
     [Test] public void SingleCell_1s123_0s12() {
@@ -319,25 +430,7 @@ public class FacetsOrientationTests {
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
         Camera4dCentral cam = new();
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam));
-    }
-    [Test] public void SingleCell_1s012_0s12() {
-        var cell4d = new IntegerCell(new int[]{0,0,0,0});
-        cell4d.Facets().TryGetValue(
-            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{0,1,2},true,true),
-            out OrientedIntegerCell cell3d);
-        Assert.That(cell3d.inverted,Is.EqualTo(false));
-        var facets2d = cell3d.Facets();
-        facets2d.TryGetValue(
-            new OrientedIntegerCell(new int[]{0,0,0,1}, new HashSet<int>{1,2},true,true),
-            out OrientedIntegerCell cell2d);
-        Assert.That(cell2d.inverted,Is.EqualTo(true));
-
-        Assert.That(CheckOrientation3d(cell3d,cell2d));
-
-        Camera4dCentral cam = new();
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam));
-
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);
     }
     [Test] public void SingleCell_1s023_0s23() {
         var cell4d = new IntegerCell(new int[]{0,0,0,0});
@@ -353,7 +446,7 @@ public class FacetsOrientationTests {
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
         Camera4dCentral cam = new();
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam));
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);
     }
     [Test] public void SingleCell_2s013_0s03() {
         var cell4d = new IntegerCell(new int[]{1,0,0,0});

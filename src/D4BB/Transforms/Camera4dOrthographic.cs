@@ -13,7 +13,10 @@ public class Camera4dOrthographic : ICamera4d
     public Camera4dOrthographic() {
         eye = initialEye;
         v = initialV;
-   		SetPerspective(initialEye);
+    }
+    public Camera4dOrthographic(Point4d eye) {
+        this.eye = eye;
+        v = initialV;
     }
     public Point3d Proj3d(Point point4d)
     {

@@ -32,10 +32,7 @@ public class OrientedIntegerCell : IntegerCell {
     }
     public override bool Parity(int a) {
         var p = base.Parity(a);
-        if (span.Contains(3)&&SpaceDim()==4) {
-            p = !p;
-        }
-        return p==parity;
+        return p==parity==inverted;
     }
     public int[][] ClockwiseFromOutsideVertices2d() {
         Debug.Assert(Dim()==2,"7289482044");
@@ -62,7 +59,7 @@ public class OrientedIntegerCell : IntegerCell {
         //     Array.IndexOf(parent,normal)
         // });
         
-        if (inverted!=parity) {
+        if (!inverted==parity) {
             (spanList[0],spanList[1])=(spanList[1],spanList[0]);
         }
         for (int n=0;n<4;n++) {
