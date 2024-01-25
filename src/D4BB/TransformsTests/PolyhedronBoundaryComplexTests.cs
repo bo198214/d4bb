@@ -129,11 +129,5 @@ public class PolyhedronBoundaryComplexTests {
             Assert.That(pbc.facets,Does.Not.Contains(facet));
         }
     }
-
-    [Test] public void Cutout4dSingleFromL() {
-        var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0,2},new int[]{1,0,0,2}, new int[]{1,1,0,2},new int[]{1,0,0,0}}));
-        
-    }
-
 }
 }
