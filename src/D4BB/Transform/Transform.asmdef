@@ -1,8 +1,0 @@
-{
-	"name": "Transform",
-	"references": [ "Comb", "Geometry", "General"],
-    "overrideReferences": true,
-    "precompiledReferences": [
-        "nunit.framework.dll"
-    ]
-}

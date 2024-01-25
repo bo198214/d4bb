@@ -1,8 +1,4 @@
 {
 	"name": "Geometry",
-	"references": [ "Comb", "General" ],
-    "overrideReferences": true,
-    "precompiledReferences": [
-        "nunit.framework.dll"
-    ]
+	"references": [ "Comb", "General" ]
 }

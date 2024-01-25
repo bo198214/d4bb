@@ -1,0 +1,14 @@
+{
+	"name": "TransformsTests",
+	"references": [ "General", "Comb", "Geometry", "Transforms" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+	    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}

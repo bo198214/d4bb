@@ -1,0 +1,14 @@
+{
+	"name": "CombTests",
+	"references": [ "General", "Comb" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+	    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}
