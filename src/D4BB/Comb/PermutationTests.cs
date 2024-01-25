@@ -3,6 +3,8 @@ using System.Diagnostics;
 using NUnit.Framework;
 
 using static D4BB.Comb.Permutation;
+
+namespace D4BB.Comb {
 public class PermutationTests {
     [Test] public void Bool2IntTest() {
         bool a;
@@ -111,4 +113,5 @@ public class PermutationTests {
             new int[] {3,2,1},
         }));
     }
+}
 }

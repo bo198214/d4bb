@@ -6,6 +6,7 @@ using D4BB.Geometry;
 using D4BB.Transforms;
 using System.Collections.Generic;
 
+namespace D4BB.Comb {
 public class FacetsOrientationTests {
     [Test] public void TakeOut1Of3Test() {
         Assert.That(new IntegerCell(new int[]{0,0,0}).Parity(2),Is.EqualTo(true));
@@ -369,4 +370,5 @@ public class FacetsOrientationTests {
         }
     }
 
+}
 }

@@ -7,6 +7,7 @@ using D4BB.Transforms;
 using System.Diagnostics;
 using D4BB.Comb;
 
+namespace D4BB.Geometry {
 public class Geom3dTests
 {
     
@@ -781,4 +782,5 @@ public class Geom3dTests
         Assert.That(c[0].neighbor,Is.SameAs(c[1]));
         Assert.That(c[1].neighbor,Is.SameAs(c[0]));
     }
+}
 }

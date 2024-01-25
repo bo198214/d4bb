@@ -4,7 +4,8 @@ using D4BB.Geometry;
 using D4BB.Transforms;
 using NUnit.Framework;
 
-public class BoundaryComplexTests {
+namespace D4BB.Transforms {
+public class PolyhedronBoundaryComplexTests {
     [Test] public void Polyhedron3dBoundaryComplex_SingleCube_Numbers() {
         var cube = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
         Assert.That(cube.VisibleFacets(),Has.Count.EqualTo(6));
@@ -134,4 +135,5 @@ public class BoundaryComplexTests {
         
     }
 
+}
 }

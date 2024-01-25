@@ -11,6 +11,7 @@ using D4BB.Transforms;
 using D4BB.General;
 using System.Diagnostics;
 
+namespace D4BB.Comb {
 public class CombTests
 {
     [Test] public void IntegerCell_vertices() {
@@ -764,4 +765,5 @@ public class CombTests
         Assert.That(facet.SideOf(new OrientedIntegerCell(new int[]{0,1,0},new HashSet<int>{0,2},false,true)),Is.EqualTo(1));
         Assert.That(facet.SideOf(new OrientedIntegerCell(new int[]{-1,1,0},new HashSet<int>{0,2},false,true)),Is.EqualTo(-1));
     }
+}
 }

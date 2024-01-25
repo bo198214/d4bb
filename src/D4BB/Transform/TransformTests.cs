@@ -5,6 +5,7 @@ using D4BB.Comb;
 using D4BB.Geometry;
 using D4BB.Transforms;
 using NUnit.Framework;
+namespace D4BB.Transforms {
 public class TransformTests {
     // [Test] public void MyVector3Test() {
     //     var a = new Vector3(0,0,0);
@@ -213,4 +214,5 @@ public class TransformTests {
             Assert.That(Is.ReferenceEquals(list.First(),c1));
         }
     }
+}
 }
