@@ -128,8 +128,10 @@ public class Polyhedron3dBoundaryComplex {
     public Dictionary<IntegerCell,Face2dBC> i2p = new();
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
+    bool debug = false;
 
-    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null) {
+    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool debug=false) {
+        this.debug = debug;
         foreach (var ic in ibc.cells) {
             var pc = new Face2dBC(ic, cam);
             i2p[ic] = pc;
@@ -212,18 +214,9 @@ public class Polyhedron3dBoundaryComplex {
         HashSet<EdgeBC> res = new();
         foreach (var facet in facets) {
             foreach (var edge in facet.facets) {
-                if (!edge.isInvisible || edge.neighbor==null) {
+                if (debug || !edge.isInvisible || edge.neighbor==null) {
                     res.Add((EdgeBC)edge);
                 }
-            }
-        }
-        return res;
-    }
-    public HashSet<EdgeBC> AllEdges() {
-        HashSet<EdgeBC> res = new();
-        foreach (var facet in facets) {
-            foreach (var edge in facet.facets) {
-                res.Add((EdgeBC)edge);
             }
         }
         return res;

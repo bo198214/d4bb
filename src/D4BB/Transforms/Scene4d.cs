@@ -10,6 +10,7 @@ namespace D4BB.Transforms
 {public class Scene4d {
     public ICamera4d camera { get; set; }
     public readonly Piece[] pieces;
+    public bool debug;
     public readonly List<List<IntegerBoundaryComplex>> culledSorted3d;
     public readonly List<Component> components3d = new();
     //public FacetsGenericMesh facetsMesh;
@@ -40,8 +41,9 @@ namespace D4BB.Transforms
             return res;
         }
     }
-    public Scene4d(int[][][] pieces, ICamera4d camera) {
+    public Scene4d(int[][][] pieces, ICamera4d camera, bool debug=false) {
         this.camera = camera;
+        this.debug=debug;
         this.pieces = new Piece[pieces.Length];
         for (int i=0;i<pieces.Length;i++) {
             this.pieces[i] = new Piece(pieces[i]);
@@ -95,7 +97,7 @@ namespace D4BB.Transforms
                     var component3d = new Component(){
                         piece=piece,
                         cells=component3dCells,
-                        pbc=new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(component3dCells),camera),
+                        pbc=new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(component3dCells),camera,debug),
                     };
                     foreach (var cell in component3dCells) {
                         component3d.definingHalfSpaces.Add(DefiningHalfSpaces(cell,camera));
