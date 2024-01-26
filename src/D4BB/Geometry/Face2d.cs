@@ -422,7 +422,7 @@ namespace D4BB.Geometry
                     inner.Add(edge1);
                 }
                 else if (sideA == HalfSpace.CONTAINED && sideB==HalfSpace.CONTAINED && sideC == HalfSpace.CONTAINED) {
-                    return new SplitResult {isContained=true};
+                  	if (! AOP.Colinear1d(a.PointRef(), b.PointRef(), c.PointRef())) return new SplitResult {isContained=true};
                 }
                 else if (sideC == HalfSpace.CONTAINED) {/* will be handled in the next step */}
                 else {
