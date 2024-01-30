@@ -93,7 +93,7 @@ namespace D4BB.Transforms
             var normal = AOP.cross(d1st,d2nd).normalize();
             {
                 var sc = o.clone().subtract(center).sc(normal);
-                Debug.Assert(AOP.gt(sc,0),"1529589158 " + sc + " " + cell + " " + facet);
+                Debug.Assert(sc>0,"1529589158 " + sc + " " + cell + " " + facet);
             }
             HalfSpace hs = new HalfSpace(o,normal);
             res[i] = hs;
