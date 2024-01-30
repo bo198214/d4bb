@@ -129,6 +129,7 @@ namespace D4BB.Transforms
             }
         }
         //for those 3d-facets now calculate an order and sort the list accordingly
+        //it is dependent on the camera only as far the facing components are concerned
         components3d.Sort(new InFrontOfComponentComparer());
 
         // cut out (in 3d) according to list order (if 4d cam moves 3d cut points needs to be recalculated, non-cut-points can just be exchanged)

@@ -227,7 +227,11 @@ namespace D4BB.Geometry
                 c = edges[i].b.getPoint();
                 if (!AOP.Colinear1d(a,b,c)) break;
             }
-            return AOP.cross(c.subtract(b),a.subtract(b)).normalize();
+            Point cross = AOP.cross(c.clone().subtract(b),a.clone().subtract(b));
+            // if (cross.len()<0.000001) {
+            //     Debug.Assert(false);
+            // }
+            return cross.normalize();
         }
         public HalfSpace HalfSpaceOf() {
             return new HalfSpace(edges[0].a.getPoint(),Normal());
