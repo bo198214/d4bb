@@ -216,10 +216,17 @@ namespace D4BB.Geometry
             Which makes it clockwise in the outside direction
         */
         public Point Normal() {
-            var a = edges[^1].a.getPoint();
-            var b = edges[^1].b.getPoint();
-            Debug.Assert(b.Equals(edges[0].a.getPoint()), "5466236667");
-            var c = edges[0].b.getPoint();
+            Point a=null;
+            Point b=null;
+            Point c=null;
+            var n = edges.Count;
+            for (int i=0;i<n;i++) {
+                a = edges[(n+i-1)%n].a.getPoint();
+                b = edges[(n+i-1)%n].b.getPoint();
+                Debug.Assert(b.Equals(edges[0].a.getPoint()), "5466236667");
+                c = edges[i].b.getPoint();
+                if (!AOP.Colinear1d(a,b,c)) break;
+            }
             return AOP.cross(c.subtract(b),a.subtract(b)).normalize();
         }
         public HalfSpace HalfSpaceOf() {
@@ -249,21 +256,40 @@ namespace D4BB.Geometry
             var res = new HashSet<Face2d>();
             var n = edges.Count;
             var o = edges[0].a;
-            for (int i=2;i<n-1;i++) {
-                var triangle = Recreate(new List<Edge>{
+            int iB = -1;
+            for (int i=0;i<n;i++) {
+                var a = edges[i+1].a.getPoint();
+                iB = i+2;
+                var b = edges[iB].a.getPoint();
+                if (!AOP.Colinear1d(o.getPoint(),a,b)) break;
+            }
+            Debug.Assert(iB!=-1);
+            int iE = -1;
+            for (int i=n;i>0;i--) {
+                var a = edges[i-1].a.getPoint();
+                iE = i-2;
+                var b = edges[iE].a.getPoint();
+                if (!AOP.Colinear1d(o.getPoint(),a,b)) break;
+            }
+            Debug.Assert(iE!=-1);
+            for (int i=iB;i<=iE-1;i++) {
+                res.Add(Recreate(new List<Edge>{
                     (Edge)edges[0].Recreate(o,edges[i].a),
                     (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a), //only using .a (reduces vertex count)
-                    (Edge)edges[0].Recreate(edges[i+1].a,o)});
-                res.Add(triangle);
+                    (Edge)edges[0].Recreate(edges[i+1].a,o)}));
             }
-            res.Add(Recreate(new List<Edge>{
-                (Edge)edges[0].Recreate(o,edges[1].a),
-                (Edge)edges[0].Recreate(edges[1].a,edges[2].a),
-                (Edge)edges[0].Recreate(edges[2].a,o)}));
-            res.Add(Recreate(new List<Edge>{
-                (Edge)edges[0].Recreate(o,edges[^2].a),
-                (Edge)edges[0].Recreate(edges[^2].a,edges[^1].a),
-                (Edge)edges[0].Recreate(edges[^1].a,o)}));
+            for (int i=0;i+1<iB;i++) {
+                res.Add(Recreate(new List<Edge>{
+                    (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a),
+                    (Edge)edges[0].Recreate(edges[i+1].a,edges[iB].a),
+                    (Edge)edges[0].Recreate(edges[iB].a,edges[i].a)}));
+            }
+            for (int i=iE+1;i<n;i++) {
+                res.Add(Recreate(new List<Edge>{
+                    (Edge)edges[0].Recreate(edges[iE].a,edges[i].a),
+                    (Edge)edges[0].Recreate(edges[i].a,edges[(i+1)%n].a),
+                    (Edge)edges[0].Recreate(edges[(i+1)%n].a,edges[iE].a)}));
+            }
             return res;
         }
         public void MakeCounterClockwise(Point insidePoint) {
