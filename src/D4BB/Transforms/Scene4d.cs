@@ -15,13 +15,32 @@ namespace D4BB.Transforms
     public readonly List<Component> components3d = new();
     //public FacetsGenericMesh facetsMesh;
     //public EdgesGenericMesh edgesMesh;
-    public ICollection<IPolyhedron> facets = new List<IPolyhedron>();
-    public HashSet<IPolyhedron> edges = new();
+    // public ICollection<IPolyhedron> facets = new HashSet<IPolyhedron>();
+    // public HashSet<IPolyhedron> edges = new();
      
     public class Piece {
         public int[][] origins;
+        public List<Component> components3d = new();
         public Piece(int[][] origins) {
             this.origins = origins;
+        }
+        public HashSet<IPolyhedron> VisibleFacets() {
+            HashSet<IPolyhedron> res = new();
+            foreach (var component3d in components3d) {
+                foreach (var facet in component3d.pbc.VisibleFacets()) {
+                    res.Add(facet);
+                }
+            }
+            return res;
+        }
+        public HashSet<IPolyhedron> VisibleEdges() {
+            HashSet<IPolyhedron> res = new();
+            foreach (var component3d in components3d) {
+                foreach (var edge in component3d.pbc.VisibleEdges()) {
+                    res.Add(edge);
+                }
+            }
+            return res;
         }
     }
     public class Component {
@@ -87,6 +106,7 @@ namespace D4BB.Transforms
         foreach (var piece in pieces) {
             var pieceIBC = new IntegerBoundaryComplex(piece.origins); //contains 3d facets for each piece
             //selecting the cells that are in front of the camera and pointing to the 4d-Camera
+            piece.components3d.Clear();
             foreach (var component3dCells in pieceIBC.Components()) {
                 Point origin = new(component3dCells.First().origin);
                 Point normal = new(component3dCells.First().Normal());
@@ -103,6 +123,7 @@ namespace D4BB.Transforms
                         component3d.definingHalfSpaces.Add(DefiningHalfSpaces(cell,camera));
                     }
                     Debug.Assert(!components3d.Contains(component3d),"4840513520");
+                    piece.components3d.Add(component3d);
                     components3d.Add(component3d);
                 }
             }
@@ -121,44 +142,22 @@ namespace D4BB.Transforms
         //4d cam has 3d subsystem - we don't need a separate 3d cam
         //render the stuff
 
-        facets.Clear();
-        for (int i=0;i<components3d.Count;i++) {
-            //if (i==1) 
-            foreach (var facet in components3d[i].pbc.facets) {
-                facets.Add(facet);
-            }
-        }
-        //facetsMesh = new FacetsGenericMesh(facets.Cast<IPolyhedron>().ToHashSet(), withCenter: false, withVertexUVs: true);
+        // facets.Clear();
+        // for (int i=0;i<components3d.Count;i++) {
+        //     //if (i==1) 
+        //     foreach (var facet in components3d[i].pbc.facets) {
+        //         facets.Add(facet);
+        //     }
+        // }
+        // //facetsMesh = new FacetsGenericMesh(facets.Cast<IPolyhedron>().ToHashSet(), withCenter: false, withVertexUVs: true);
 
-        edges.Clear();
-        for (int i=0;i<components3d.Count;i++) {
-            foreach (var edge in components3d[i].pbc.VisibleEdges()) {
-                edges.Add(edge);
-            }
-        }
-        //edgesMesh = new EdgesGenericMesh(edges.Cast<IPolyhedron>().ToHashSet());
+        // edges.Clear();
+        // for (int i=0;i<components3d.Count;i++) {
+        //     foreach (var edge in components3d[i].pbc.VisibleEdges()) {
+        //         edges.Add(edge);
+        //     }
+        // }
+        // //edgesMesh = new EdgesGenericMesh(edges.Cast<IPolyhedron>().ToHashSet());
     }
-    public static Polyhedron Proj3d(IntegerCell integerCell, ICamera4d cam) {
-        return null;
-    }
-    public static List<Polyhedron> SortedCulled(List<IntegerBoundaryComplex> pieces, ICamera4d cam, bool doBackFaceCulling) {
-        
-        return null;
-    }
-
-    public static Polyhedron3dBoundaryComplex CutCubes(List<Polyhedron> polyhedrons) {
-        return null;
-    }
-
-    // public static Mesh TriangularMesh(Polyhedron3dBoundaryComplex pc) {
-    //     return null;
-    // }
-    // public static Mesh LinesMesh(Polyhedron3dBoundaryComplex pc) {
-    //     return null;
-    // }
-    // public static Mesh PointsMesh(Polyhedron3dBoundaryComplex pc) {
-    //     return null;
-    // }
-
 }
 }
