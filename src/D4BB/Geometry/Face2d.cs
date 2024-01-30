@@ -252,8 +252,8 @@ namespace D4BB.Geometry
             return res;
         }
         /* assumes polyhedron to be 2d */
-        public HashSet<Face2d> BoundaryTriangulation2d() {
-            var res = new HashSet<Face2d>();
+        public List<Face2d> BoundaryTriangulation2d() {
+            var res = new List<Face2d>();
             var n = edges.Count;
             var o = edges[0].a;
             int iB = -1;
@@ -272,17 +272,17 @@ namespace D4BB.Geometry
                 if (!AOP.Colinear1d(o.getPoint(),a,b)) break;
             }
             Debug.Assert(iE!=-1);
-            for (int i=iB;i<=iE-1;i++) {
-                res.Add(Recreate(new List<Edge>{
-                    (Edge)edges[0].Recreate(o,edges[i].a),
-                    (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a), //only using .a (reduces vertex count)
-                    (Edge)edges[0].Recreate(edges[i+1].a,o)}));
-            }
             for (int i=0;i+1<iB;i++) {
                 res.Add(Recreate(new List<Edge>{
                     (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a),
                     (Edge)edges[0].Recreate(edges[i+1].a,edges[iB].a),
                     (Edge)edges[0].Recreate(edges[iB].a,edges[i].a)}));
+            }
+            for (int i=iB;i<=iE-1;i++) {
+                res.Add(Recreate(new List<Edge>{
+                    (Edge)edges[0].Recreate(o,edges[i].a),
+                    (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a), //only using .a (reduces vertex count)
+                    (Edge)edges[0].Recreate(edges[i+1].a,o)}));
             }
             for (int i=iE+1;i<n;i++) {
                 res.Add(Recreate(new List<Edge>{
