@@ -147,10 +147,15 @@ namespace D4BB.CombTests
                     bool isFacing   = camera.IsFacedBy(origin,normal);
                     if (isFacing) facets.Add(facet);
                 }
+                int n = facets.Count;
                 facets.TSort(new InFrontOfCellComparer());
+                Assert.That(facets,Has.Count.EqualTo(n));
                 for (int i=0;i<facets.Count;i++) {
                     for (int j=i+1;j<facets.Count;j++) {
-                        Assert.That(InFrontOfCellComparer.IsInFrontOf(facets[i],facets[j])<=0,$"{facets[i]} !<= {facets[j]}");
+                        Assert.That(
+                            InFrontOfCellComparer.IsInFrontOf(facets[i],facets[j]),
+                            Is.LessThanOrEqualTo(0),
+                            $"{facets[i]} !<= {facets[j]}");
                     }
                 }
             }
