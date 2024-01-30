@@ -113,29 +113,72 @@ public class Face2dBCTests
         Assert.That(res.outer, Is.EqualTo(c1));
     }
     [Test] public void Triangulation2d() {
-        var square = new Face2dBC(new List<Point>(){
-            new Point(0,0,0), new Point(1,0,0), new Point(1,1,0), new Point(0,1,0)
-        },false, null);
-        var centerPoint = square.CenterPoint();
-        var triangles = square.CenterTriangulation2d(centerPoint);
-        Assert.That(triangles, Has.Count.EqualTo(4));
-        var center = new Point(0.5,0.5,0);
-        foreach (var triangle in triangles) {
-            var vs = triangle.points;
-            Assert.That(vs.Contains(center));
-            Assert.That(vs, Has.Count.EqualTo(3));
+        {
+            var square = new Face2dBC(new List<Point>(){
+                new Point(0,0,0), new Point(1,0,0), new Point(1,1,0), new Point(0,1,0)
+            },false, null);
+            var centerPoint = square.CenterPoint();
+            var triangles = square.CenterTriangulation2d(centerPoint);
+            Assert.That(triangles, Has.Count.EqualTo(4));
+            var center = new Point(0.5,0.5,0);
+            foreach (var triangle in triangles) {
+                var vs = triangle.points;
+                Assert.That(vs.Contains(center));
+                Assert.That(vs, Has.Count.EqualTo(3));
+            }
         }
-
-        square = new Face2dBC(new Face2d(new List<Point>(){
-            new Point(0,0,0), new Point(1,0,0), new Point(1,1,0), new Point(0,1,0)
-        }).facets,false,null);
-        triangles = square.BoundaryTriangulation2d();
-        Assert.That(triangles, Has.Count.EqualTo(2));
-        foreach (var triangle in triangles) {
-            var vs = triangle.points;
-            Assert.That(vs.Contains(new Point(0,0,0)));
-            Assert.That(vs, Has.Count.EqualTo(3));
+        {
+            var square = new Face2dBC(new Face2d(new List<Point>(){
+                new Point(0,0,0), new Point(1,0,0), new Point(1,1,0), new Point(0,1,0)
+            }).facets,false,null);
+            var triangles = square.BoundaryTriangulation2d();
+            Assert.That(triangles, Has.Count.EqualTo(2));
+            foreach (var triangle in triangles) {
+                var vs = triangle.points;
+                Assert.That(vs.Contains(new Point(0,0,0)));
+                Assert.That(vs, Has.Count.EqualTo(3));
+            }
         }
+    }
+    [Test] public void ColinearBoundaryTriangulation() {
+        List<Point> points = new() {
+            new(1,0,0),//0
+            new(2,0,0),//1
+            new(3,0,0),//2
+            new(4,0,0),//3
+            new(4,1,0),//4
+            new(0,1,0),//5
+            new(0,0,0),//6
+        };
+        var rectangle = new Face2d(points);
+        var triangles = rectangle.BoundaryTriangulation2d();
+        Assert.That(triangles[0],Is.EqualTo(new Face2d(new List<Point>{points[0],points[1],points[4]})));
+        Assert.That(triangles[1],Is.EqualTo(new Face2d(new List<Point>{points[1],points[2],points[4]})));
+        Assert.That(triangles[2],Is.EqualTo(new Face2d(new List<Point>{points[2],points[3],points[4]})));
+        Assert.That(triangles[3],Is.EqualTo(new Face2d(new List<Point>{points[0],points[4],points[5]})));
+        Assert.That(triangles[4],Is.EqualTo(new Face2d(new List<Point>{points[0],points[5],points[6]})));
+        Assert.That(triangles.Count==5);
+    }
+    [Test] public void ColinearBoundaryTriangulation2() {
+        List<Point> points = new() {
+            new(1,0,0),//0
+            new(2,0,0),//1
+            new(3,0,0),//2
+            new(4,0,0),//3
+            new(4,1,0),//4
+            new(0,1,0),//5
+            new(0,0,0),//6
+            new(0.5,0,0),//7
+        };
+        var rectangle = new Face2d(points);
+        var triangles = rectangle.BoundaryTriangulation2d();
+        Assert.That(triangles[0],Is.EqualTo(new Face2d(new List<Point>{points[0],points[1],points[4]})));
+        Assert.That(triangles[1],Is.EqualTo(new Face2d(new List<Point>{points[1],points[2],points[4]})));
+        Assert.That(triangles[2],Is.EqualTo(new Face2d(new List<Point>{points[2],points[3],points[4]})));
+        Assert.That(triangles[3],Is.EqualTo(new Face2d(new List<Point>{points[0],points[4],points[5]})));
+        Assert.That(triangles[4],Is.EqualTo(new Face2d(new List<Point>{points[7],points[5],points[6]})));
+        Assert.That(triangles[5],Is.EqualTo(new Face2d(new List<Point>{points[0],points[5],points[7]})));
+        Assert.That(triangles.Count==6);
     }
     [Test] public void PolyhedronSpanningPoints() {
         
