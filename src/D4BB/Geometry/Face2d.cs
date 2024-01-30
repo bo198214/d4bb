@@ -507,18 +507,22 @@ namespace D4BB.Geometry
                 // edges[i].b.PointRef().x = insetPoints[(i+1)%n].x;
             }
         }
+
+        public class NotInPlaneException : Exception {}
         /// <summary>
         /// 
         /// </summary>
         /// <param name="p">the point to check</param>
         /// <returns>1 if p is outside, 0 if on the boundary, -1 if inside (see HalfSpace)</returns>
-        public int Side(Point p) {
+        public int Containment(Point p) {
             Debug.Assert(p.dim()==3);
             Point n = Normal();
+            var a = edges[0].a.PointRef();
+            if (!AOP.eq(p.subtract(a).sc(n),0)) throw new NotInPlaneException();
             foreach (var edge in edges) {
-                var a = edge.a.PointRef();
+                a = edge.a.PointRef();
                 var ab = edge.b.getPoint().subtract(a).normalize();
-                var hs = new HalfSpace(edge.a.getPoint(),AOP.cross(n,ab).normalize());
+                var hs = new HalfSpace(edge.a.getPoint(),AOP.cross(ab,n).normalize());
                 var side = hs.side(p);
                 if (side==HalfSpace.OUTSIDE) return side;
                 if (side==HalfSpace.CONTAINED) {
@@ -529,12 +533,14 @@ namespace D4BB.Geometry
             return -1;
         }
         public bool IsContained(Face2d facet) {
-            var n = Normal();
             foreach (var edge in facet.edges) {
                 var p = edge.a.getPoint();
                 var a = edges[0].a.PointRef();
-                if (!AOP.eq(p.subtract(a).sc(n),0)) return false;
-                if (Side(p)==HalfSpace.OUTSIDE) {
+                try {
+                    if (Containment(p)==HalfSpace.OUTSIDE) {
+                        return false;
+                    }
+                } catch (NotInPlaneException) {
                     return false;
                 }
             }
