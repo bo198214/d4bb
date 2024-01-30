@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using D4BB.Comb;
 using D4BB.Geometry;
+using static D4BB.General.TopologicalSort;
 
 
 namespace D4BB.Transforms
@@ -130,7 +131,7 @@ namespace D4BB.Transforms
         }
         //for those 3d-facets now calculate an order and sort the list accordingly
         //it is dependent on the camera only as far the facing components are concerned
-        components3d.Sort(new InFrontOfComponentComparer());
+        components3d.TSort(new InFrontOfComponentComparer());
 
         // cut out (in 3d) according to list order (if 4d cam moves 3d cut points needs to be recalculated, non-cut-points can just be exchanged)
         for (int i=0;i<components3d.Count;i++) {
@@ -140,25 +141,6 @@ namespace D4BB.Transforms
                 }
             }
         }
-        //4d cam has 3d subsystem - we don't need a separate 3d cam
-        //render the stuff
-
-        // facets.Clear();
-        // for (int i=0;i<components3d.Count;i++) {
-        //     //if (i==1) 
-        //     foreach (var facet in components3d[i].pbc.facets) {
-        //         facets.Add(facet);
-        //     }
-        // }
-        // //facetsMesh = new FacetsGenericMesh(facets.Cast<IPolyhedron>().ToHashSet(), withCenter: false, withVertexUVs: true);
-
-        // edges.Clear();
-        // for (int i=0;i<components3d.Count;i++) {
-        //     foreach (var edge in components3d[i].pbc.VisibleEdges()) {
-        //         edges.Add(edge);
-        //     }
-        // }
-        // //edgesMesh = new EdgesGenericMesh(edges.Cast<IPolyhedron>().ToHashSet());
     }
 }
 }
