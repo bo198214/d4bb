@@ -215,6 +215,18 @@ public class Face2dBCTests
         Assert.That(triangles[1],Is.EqualTo(new Face2d(new List<Point>{points[1],points[3],points[4]})));
         Assert.That(triangles[2],Is.EqualTo(new Face2d(new List<Point>{points[1],points[4],points[0]})));
     }
+    [Test] public void TriangleDivisionBase11BoundaryTriangulation() {
+        var points = new List<Point>{
+            new(0,0,0),new(1,0,0),new(2,0,0),new(0,1,0),new(-2,0,0),new(-1,0,0)
+        };
+        var triangle = new Face2d(points);
+        var triangles = triangle.BoundaryTriangulation2d();
+        Assert.That(triangles,Has.Count.EqualTo(4));
+        Assert.That(triangles[0],Is.EqualTo(new Face2d(new List<Point>{points[0],points[1],points[3]})));
+        Assert.That(triangles[1],Is.EqualTo(new Face2d(new List<Point>{points[1],points[2],points[3]})));
+        Assert.That(triangles[2],Is.EqualTo(new Face2d(new List<Point>{points[3],points[4],points[5]})));
+        Assert.That(triangles[3],Is.EqualTo(new Face2d(new List<Point>{points[3],points[5],points[0]})));
+    }
     [Test] public void PolyhedronSpanningPoints() {
         
         HashSet<Point> svs;
