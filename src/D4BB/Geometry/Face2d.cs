@@ -257,7 +257,6 @@ namespace D4BB.Geometry
         }
         /* assumes polyhedron to be 2d */
         public List<Face2d> BoundaryTriangulation2d() {
-            var res = new List<Face2d>();
             var n = edges.Count;
             var o = edges[0].a;
             int iB = -1;
@@ -276,25 +275,53 @@ namespace D4BB.Geometry
                 if (!AOP.Colinear1d(o.getPoint(),a,b)) break;
             }
             Debug.Assert(iE!=-1);
-            for (int i=0;i+1<iB;i++) {
-                res.Add(Recreate(new List<Edge>{
-                    (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a),
-                    (Edge)edges[0].Recreate(edges[i+1].a,edges[iB].a),
-                    (Edge)edges[0].Recreate(edges[iB].a,edges[i].a)}));
+            if (iB>iE && iB==2 && iE==n-2) { //undivided triangle
+                Debug.Assert(n==3);
+                return new List<Face2d> {Recreate(new List<Edge>{
+                    (Edge)edges[0].Recreate(edges[0].a,edges[1].a),
+                    (Edge)edges[0].Recreate(edges[1].a,edges[2].a),
+                    (Edge)edges[0].Recreate(edges[2].a,edges[0].a)
+                })};
             }
-            for (int i=iB;i<=iE-1;i++) {
-                res.Add(Recreate(new List<Edge>{
-                    (Edge)edges[0].Recreate(o,edges[i].a),
-                    (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a), //only using .a (reduces vertex count)
-                    (Edge)edges[0].Recreate(edges[i+1].a,o)}));
+            if (iB>iE && iB > 2 && iE < n-2) {
+                //beginning and end is subdivided
+                var res = new List<Face2d>();
+                for (int i=1;i+1<iB;i++) {
+                    res.Add(Recreate(new List<Edge>{
+                        (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a),
+                        (Edge)edges[0].Recreate(edges[i+1].a,edges[iB].a),
+                        (Edge)edges[0].Recreate(edges[iB].a,edges[i].a)}));
+                }
+                for (int i=iE+1;i<n;i++) {
+                    res.Add(Recreate(new List<Edge>{
+                        (Edge)edges[0].Recreate(edges[1].a,edges[i].a),
+                        (Edge)edges[0].Recreate(edges[i].a,edges[(i+1)%n].a),
+                        (Edge)edges[0].Recreate(edges[(i+1)%n].a,edges[1].a)}));
+                }
+                return res;
             }
-            for (int i=iE+1;i<n;i++) {
-                res.Add(Recreate(new List<Edge>{
-                    (Edge)edges[0].Recreate(edges[iE].a,edges[i].a),
-                    (Edge)edges[0].Recreate(edges[i].a,edges[(i+1)%n].a),
-                    (Edge)edges[0].Recreate(edges[(i+1)%n].a,edges[iE].a)}));
+            {
+                var res = new List<Face2d>();
+                if (iB<=iE||iE==n-2) for (int i=0;i+1<iB;i++) {
+                    res.Add(Recreate(new List<Edge>{
+                        (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a),
+                        (Edge)edges[0].Recreate(edges[i+1].a,edges[iB].a),
+                        (Edge)edges[0].Recreate(edges[iB].a,edges[i].a)}));
+                }
+                for (int i=iB;i<=iE-1;i++) {
+                    res.Add(Recreate(new List<Edge>{
+                        (Edge)edges[0].Recreate(o,edges[i].a),
+                        (Edge)edges[0].Recreate(edges[i].a,edges[i+1].a), //only using .a (reduces vertex count)
+                        (Edge)edges[0].Recreate(edges[i+1].a,o)}));
+                }
+                if (iB<=iE||iB==2) for (int i=iE+1;i<n;i++) {
+                    res.Add(Recreate(new List<Edge>{
+                        (Edge)edges[0].Recreate(edges[iE].a,edges[i].a),
+                        (Edge)edges[0].Recreate(edges[i].a,edges[(i+1)%n].a),
+                        (Edge)edges[0].Recreate(edges[(i+1)%n].a,edges[iE].a)}));
+                }
+                return res;
             }
-            return res;
         }
         public void MakeCounterClockwise(Point insidePoint) {
             Edge edge1 = edges[^1];
