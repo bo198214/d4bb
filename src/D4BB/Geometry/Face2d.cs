@@ -532,7 +532,7 @@ namespace D4BB.Geometry
             }
             return -1;
         }
-        public bool IsContained(Face2d facet) {
+        public bool Contains(Face2d facet) {
             foreach (var edge in facet.edges) {
                 var p = edge.a.getPoint();
                 var a = edges[0].a.PointRef();

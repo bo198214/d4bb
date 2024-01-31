@@ -101,6 +101,24 @@ namespace D4BB.Transforms
         }
         return res;
     }
+    public Dictionary<Face2dBC,Face2dBC> ContainedFacetsInComponents() {
+        Dictionary<Face2dBC,Face2dBC> res = new();
+        List<Face2dBC> pool = new();
+        foreach (var component3d in components3d) {
+            pool.AddRange(component3d.pbc.facets);
+        }
+        foreach (var component3d in components3d) {
+            foreach (var facet1 in component3d.pbc.facets) {
+                pool.Remove(facet1);
+                foreach (var facet2 in pool) {
+                    if (facet1.Contains(facet2)) {
+                        res[facet2]=facet1;
+                    }
+                }
+            }
+        }
+        return res;
+    }
     public void ReCalculate() {
         //Take the pieces and calculate the 3d IntegerBoundaryComplexes
         components3d.Clear();

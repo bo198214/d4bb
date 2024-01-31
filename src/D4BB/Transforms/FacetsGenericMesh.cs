@@ -26,6 +26,8 @@ public class FacetsGenericMesh {
     public List<ushort> triangles;
     public List<double[]> uvs;
     public List<double[]> normals;
+    public List<Face2dWithIntegerCellAttribute> debugPolyTriangles;
+
     public double[] CenterPoint() {
         double[] center = null;
         foreach (var vertex in vertices) {
@@ -150,6 +152,7 @@ public class FacetsGenericMesh {
         if (withVertexNormals) normals   = new();
 
         List<Face2dWithIntegerCellAttribute> polyTriangles = new();
+        debugPolyTriangles = polyTriangles;
 
         foreach (var pFacet in faces2d) {
             // var insetPoints = AOP.Inset3d(((Face2d)pFacet).points,0.01);
@@ -182,6 +185,7 @@ public class FacetsGenericMesh {
         foreach (var pt in polyTriangles) {
             var triangleVertices = pt.GetVertices();
             var normal = pt.Normal();
+            Debug.Assert(AOP.eq(pt.Normal().len(),1));
             foreach (var v in triangleVertices) {
                 Point p = v.getPoint();
                 if (!vertexNumbers.ContainsKey(v)) {
@@ -205,5 +209,22 @@ public class FacetsGenericMesh {
                 //}
             }
         }
+    }
+    public Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> ContainedFacetsInComponents() {
+        Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> res = new();
+        List<Face2dWithIntegerCellAttribute> pool = new(debugPolyTriangles);
+        foreach (var facet1 in debugPolyTriangles) {
+            pool.Remove(facet1);
+            foreach (var facet2 in pool) {
+                try {
+                    if (facet1.Containment(facet2.CenterPoint())==HalfSpace.INSIDE) {
+                        res[facet2]=facet1;
+                    }
+                } catch (Face2d.NotInPlaneException) {
+
+                }
+            }
+        }
+        return res;
     }
 }}

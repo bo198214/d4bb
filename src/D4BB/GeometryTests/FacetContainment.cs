@@ -65,14 +65,14 @@ namespace D4BB.GeometryTests
             Face2d square = new(new List<Point>{
                 new(0,0,0),new(1,0,0),new(1,1,0),new(0,1,0)
             });
-            Assert.That(square.IsContained(square));
+            Assert.That(square.Contains(square));
             Face2d triangle = new(new List<Point>{
                 new(0,0,0),new(1,0,0),new(1,1,0)
             });
-            Assert.That(triangle.IsContained(triangle));
+            Assert.That(triangle.Contains(triangle));
             
-            Assert.That(square.IsContained(triangle),Is.True);
-            Assert.That(triangle.IsContained(square),Is.False);
+            Assert.That(square.Contains(triangle),Is.True);
+            Assert.That(triangle.Contains(square),Is.False);
         }
     }
 }
