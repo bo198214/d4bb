@@ -180,6 +180,41 @@ public class Face2dBCTests
         Assert.That(triangles[5],Is.EqualTo(new Face2d(new List<Point>{points[0],points[5],points[7]})));
         Assert.That(triangles.Count==6);
     }
+    [Test] public void TriangleBoundaryTriangulation() {
+        var triangle = new Face2d(new List<Point>{
+            new(0,0,0),new(1,0,0),new(1,1,0)
+        });
+        var triangles = triangle.BoundaryTriangulation2d();
+        Assert.That(triangles,Has.Count.EqualTo(1));
+        Assert.That(triangles[0],Is.EqualTo(triangle));
+    }
+    [Test] public void TriangleDivision10BoundaryTriangulation() {
+        var triangle = new Face2d(new List<Point>{
+            new(0,0,0),new(0.5,0,0),new(1,0,0),new(1,1,0)
+        });
+        var triangles = triangle.BoundaryTriangulation2d();
+        Assert.That(triangles,Has.Count.EqualTo(2));
+        //Assert.That(triangles[0],Is.EqualTo(triangle));
+    }
+    [Test] public void TriangleDivision01BoundaryTriangulation() {
+        var triangle = new Face2d(new List<Point>{
+            new(0,0,0),new(1,0,0),new(0,1,0),new(0,0.5,0)
+        });
+        var triangles = triangle.BoundaryTriangulation2d();
+        Assert.That(triangles,Has.Count.EqualTo(2));
+        //Assert.That(triangles[0],Is.EqualTo(triangle));
+    }
+    [Test] public void TriangleDivision11BoundaryTriangulation() {
+        var points = new List<Point>{
+            new(0,0,0),new(0.5,0,0),new(1,0,0),new(0,1,0),new(0,0.5,0)
+        };
+        var triangle = new Face2d(points);
+        var triangles = triangle.BoundaryTriangulation2d();
+        Assert.That(triangles,Has.Count.EqualTo(3));
+        Assert.That(triangles[0],Is.EqualTo(new Face2d(new List<Point>{points[1],points[2],points[3]})));
+        Assert.That(triangles[1],Is.EqualTo(new Face2d(new List<Point>{points[1],points[3],points[4]})));
+        Assert.That(triangles[2],Is.EqualTo(new Face2d(new List<Point>{points[1],points[4],points[0]})));
+    }
     [Test] public void PolyhedronSpanningPoints() {
         
         HashSet<Point> svs;
