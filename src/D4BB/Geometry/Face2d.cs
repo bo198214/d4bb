@@ -518,7 +518,7 @@ namespace D4BB.Geometry
             Debug.Assert(p.dim()==3);
             Point n = Normal();
             var a = edges[0].a.PointRef();
-            if (!AOP.eq(p.subtract(a).sc(n),0)) throw new NotInPlaneException();
+            if (!AOP.eq(p.clone().subtract(a).sc(n),0)) throw new NotInPlaneException();
             foreach (var edge in edges) {
                 a = edge.a.PointRef();
                 var ab = edge.b.getPoint().subtract(a).normalize();
@@ -535,7 +535,6 @@ namespace D4BB.Geometry
         public bool Contains(Face2d facet) {
             foreach (var edge in facet.edges) {
                 var p = edge.a.getPoint();
-                var a = edges[0].a.PointRef();
                 try {
                     if (Containment(p)==HalfSpace.OUTSIDE) {
                         return false;

@@ -74,5 +74,30 @@ namespace D4BB.GeometryTests
             Assert.That(square.Contains(triangle),Is.True);
             Assert.That(triangle.Contains(square),Is.False);
         }
+        [Test] public void TriangulationContainmentTriangle() {
+            Face2d triangle = new(new List<Point>{
+                new(0,0,0),new(1,0,0),new(1,1,0)
+            });
+            Assert.That(triangle.Contains(triangle));
+            var triangles = triangle.BoundaryTriangulation2d();
+            foreach (var t in triangles) {
+                Assert.That(triangle.Contains(t),Is.True,$"{triangle} does not contain {t}");
+            }
+        }
+        [Test] public void TriangleContainsTriangle() {
+            Face2d triangle1 = new(new List<Point>{
+                new(0,0,0),new(1,0,0),new(1,1,0)
+            });
+            Assert.That(triangle1.Contains(triangle1));
+            Face2d triangle2 = new(new List<Point>{
+                new(1,0,0),new(1,1,0),new(0,0,0)
+            });
+            var contains = triangle2.Contains(triangle2);
+            Assert.That(contains);
+
+            Assert.That(triangle1.Contains(triangle2));
+            Assert.That(triangle2.Contains(triangle1));
+        }
+
     }
 }

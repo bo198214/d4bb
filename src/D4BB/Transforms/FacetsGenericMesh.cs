@@ -216,12 +216,14 @@ public class FacetsGenericMesh {
         foreach (var facet1 in debugPolyTriangles) {
             pool.Remove(facet1);
             foreach (var facet2 in pool) {
-                try {
-                    if (facet1.Containment(facet2.CenterPoint())==HalfSpace.INSIDE) {
-                        res[facet2]=facet1;
-                    }
-                } catch (Face2d.NotInPlaneException) {
+                // try {
+                // var containment = facet1.Containment(facet2.CenterPoint());
+                //     }
+                // } catch (Face2d.NotInPlaneException) {
 
+                //    if (containment==HalfSpace.INSIDE) {
+                    if (facet1.Contains(facet2)) {
+                        res[facet2]=facet1;
                 }
             }
         }
