@@ -133,7 +133,7 @@ public class FacetsGenericMesh {
         return AOP.Params(xv,yv,pv);
     }
 
-    public FacetsGenericMesh(ICollection<IPolyhedron> faces2d, double inset = 0,
+    public FacetsGenericMesh(ICollection<Face2d> faces2d, double inset = 0,
             bool withVertexNormals=true, 
             bool withVertexUVs=true,
             bool duplicateVertices=true,

@@ -1,3 +1,4 @@
+using System;
 using D4BB.Geometry;
 
 namespace D4BB.Transforms {
@@ -8,7 +9,7 @@ public class Camera4dOrthographic : ICamera4d
     public Point4d viewNormal { get { return v[3]; } }
 	private double clipDist = 0.3;
   	private double zoom3d = 1;
-	protected readonly Point4d initialEye = (Point4d)new Point4d(1,1,1,-1).normalize();
+	protected readonly Point4d initialEye = new (0.5,0.5,0.5,-2);
 	protected readonly Point4d[] initialV = new Point4d[] {new(1,0,0,0),new(0,1,0,0),new(0,0,1,0),new(0,0,0,1)};
     public Camera4dOrthographic() {
         eye = initialEye;

@@ -390,7 +390,7 @@ public class Face2dBCTests
         pbc.CutOut(new HalfSpace[] {cutLeftRight,cutUpDown});
         var visibleFacets = pbc.VisibleFacets();
         Assert.That(visibleFacets, Has.Count.EqualTo(8));
-        var cm = new FacetsGenericMesh(pbc.facets.Cast<IPolyhedron>().ToHashSet());
+        var cm = new FacetsGenericMesh(pbc.facets.Cast<Face2d>().ToHashSet());
     }
 }
 }

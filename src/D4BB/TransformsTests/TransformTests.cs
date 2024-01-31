@@ -28,22 +28,22 @@ public class TransformTests {
         Assert.That(vertices, Has.Count.EqualTo(8*3*2));
 
         cube = Face2dBC.FromIntegerCell(new int[]{0,0,0});
-        var cm = new FacetsGenericMesh(cube.facets,withCenter: false, duplicateVertices: false);
+        var cm = new FacetsGenericMesh(cube.facets.Cast<Face2d>().ToHashSet(),withCenter: false, duplicateVertices: false);
         Assert.That(cm.triangles.Count,Is.EqualTo(6*2*3));
         Assert.That(cm.vertices.Count,Is.EqualTo(8));
 
         cube = Face2dBC.FromIntegerCell(new int[]{0,0,0});
-        cm = new FacetsGenericMesh(cube.facets,withCenter: true, duplicateVertices: false);
+        cm = new FacetsGenericMesh(cube.facets.Cast<Face2d>().ToHashSet(),withCenter: true, duplicateVertices: false);
         Assert.That(cm.triangles.Count,Is.EqualTo(6*4*3));
         Assert.That(cm.vertices.Count,Is.EqualTo(8+6));
 
         cube = Face2dBC.FromIntegerCell(new int[]{0,0,0});
-        cm = new FacetsGenericMesh(cube.facets,withCenter: false, duplicateVertices: true);
+        cm = new FacetsGenericMesh(cube.facets.Cast<Face2d>().ToHashSet(),withCenter: false, duplicateVertices: true);
         Assert.That(cm.triangles.Count,Is.EqualTo(6*2*3));
         Assert.That(cm.vertices.Count,Is.EqualTo(8*3));
 
         cube = Face2dBC.FromIntegerCell(new int[]{0,0,0});
-        cm = new FacetsGenericMesh(cube.facets,withCenter: true, duplicateVertices: true);
+        cm = new FacetsGenericMesh(cube.facets.Cast<Face2d>().ToHashSet(),withCenter: true, duplicateVertices: true);
         Assert.That(cm.triangles.Count,Is.EqualTo(6*4*3));
         Assert.That(cm.vertices.Count,Is.EqualTo(8*3+6));
     }
@@ -93,7 +93,7 @@ public class TransformTests {
         {
             var ic = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
             var pc = new PolyhedralComplex(new HashSet<IPolyhedron>{ic});
-            var cm = new FacetsGenericMesh(pc.CalculateVisibleFacets(),duplicateVertices:false,withCenter: false);
+            var cm = new FacetsGenericMesh(pc.CalculateVisibleFacets().Cast<Face2d>().ToHashSet(),duplicateVertices:false,withCenter: false);
             Assert.That(cm.vertices.Count, Is.EqualTo(8));
             Assert.That(cm.triangles.Count, Is.EqualTo(6*2*3));
         }
@@ -101,7 +101,7 @@ public class TransformTests {
             var ic = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
             var ic2 = Face2dBC.FromIntegerCell(new int[] { 1, 0, 0 });
             var pc = new PolyhedralComplex(new HashSet<IPolyhedron>{ic,ic2});
-            var cm = new FacetsGenericMesh(pc.CalculateVisibleFacets(),duplicateVertices:false,withCenter: false);
+            var cm = new FacetsGenericMesh(pc.CalculateVisibleFacets().Cast<Face2d>().ToHashSet(),duplicateVertices:false,withCenter: false);
             Assert.That(cm.vertices.Count, Is.EqualTo(12));
             Assert.That(cm.triangles.Count, Is.EqualTo(10*2*3));
         }
@@ -122,16 +122,16 @@ public class TransformTests {
             var edgesCount = 3+8+1+8+4;
             Assert.That(pc2.CalculateVisibleFaces(1).Count,Is.EqualTo(facetsCount));
             Assert.That(pc2.CalculateVisibleFaces(2).Count,Is.EqualTo(edgesCount));
-            var cm = new FacetsGenericMesh(pc2.CalculateVisibleFacets(),withCenter: true, withVertexUVs: true);
+            var cm = new FacetsGenericMesh(pc2.CalculateVisibleFacets().Cast<Face2d>().ToHashSet(),withCenter: true, withVertexUVs: true);
             Assert.That(true);
     }
     [Test] public void Inset() {
         {
             var face2d1 = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,1},true,true));
             var face2d2 = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,1},true,true));
-            var cm1 = new FacetsGenericMesh(new HashSet<IPolyhedron>{face2d1},withCenter: false, withVertexUVs: true);
+            var cm1 = new FacetsGenericMesh(new HashSet<Face2d>{face2d1},withCenter: false, withVertexUVs: true);
             face2d2.Inset(0.25);
-            var cm2 = new FacetsGenericMesh(new HashSet<IPolyhedron>{face2d2},withCenter: false, withVertexUVs: true);
+            var cm2 = new FacetsGenericMesh(new HashSet<Face2d>{face2d2},withCenter: false, withVertexUVs: true);
             Assert.That(cm2.vertices, Has.Count.EqualTo(cm1.vertices.Count));
             Assert.That(cm2.triangles, Has.Count.EqualTo(cm1.triangles.Count));
         }
@@ -149,8 +149,8 @@ public class TransformTests {
             }
             var pc2faces = pc2.Faces(2);
             Assert.That(pc2faces,Has.Count.EqualTo(pc1.Faces(2).Count));
-            var cm1 = new FacetsGenericMesh(pc1.Faces(2),withCenter: false,withVertexUVs: true);
-            var cm2 = new FacetsGenericMesh(pc2.Faces(2),withCenter: false,withVertexUVs: true);
+            var cm1 = new FacetsGenericMesh(pc1.Faces(2).Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
+            var cm2 = new FacetsGenericMesh(pc2.Faces(2).Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
             Assert.That(cm2.vertices,Has.Count.EqualTo(cm1.vertices.Count));
             Assert.That(cm2.triangles,Has.Count.EqualTo(cm1.triangles.Count));
         }

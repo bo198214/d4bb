@@ -261,6 +261,7 @@ public class AOP {
 	static public readonly Point4d D1000 = UNITVECTOR4[0];
 	static public readonly Point3d D100 = UNITVECTOR3[0];
 
+	public const int precision = 5;
 	public  const double ERR = 0.00001;
 	public static bool isZero(double x, double err=ERR) {
 		return Math.Abs(x) < err;

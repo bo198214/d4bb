@@ -25,8 +25,8 @@ namespace D4BB.Transforms
         public Piece(int[][] origins) {
             this.origins = origins;
         }
-        public HashSet<IPolyhedron> VisibleFacets() {
-            HashSet<IPolyhedron> res = new();
+        public HashSet<Face2d> VisibleFacets() {
+            HashSet<Face2d> res = new(new Face2dUnOrientedEquality(AOP.precision)){};
             foreach (var component3d in components3d) {
                 foreach (var facet in component3d.pbc.VisibleFacets()) {
                     res.Add(facet);
@@ -39,6 +39,24 @@ namespace D4BB.Transforms
             foreach (var component3d in components3d) {
                 foreach (var edge in component3d.pbc.VisibleEdges()) {
                     res.Add(edge);
+                }
+            }
+            return res;
+        }
+        public Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> ContainedFacetsInComponents() {
+            Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> res = new();
+            List<Face2dBC> pool = new();
+            foreach (var component3d in components3d) {
+                pool.AddRange(component3d.pbc.facets);
+            }
+            foreach (var component3d in components3d) {
+                foreach (var facet1 in component3d.pbc.facets) {
+                    pool.Remove(facet1);
+                    foreach (var facet2 in pool) {
+                        if (facet1.Contains(facet2)) {
+                            res[facet2]=facet1;
+                        }
+                    }
                 }
             }
             return res;

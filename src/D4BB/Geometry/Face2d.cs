@@ -88,15 +88,15 @@ namespace D4BB.Geometry
             res.multiply(1.0/edges.Count);
             return res;
         }
-        public static bool RotationEqual(List<Point> points1, List<Point> points2) {
+        public static bool RotationEqual(List<Point> points1, List<Point> points2, int precision=AOP.precision) {
             if (points1.Count!=points2.Count) return false;
             if (points1.Count==0) return true;
             for (int i=0;i<points2.Count;i++) {
-                if (points1[0].Equals(points2[i])) { 
+                if (points1[0].Equals(points2[i],precision)) { 
                     var off=i; 
                     var isEqual = true;
                     for (int j=0;j<points2.Count;j++) {
-                        if (!points1[j].Equals(points2[(j+off)%points2.Count])) {
+                        if (!points1[j].Equals(points2[(j+off)%points2.Count],precision)) {
                             isEqual=false;
                             break;
                         }
@@ -106,26 +106,35 @@ namespace D4BB.Geometry
             }
             return false;
         }
-        public static bool RotationEqual(List<Edge> edges1, List<Edge> edges2) { 
+        public static bool RotationEqual(List<Edge> edges1, List<Edge> edges2, int precision=AOP.precision) { 
             return RotationEqual(
                 edges1.Select(edge => edge.a.getPoint()).ToList(),
-                edges2.Select(edge => edge.a.getPoint()).ToList()
+                edges2.Select(edge => edge.a.getPoint()).ToList(),
+                precision
             );}
-        public bool OrientedEquals(Face2d other) {
-            return RotationEqual(this.edges,other.edges);
+        public static bool Face2dOrientedEquals(Face2d a,Face2d b, int precision=AOP.precision) {
+            return RotationEqual(a.edges,b.edges, precision);
+        }
+        public static bool Face2dUnOrientedEquals(Face2d a, Face2d b,int precision=AOP.precision) {
+            if (RotationEqual(a.edges,b.edges,precision)) return true;
+            var aReversedEdges = new List<Edge>(a.edges);
+            aReversedEdges.Reverse();
+            return RotationEqual(aReversedEdges,b.edges,precision);
         }
         public override bool Equals(object obj) {
             if (obj==null) return false;
-            var otherEdges = ((Face2d) obj).edges;
-            var otherEdgesReversed = new List<Edge>(otherEdges);
-            otherEdgesReversed.Reverse();
-            return RotationEqual(this.edges,otherEdges) || RotationEqual(this.edges,otherEdgesReversed);
+            var other = (Face2d) obj;
+            return Face2dUnOrientedEquals(this,other);
         }
         public override int GetHashCode()
         {
+            return GetHashCode(AOP.precision);
+        }
+        public int GetHashCode(int precision)
+        {
             int res = 0;
             foreach (var edge in edges) {
-                res += edge.a.GetHashCode();
+                res += edge.a.PointRef().GetHashCode(precision);
             }
             return res;
         }
@@ -614,6 +623,38 @@ namespace D4BB.Geometry
         public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) { 
 
             return new Face2dWithIntegerCellAttribute(facets, isInvisible, integerCell);
+        }
+    }
+    public class Face2dOrientedEquality : IEqualityComparer<Face2d>
+    {
+        public readonly int precision;
+        public Face2dOrientedEquality(int precision) {
+            this.precision = precision;
+        }
+        public bool Equals(Face2d x, Face2d y)
+        {
+            return Face2d.Face2dOrientedEquals(x,y,precision);
+        }
+
+        public int GetHashCode(Face2d obj)
+        {
+            return obj.GetHashCode(precision);
+        }
+    }
+    public class Face2dUnOrientedEquality : IEqualityComparer<Face2d>
+    {
+        public readonly int precision;
+        public Face2dUnOrientedEquality(int precision) {
+            this.precision = precision;
+        }
+        public bool Equals(Face2d x, Face2d y)
+        {
+            return Face2d.Face2dUnOrientedEquals(x,y,precision);
+        }
+
+        public int GetHashCode(Face2d obj)
+        {
+            return obj.GetHashCode(precision);
         }
     }
 }

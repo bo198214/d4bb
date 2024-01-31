@@ -35,7 +35,7 @@ namespace D4BB.Geometry
         public int dim() {
             return x.Length;
         }
-        override public bool Equals(Object obj) {
+        override public bool Equals(object obj) {
             if (obj==null) { return false; }
             Point p = (Point) obj;
             if (x.Length!=p.x.Length) { return false; }
@@ -46,11 +46,28 @@ namespace D4BB.Geometry
     //		return true;
         }
 
+        public bool Equals(object obj, int precision) {
+            if (obj==null) { return false; }
+            Point p = (Point) obj;
+            if (x.Length!=p.x.Length) { return false; }
+    		for (int i=0;i<x.Length;i++) {
+    			if (Math.Round(x[i],precision)!=Math.Round(p.x[i],precision)) { return false; }
+    		}
+    		return true;
+        }
         public override int GetHashCode()
         {
             int res = 0;
             for (int i=0;i<x.Length;i++) {
                 res += x[i].GetHashCode();
+            }
+            return res;
+        }
+        public int GetHashCode(int precision)
+        {
+            int res = 0;
+            for (int i=0;i<x.Length;i++) {
+                res += Math.Round(x[i],precision).GetHashCode();
             }
             return res;
         }
