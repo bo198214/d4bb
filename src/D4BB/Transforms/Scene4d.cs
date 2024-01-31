@@ -43,19 +43,14 @@ namespace D4BB.Transforms
             }
             return res;
         }
-        public Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> ContainedFacetsInComponents() {
-            Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> res = new();
-            List<Face2dBC> pool = new();
-            foreach (var component3d in components3d) {
-                pool.AddRange(component3d.pbc.facets);
-            }
-            foreach (var component3d in components3d) {
-                foreach (var facet1 in component3d.pbc.facets) {
-                    pool.Remove(facet1);
-                    foreach (var facet2 in pool) {
-                        if (facet1.Contains(facet2)) {
-                            res[facet2]=facet1;
-                        }
+        public Dictionary<Face2d,Face2d> ContainedFacetsInComponents(HashSet<Face2d> facets) {
+            Dictionary<Face2d,Face2d> res = new();
+            List<Face2d> pool = new(facets);
+            foreach (var facet1 in facets) {
+                pool.Remove(facet1);
+                foreach (var facet2 in pool) {
+                    if (facet1.Contains(facet2)) {
+                        res[facet2]=facet1;
                     }
                 }
             }
@@ -67,6 +62,7 @@ namespace D4BB.Transforms
         public HashSet<OrientedIntegerCell> cells;
         public Polyhedron3dBoundaryComplex pbc;
         public List<HalfSpace[]> definingHalfSpaces = new();
+        // public List<Face2dBC> distinguishedFacets = new();
         public override bool Equals(object obj)
         {
             var other = (Component) obj;
@@ -169,11 +165,27 @@ namespace D4BB.Transforms
         //it is dependent on the camera only as far the facing components are concerned
         components3d.TSort(new InFrontOfComponentComparer());
 
+        // //before cutting we make sure to remove doublet facets
+        // HashSet<Face2dBC> facets = new();
+        // for (int i=0;i<components3d.Count;i++) {
+        //     components3d[i].distinguishedFacets.Clear();
+        //     foreach (var facet in components3d[i].pbc.facets) {
+        //         if (facets.TryGetValue(facet, out var f)) {
+        //             components3d[i].distinguishedFacets.Add(f);
+        //         } else {
+        //             facets.Add(facet);
+        //             components3d[i].distinguishedFacets.Add(facet);
+        //         }
+        //     }
+        // }
         // cut out (in 3d) according to list order (if 4d cam moves 3d cut points needs to be recalculated, non-cut-points can just be exchanged)
         for (int i=0;i<components3d.Count;i++) {
             for (int j=i+1;j<components3d.Count;j++) {
                 foreach (var halfSpaces in components3d[j].definingHalfSpaces) {
                     components3d[i].pbc.CutOut(halfSpaces);
+                    // components3d[i].distinguishedFacets = 
+                    //     Polyhedron3dBoundaryComplex.CutOut(components3d[i].distinguishedFacets,halfSpaces);
+                    
                 }
             }
         }
