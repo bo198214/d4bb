@@ -126,6 +126,11 @@ namespace D4BB.Geometry
             var other = (Face2d) obj;
             return Face2dUnOrientedEquals(this,other);
         }
+        public bool Equals(object obj, int precision) {
+            if (obj==null) return false;
+            var other = (Face2d) obj;
+            return Face2dUnOrientedEquals(this,other,precision);
+        }
         public override int GetHashCode()
         {
             return GetHashCode(AOP.precision);
