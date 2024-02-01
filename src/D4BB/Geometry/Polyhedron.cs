@@ -4,11 +4,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using D4BB.Comb;
-using D4BB.Transforms;
 
 namespace D4BB.Geometry
 {
-    public struct SplitResult {
+    public class SplitResult {
         /* following combinations are possible:
         isContained false:
             if innerCut is defined, then also inner has to be defined, same with outer
@@ -30,7 +29,9 @@ namespace D4BB.Geometry
         public IPolyhedron outerCut;
         public IPolyhedron outer;
         public bool isContained;
-        public readonly SplitResult CrossReference(IPolyhedron orig, HalfSpace hs) {
+        public IPolyhedron neighborSplitInner;
+        public IPolyhedron neighborSplitOuter;
+        public SplitResult CrossReference(IPolyhedron orig, HalfSpace hs) {
             if (inner!=null && outer!=null) {
                 Debug.Assert(innerCut!=null && outerCut!=null,"5333029568");
                 innerCut.isInvisible = true; //because they are in the same subspace
@@ -48,11 +49,10 @@ namespace D4BB.Geometry
                     Debug.Assert(orig.neighbor.neighbor==orig, $"5333039568 orig: {orig}, neighbor: {orig.neighbor}, nn: {orig.neighbor.neighbor}");
                     orig.neighbor.neighbor = null;
                     SplitResult sr = orig.neighbor.Split(hs).CrossReference(orig.neighbor,hs);
+                    neighborSplitInner = sr.inner;
+                    neighborSplitOuter = sr.outer;
                     if (orig.neighbor.parent!=null) {
                         orig.neighbor.parent.Replace(orig.neighbor,sr.inner,sr.outer);
-                    } else if (typeof(Face2dBC).IsAssignableFrom(orig.neighbor.GetType())) {
-                        var pbc = ((Face2dBC)orig.neighbor).pbc;
-                        pbc.Replace((Face2dBC)orig.neighbor,(Face2dBC)sr.inner,(Face2dBC)sr.outer);
                     }
 
                     inner.neighbor = sr.inner;

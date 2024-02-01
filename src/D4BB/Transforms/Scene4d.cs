@@ -43,7 +43,7 @@ namespace D4BB.Transforms
             }
             return res;
         }
-        public Dictionary<Face2d,Face2d> ContainedFacetsInComponents(HashSet<Face2d> facets) {
+        public static Dictionary<Face2d,Face2d> ContainedFacets(HashSet<Face2d> facets) {
             Dictionary<Face2d,Face2d> res = new();
             List<Face2d> pool = new(facets);
             foreach (var facet1 in facets) {
@@ -140,6 +140,7 @@ namespace D4BB.Transforms
             var pieceIBC = new IntegerBoundaryComplex(piece.origins); //contains 3d facets for each piece
             //selecting the cells that are in front of the camera and pointing to the 4d-Camera
             piece.components3d.Clear();
+            Dictionary<OrientedIntegerCell,Component> mapping = new();
             foreach (var component3dCells in pieceIBC.Components()) {
                 Point origin = new(component3dCells.First().origin);
                 Point normal = new(component3dCells.First().Normal());
@@ -152,12 +153,37 @@ namespace D4BB.Transforms
                         cells=component3dCells,
                         pbc=new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(component3dCells),camera,debug),
                     };
-                    foreach (var cell in component3dCells) {
-                        component3d.definingHalfSpaces.Add(DefiningHalfSpaces(cell,camera));
+                    foreach (var cell3d in component3dCells) {
+                        mapping[cell3d] = component3d;
+                        component3d.definingHalfSpaces.Add(DefiningHalfSpaces(cell3d,camera));
                     }
-                    Debug.Assert(!components3d.Contains(component3d),"4840513520");
+                    Debug.Assert(!components3d.Contains(component3d), "4840513520");
                     piece.components3d.Add(component3d);
                     components3d.Add(component3d);
+                }
+            }
+            foreach (var component3d in piece.components3d) {
+                foreach (var iCell3d in component3d.cells) {
+                    foreach (var iFacet2d in iCell3d.Facets()) {
+                        if (!component3d.pbc.i2p.ContainsKey(iFacet2d)) continue; //consider boundary facets
+                        var iOther3d = pieceIBC.neighborOfVia[iCell3d][iFacet2d];
+                        if (mapping.TryGetValue(iOther3d,out var otherComp3d)) {
+                            Debug.Assert(component3d.pbc.i2p.ContainsKey(iFacet2d), "4840513521");
+                            Debug.Assert(otherComp3d.pbc.i2p.ContainsKey(iFacet2d), "4840513522");
+                            var otherPFace2d = otherComp3d.pbc.i2p[iFacet2d];
+                            var thisPFace2d = component3d.pbc.i2p[iFacet2d];
+                            otherPFace2d.neighbor = thisPFace2d;
+                            thisPFace2d.neighbor = otherPFace2d;
+                        }
+                    }
+                }
+            }
+            if (debug) foreach (var component3d in piece.components3d) {
+                foreach (var pFacet in component3d.pbc.facets) {
+                    foreach (var pEdge in pFacet.facets) {
+                        Debug.Assert(pEdge.neighbor!=null, "2662198159");
+                        Debug.Assert(pEdge.neighbor.neighbor==pEdge, "2662198160");
+                    }
                 }
             }
         }
@@ -183,6 +209,15 @@ namespace D4BB.Transforms
             for (int j=i+1;j<components3d.Count;j++) {
                 foreach (var halfSpaces in components3d[j].definingHalfSpaces) {
                     components3d[i].pbc.CutOut(halfSpaces);
+                    if (debug) foreach (var component3d in components3d) {
+                        foreach (var pFacet in component3d.pbc.facets) {
+                            foreach (var pEdge in pFacet.facets) {
+                                //Debug.Assert(pEdge.neighbor!=null, $"2692198159 {pFacet} {pEdge} null neighbor");
+                                if (pEdge.neighbor!=null) Debug.Assert(pEdge.neighbor.neighbor==pEdge,
+                                     $"2362198160 {pFacet} {pEdge} neighbor: {pEdge.neighbor}, nn: {pEdge.neighbor.neighbor}");
+                            }
+                        }
+                    }
                     // components3d[i].distinguishedFacets = 
                     //     Polyhedron3dBoundaryComplex.CutOut(components3d[i].distinguishedFacets,halfSpaces);
                     

@@ -357,21 +357,21 @@ namespace D4BB.Geometry
             Edge edge1;
             Edge edge2;
             if (outer.a.Equals(edge.a)) {
-                Debug.Assert(inner.b.Equals(edge.b));
+                Debug.Assert(inner.b.Equals(edge.b), "2662490147");
                 edge2 = (Edge)inner;
                 edge1 = (Edge)outer;
             } else if (inner.a.Equals(edge.a)) {
-                Debug.Assert(outer.b.Equals(edge.b));
+                Debug.Assert(outer.b.Equals(edge.b), "2662490148");
                 edge2 = (Edge)outer;
                 edge1 = (Edge)inner;
             } else {
                 throw new Exception();
             }
-            Debug.Assert(edge1.a.Equals(edge.a));
-            Debug.Assert(edge2.b.Equals(edge.b));
+            Debug.Assert(edge1.a.Equals(edge.a), "2662490149");
+            Debug.Assert(edge2.b.Equals(edge.b), "2662490150");
             
             var index = edges.IndexOf(edge);
-            Debug.Assert(index>=0);
+            Debug.Assert(index>=0, $"2662490151 {this} {edge}");
 
             edges[index]= edge2;
             edges.Insert(index,edge1);

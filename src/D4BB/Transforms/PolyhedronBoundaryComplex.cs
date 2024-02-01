@@ -122,6 +122,14 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
         // }
         return res;
     }
+    public new SplitResult Split(HalfSpace cutPlane) {
+        var sr = ((IPolyhedron)this).Split(cutPlane);
+        if (sr.inner==null || sr.outer==null || neighbor==null) return sr;
+
+        var pbc = ((Face2dBC)neighbor).pbc;
+        pbc.Replace((Face2dBC)neighbor,(Face2dBC)sr.neighborSplitInner,(Face2dBC)sr.neighborSplitOuter);
+        return sr;
+    }
 }
 
 public class Polyhedron3dBoundaryComplex {
@@ -129,7 +137,7 @@ public class Polyhedron3dBoundaryComplex {
     public Dictionary<IntegerCell,Face2dBC> i2p = new();
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
-    bool debug = false;
+    bool debug;
 
     public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool debug=false) {
         this.debug = debug;
@@ -145,12 +153,12 @@ public class Polyhedron3dBoundaryComplex {
                 var ic2 = ibc.neighborOfVia[ic1][iEdge];
                 var pEdge1 = i2p[ic1].i2p[iEdge];
                 var pEdge2 = i2p[ic2].i2p[iEdge];
-                Debug.Assert(pEdge2!=null);
+                Debug.Assert(pEdge2!=null, "5395413579");
                 pEdge1.neighbor = pEdge2;
                 pEdge1.parent = pc;
                 var visible = visibleIEdges.Contains(iEdge);
                 pEdge1.isInvisible = !visible;
-                pEdge2.isInvisible = !visible;
+                //pEdge2.isInvisible = !visible;
             }
         }
     }
