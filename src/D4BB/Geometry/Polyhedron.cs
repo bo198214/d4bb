@@ -59,8 +59,8 @@ namespace D4BB.Geometry
                 //     outer.neighbor = polyhedron.neighbor;
                 // }
                 if (orig.neighbor!=null) {
-                    //cut also the neighbor polyhedron
-                    Debug.Assert(orig.neighbor.neighbor==orig);
+                    //cut also the neighbor polyhedron 
+                    Debug.Assert(orig.neighbor.neighbor==orig, $"5333029569 orig: {orig}, neighbor: {orig.neighbor}, nn: {orig.neighbor.neighbor}");
                     orig.neighbor.neighbor = null;
                     SplitResult sr = orig.neighbor.Split(hs).CrossReference(orig.neighbor,hs);
                     orig.neighbor.parent.Replace(orig.neighbor,sr.inner,sr.outer);

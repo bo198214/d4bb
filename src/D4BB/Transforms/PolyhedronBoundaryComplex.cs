@@ -128,7 +128,7 @@ public class Polyhedron3dBoundaryComplex {
     public Dictionary<IntegerCell,Face2dBC> i2p = new();
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
-    bool debug = false;
+    bool debug;
 
     public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool debug=false) {
         this.debug = debug;
@@ -144,12 +144,12 @@ public class Polyhedron3dBoundaryComplex {
                 var ic2 = ibc.neighborOfVia[ic1][iEdge];
                 var pEdge1 = i2p[ic1].i2p[iEdge];
                 var pEdge2 = i2p[ic2].i2p[iEdge];
-                Debug.Assert(pEdge2!=null);
+                Debug.Assert(pEdge2!=null, "5395413579");
                 pEdge1.neighbor = pEdge2;
                 pEdge1.parent = pc;
                 var visible = visibleIEdges.Contains(iEdge);
                 pEdge1.isInvisible = !visible;
-                pEdge2.isInvisible = !visible;
+                //pEdge2.isInvisible = !visible;
             }
         }
     }
