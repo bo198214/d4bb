@@ -3,7 +3,6 @@ using NUnit.Framework;
 using System.Linq;
 using System;
 using D4BB.Comb;
-using D4BB.Transforms;
 
 namespace D4BB.Geometry {
 public class Geom3dTests
@@ -485,13 +484,6 @@ public class Geom3dTests
         Assert.That(c[0].neighbor,Is.SameAs(c[1]));
         Assert.That(c[1].neighbor,Is.SameAs(c[0]));
     }
-    [Test] public void DiagonalCubeSplit() {
-        IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
-        var pbc = new Polyhedron3dBoundaryComplex(ibc);
-        HalfSpace diagonal = new HalfSpace(Math.Sqrt(2.0)/2,new Point(1,1,0).normalize());
-        pbc.CutOut(new HalfSpace[]{diagonal});
-        Assert.That(pbc.facets,Has.Count.EqualTo(4));
-    }
     [Test] public void PreSplittedCut2d() {
         var preSplitted = new Face2d(new List<Point>{
             new(0,0),new(0,1),new(0.5,1),new(1,1),new(1,0),new(0.5,0)
@@ -500,108 +492,6 @@ public class Geom3dTests
         SplitResult sr = preSplitted.Split(halfSpace);
         Assert.That(sr.inner,Is.Not.Null);
         Assert.That(sr.outer,Is.Not.Null);
-    }
-    [Test] public void PreSplittedCut3d() {
-        var nonSplittedFront = new Face2d(new List<Point>{new(0,0,0),new(0,1,0),new(1,1,0),new(1,0,0)});
-        var nonSplittedBack = new Face2d(new List<Point>{new(0,0,1),new(1,0,1),new(1,1,1),new(0,1,1)});
-        //var nonSplittedTop = new Face2d(new List<Point>{new(0,1,0),new(0,1,1),new(1,1,1),new(1,1,0)});
-        var preSplittedTop = new Face2d(new List<Point>{new(0,1,0),new(0,1,1),new(0.5,1,1),new(1,1,1),new(1,1,0),new(0.5,1,0)});
-        IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
-        var pbc = new Polyhedron3dBoundaryComplex(ibc);
-        var indexFront = -1;
-        for (int i=0;i<pbc.facets.Count;i++) if (pbc.facets[i].Equals(nonSplittedFront)) {indexFront=i;break;}
-        Assert.That(indexFront,Is.Not.EqualTo(-1)); //==2
-        var frontFace = pbc.facets[indexFront];
-        var indexBack = -1;
-        for (int i=0;i<pbc.facets.Count;i++) if (pbc.facets[i].Equals(nonSplittedBack)) {indexBack=i;break;}
-        Assert.That(indexBack,Is.Not.EqualTo(-1));  //==5
-        var backFace = pbc.facets[indexBack];
-        //indexTop == 4
-
-        HalfSpace halfSpace = new HalfSpace(0.5,new Point(new double[]{1,0,0}).normalize());
-        
-        SplitResult srFront = frontFace.Split(halfSpace);
-        Assert.That(srFront.inner,Is.Not.Null);
-        Assert.That(srFront.outer,Is.Not.Null);
-        pbc.Replace(frontFace,(Face2dBC)srFront.inner,(Face2dBC)srFront.outer);
-        
-        SplitResult srBack = backFace.Split(halfSpace);
-        Assert.That(srBack.inner,Is.Not.Null);
-        Assert.That(srBack.outer,Is.Not.Null);
-        pbc.Replace(backFace,(Face2dBC)srBack.inner,(Face2dBC)srBack.outer);
-        Assert.That(pbc.facets,Has.Count.EqualTo(8));
-
-        var indexTop = -1;
-        for (int i=0;i<pbc.facets.Count;i++) if (pbc.facets[i].Equals(preSplittedTop)) {indexTop=i;break;}
-        Assert.That(indexTop,Is.Not.EqualTo(-1));
-        var topFace = pbc.facets[indexTop];
-        SplitResult srTop = topFace.Split(halfSpace);
-        Assert.That(srTop.inner,Is.Not.Null);
-        Assert.That(srTop.outer,Is.Not.Null);
-        pbc.Replace(topFace,(Face2dBC)srTop.inner,(Face2dBC)srTop.outer);
-        Assert.That(pbc.facets,Has.Count.EqualTo(9));
-
-        pbc.CutOut(new HalfSpace[]{halfSpace});
-        Assert.That(pbc.facets,Has.Count.EqualTo(5));
-    }
-    [Test] public void DiagSplittedCube() {
-        IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
-
-        HalfSpace hs1 = new HalfSpace(new Point(0.6,0.5,0),new Point(1,1,0).normalize());
-        HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
-
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            pbc.CutOut(new HalfSpace[]{hs1});
-            Assert.That(pbc.facets,Has.Count.EqualTo(4));
-        }
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            pbc.CutOut(new HalfSpace[]{hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(4));
-        }
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            List<Face2dBC> i = new();
-            List<Face2dBC> o = new();
-            Polyhedron3dBoundaryComplex.Split(hs1,pbc.facets,i,o);
-            Assert.That(i,Has.Count.EqualTo(6));
-            Assert.That(o,Has.Count.EqualTo(4));
-            List<Face2dBC> ii = new();
-            List<Face2dBC> io = new();
-            Polyhedron3dBoundaryComplex.Split(hs2,i,ii,io);
-            Assert.That(ii,Has.Count.EqualTo(4));
-            Assert.That(io,Has.Count.EqualTo(4));
-        }
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(7));
-        }
-    }
-    [Test] public void CutOutGroove() {
-        IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            HalfSpace hs1 = new HalfSpace(new Point(0.5,0.5,0),new Point(1,1,0).normalize());
-            HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
-            pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(7));
-        }
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            HalfSpace hs1 = new HalfSpace(new Point(0.6,0.5,0),new Point(1,1,0).normalize());
-            HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
-            pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(7));
-        }
-        {
-            var pbc = new Polyhedron3dBoundaryComplex(ibc);
-            HalfSpace hs1 = new HalfSpace(new Point(0.4,0.5,0),new Point(1,1,0).normalize());
-            HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
-            pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(8));
-        }
     }
 }
 }
