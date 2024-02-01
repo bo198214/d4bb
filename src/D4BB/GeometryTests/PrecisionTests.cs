@@ -64,6 +64,22 @@ public class PrecisionTests
             face2ds.Add(square2);
             Assert.That(face2ds,Has.Count.EqualTo(2));
         }
+        {
+            var square1 = new Face2d(new List<Point>{new(-1,-1,1),new(-1,0,1),new(0,0,1),new(0,-1,1)});
+            var square2 = new Face2d(new List<Point>{new(-1,-1.001,1),new(0,-1,1),new(0,0,1),new(-1,0,1)});
+            HashSet<Face2d> face2ds = new(new Face2dUnOrientedEquality(2));
+            face2ds.Add(square1);
+            face2ds.Add(square2);
+            Assert.That(face2ds,Has.Count.EqualTo(1));
+        }
+        {
+            var square1 = new Face2d(new List<Point>{new(-1,-1,1),new(-1,0,1),new(0,0,1),new(0,-1,1)});
+            var square2 = new Face2d(new List<Point>{new(-1,-1.001,1),new(0,-1,1),new(0,0,1),new(-1,0,1)});
+            HashSet<Face2d> face2ds = new(new Face2dUnOrientedEquality(3));
+            face2ds.Add(square1);
+            face2ds.Add(square2);
+            Assert.That(face2ds,Has.Count.EqualTo(2));
+        }
     }
 }
 }

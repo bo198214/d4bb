@@ -24,13 +24,14 @@ public class EdgeBC : Edge
         Debug.Assert(ic.Dim()==1,"1163775061");
     }
     public override IPolyhedron Recreate(Vertex a, Vertex b) {
-        return new EdgeBC(a,b,isInvisible) { parent = parent };
+        return new EdgeBC(a,b,isInvisible) { parent = parent, neighbor=neighbor };
     }
 }
 public class Face2dBC : Face2dWithIntegerCellAttribute {
     /* this class contains some helper attributes for bringing the data on the screen */
     public Dictionary<IntegerCell,EdgeBC> i2p = new();
     public ICamera4d camera; //clockwise from outside original IntegerCell corners
+    public Polyhedron3dBoundaryComplex pbc;
     public Face2dBC(HashSet<IPolyhedron> facets, bool connecting_, IntegerCell _integerCell) : base(facets,connecting_,_integerCell) {}
     public Face2dBC(List<Edge> edges, bool connecting_, IntegerCell _integerCell) : base(edges,connecting_,_integerCell) {}
     public Face2dBC(List<Point> points, bool invisible, IntegerCell integerCell) : base(points,invisible,integerCell) { this.integerCell=integerCell;}
@@ -65,17 +66,17 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
     }
     public override IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
     {
-        var res = new Face2dBC(_facets, isInvisible, integerCell)  { parent = parent, camera = camera };
+        var res = new Face2dBC(_facets, isInvisible, integerCell)  { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc };
         return res;
     }
     public override Face2d Recreate(List<Point> points)
     {
-        var res =  new Face2dBC(points,isInvisible, integerCell) { parent = parent, camera = camera };
+        var res =  new Face2dBC(points,isInvisible, integerCell) { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc  };
         return res;
     }
     public override Face2d Recreate(List<Edge> edges)
     {
-        var res =  new Face2dBC(edges,isInvisible, integerCell) { parent = parent, camera = camera };
+        var res =  new Face2dBC(edges,isInvisible, integerCell) { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc  };
         return res;
     }
     public static IPolyhedron FromIntegerCell(int[] origin) {
@@ -133,7 +134,7 @@ public class Polyhedron3dBoundaryComplex {
     public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool debug=false) {
         this.debug = debug;
         foreach (var ic in ibc.cells) {
-            var pc = new Face2dBC(ic, cam);
+            var pc = new Face2dBC(ic, cam) { pbc = this};
             i2p[ic] = pc;
             facets.Add(pc);
         }
@@ -220,6 +221,12 @@ public class Polyhedron3dBoundaryComplex {
             }
         }
         return res;
+    }
+    public void Replace(Face2dBC ab,Face2dBC a,Face2dBC b) {
+        int index = facets.IndexOf(ab);
+        if (index==-1) throw new Exception($"Replacing non-existing value {ab}");
+        facets[index]=b;
+        facets.Insert(index,a);
     }
 }
 }

@@ -129,5 +129,50 @@ public class PolyhedronBoundaryComplexTests {
             Assert.That(pbc.facets,Does.Not.Contains(facet));
         }
     }
+    static void CheckReferentialIntegrity(Polyhedron3dBoundaryComplex pbc) {
+        foreach (var facet in pbc.facets) {
+            foreach (var edge in facet.facets) {
+                if (edge.neighbor!=null) {
+                    Assert.That(Is.ReferenceEquals(edge.neighbor.neighbor,edge));
+                }
+            }
+        }
+    }
+    [Test] public void NeighborCut() {
+        var ibc = new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0,0}});
+        Assert.That(ibc.Dim(),Is.EqualTo(3));
+        Assert.That(ibc.cells,Has.Count.EqualTo(8));
+        ibc.cells.TryGetValue(new OrientedIntegerCell(new int[]{0,0,0,0},new(){0,1,2},true,true),out var iFace3d1);
+        ibc.cells.TryGetValue(new OrientedIntegerCell(new int[]{0,0,0,0},new(){1,2,3},true,true),out var iFace3d2);
+        var iCut = new IntegerCell(new int[]{0,0,0,0},new(){1,2});
+        var pCut = new Face2d(new List<Point>{new(0,0,0),new(0,0,1),new(0,1,1),new(0,1,0)});
+        Assert.That(ibc.neighborOfVia[iFace3d1][iCut],Is.EqualTo(iFace3d2));
+        var camera = new Camera4dOrthographic();
+        var pbc1 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(iFace3d1),camera);
+        var pbc2 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(iFace3d2),camera);
+        Assert.That(pbc1.i2p.ContainsKey(iCut));
+        Assert.That(pbc2.i2p.ContainsKey(iCut));
+        var pCut1 = pbc1.i2p[iCut];
+        var pCut2 = pbc2.i2p[iCut];
+        pCut1.neighbor = pCut2;
+        pCut2.neighbor = pCut1;
+        Assert.That(pCut1,Is.EqualTo(pCut));
+        Assert.That(pCut2,Is.EqualTo(pCut));
+        
+        CheckReferentialIntegrity(pbc1);
+        CheckReferentialIntegrity(pbc2);
+        Assert.That(pbc1.facets,Has.Count.EqualTo(6));
+        Assert.That(pbc1.facets.Contains(pCut1));
+        Assert.That(pbc2.facets,Has.Count.EqualTo(6));
+        Assert.That(pbc2.facets.Contains(pCut2));
+        var toCutOut = PolyhedronCreate.Cube3dAt(new Point(0,-0.5,0),1);
+        pbc1.CutOut(toCutOut);
+        Assert.That(pbc1.facets,Has.Count.EqualTo(5));
+        Assert.That(pbc1.facets.Contains(pCut1),Is.False);
+        Assert.That(pbc2.facets,Has.Count.EqualTo(7));
+        Assert.That(pbc2.facets.Contains(pCut2),Is.False);
+        CheckReferentialIntegrity(pbc1);
+        CheckReferentialIntegrity(pbc2);
+    }
 }
 }
