@@ -122,6 +122,14 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
         // }
         return res;
     }
+    public new SplitResult Split(HalfSpace cutPlane) {
+        var sr = ((IPolyhedron)this).Split(cutPlane);
+        if (sr.inner==null || sr.outer==null || neighbor==null) return sr;
+
+        var pbc = ((Face2dBC)neighbor).pbc;
+        pbc.Replace((Face2dBC)neighbor,(Face2dBC)sr.neighborSplitInner,(Face2dBC)sr.neighborSplitOuter);
+        return sr;
+    }
 }
 
 public class Polyhedron3dBoundaryComplex {
