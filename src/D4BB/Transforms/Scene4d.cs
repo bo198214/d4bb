@@ -26,7 +26,7 @@ namespace D4BB.Transforms
             this.origins = origins;
         }
         public HashSet<Face2d> VisibleFacets() {
-            HashSet<Face2d> res = new(new Face2dUnOrientedEquality(AOP.precision)){};
+            HashSet<Face2d> res = new(new Face2dUnOrientedEquality(AOP.binaryPrecision)){};
             foreach (var component3d in components3d) {
                 foreach (var facet in component3d.pbc.VisibleFacets()) {
                     res.Add(facet);

@@ -89,15 +89,15 @@ namespace D4BB.Geometry
             res.multiply(1.0/edges.Count);
             return res;
         }
-        public static bool RotationEqual(List<Point> points1, List<Point> points2, int precision=AOP.precision) {
+        public static bool RotationEqual(List<Point> points1, List<Point> points2, int binaryPrecision=AOP.binaryPrecision) {
             if (points1.Count!=points2.Count) return false;
             if (points1.Count==0) return true;
             for (int i=0;i<points2.Count;i++) {
-                if (points1[0].Equals(points2[i],precision)) { 
+                if (points1[0].Equals(points2[i],binaryPrecision)) { 
                     var off=i; 
                     var isEqual = true;
                     for (int j=0;j<points2.Count;j++) {
-                        if (!points1[j].Equals(points2[(j+off)%points2.Count],precision)) {
+                        if (!points1[j].Equals(points2[(j+off)%points2.Count],binaryPrecision)) {
                             isEqual=false;
                             break;
                         }
@@ -107,20 +107,20 @@ namespace D4BB.Geometry
             }
             return false;
         }
-        public static bool RotationEqual(List<Edge> edges1, List<Edge> edges2, int precision=AOP.precision) { 
+        public static bool RotationEqual(List<Edge> edges1, List<Edge> edges2, int binaryPrecision=AOP.binaryPrecision) { 
             return RotationEqual(
                 edges1.Select(edge => edge.a.getPoint()).ToList(),
                 edges2.Select(edge => edge.a.getPoint()).ToList(),
-                precision
+                binaryPrecision
             );}
-        public static bool Face2dOrientedEquals(Face2d a,Face2d b, int precision=AOP.precision) {
-            return RotationEqual(a.edges,b.edges, precision);
+        public static bool Face2dOrientedEquals(Face2d a,Face2d b, int binaryPrecision=AOP.binaryPrecision) {
+            return RotationEqual(a.edges,b.edges, binaryPrecision);
         }
-        public static bool Face2dUnOrientedEquals(Face2d a, Face2d b,int precision=AOP.precision) {
-            if (RotationEqual(a.edges,b.edges,precision)) return true;
+        public static bool Face2dUnOrientedEquals(Face2d a, Face2d b,int binaryPrecision=AOP.binaryPrecision) {
+            if (RotationEqual(a.edges,b.edges,binaryPrecision)) return true;
             var aReversedEdges = new List<Edge>(a.edges);
             aReversedEdges.Reverse();
-            return RotationEqual(aReversedEdges,b.edges,precision);
+            return RotationEqual(aReversedEdges,b.edges,binaryPrecision);
         }
         public override bool Equals(object obj) {
             if (obj==null) return false;
@@ -134,7 +134,7 @@ namespace D4BB.Geometry
         }
         public override int GetHashCode()
         {
-            return GetHashCode(AOP.precision);
+            return GetHashCode(AOP.binaryPrecision);
         }
         public int GetHashCode(int precision)
         {
@@ -637,8 +637,8 @@ namespace D4BB.Geometry
     public class Face2dOrientedEquality : IEqualityComparer<Face2d>
     {
         public readonly int precision;
-        public Face2dOrientedEquality(int precision) {
-            this.precision = precision;
+        public Face2dOrientedEquality(int binaryPrecision) {
+            this.precision = binaryPrecision;
         }
         public bool Equals(Face2d x, Face2d y)
         {
@@ -653,8 +653,8 @@ namespace D4BB.Geometry
     public class Face2dUnOrientedEquality : IEqualityComparer<Face2d>
     {
         public readonly int precision;
-        public Face2dUnOrientedEquality(int precision) {
-            this.precision = precision;
+        public Face2dUnOrientedEquality(int binaryPrecision) {
+            this.precision = binaryPrecision;
         }
         public bool Equals(Face2d x, Face2d y)
         {

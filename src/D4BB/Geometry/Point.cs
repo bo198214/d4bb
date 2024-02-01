@@ -46,12 +46,12 @@ namespace D4BB.Geometry
     //		return true;
         }
 
-        public bool Equals(object obj, int precision) {
+        public bool Equals(object obj, int binaryPrecision) {
             if (obj==null) { return false; }
             Point p = (Point) obj;
             if (x.Length!=p.x.Length) { return false; }
     		for (int i=0;i<x.Length;i++) {
-    			if (Math.Round(x[i],precision)!=Math.Round(p.x[i],precision)) { return false; }
+    			if (Precision.TruncateBinary(x[i],binaryPrecision)!=Precision.TruncateBinary(p.x[i],binaryPrecision)) { return false; }
     		}
     		return true;
         }
@@ -67,7 +67,7 @@ namespace D4BB.Geometry
         {
             int res = 0;
             for (int i=0;i<x.Length;i++) {
-                res += Math.Round(x[i],precision).GetHashCode();
+                res += Precision.TruncateBinary(x[i],precision).GetHashCode();
             }
             return res;
         }
