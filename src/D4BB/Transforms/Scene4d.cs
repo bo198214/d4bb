@@ -43,19 +43,6 @@ namespace D4BB.Transforms
             }
             return res;
         }
-        public static Dictionary<Face2d,Face2d> ContainedFacets(HashSet<Face2d> facets) {
-            Dictionary<Face2d,Face2d> res = new();
-            List<Face2d> pool = new(facets);
-            foreach (var facet1 in facets) {
-                pool.Remove(facet1);
-                foreach (var facet2 in pool) {
-                    if (facet1.Contains(facet2)) {
-                        res[facet2]=facet1;
-                    }
-                }
-            }
-            return res;
-        }
     }
     public class Component {
         public Piece piece;
