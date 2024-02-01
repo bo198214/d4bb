@@ -11,8 +11,6 @@ namespace D4BB.Geometry
         public bool isInvisible { get; set; }
         public IPolyhedron parent {get; set; }
         public IPolyhedron neighbor {get;set;}
-        public IPolyhedron innerNeighborTemp {get;set;}
-        public IPolyhedron outerNeighborTemp {get;set;}
         public HashSet<IPolyhedron> facets {
             get {
                 return new HashSet<IPolyhedron>(edges);
@@ -52,13 +50,13 @@ namespace D4BB.Geometry
         }
         public Face2d(HashSet<IPolyhedron> edges, bool isInvisible) : this(SortedEdges(edges),isInvisible) {}
         public virtual IPolyhedron Recreate(HashSet<IPolyhedron> facets) { 
-            return new Face2d(facets, isInvisible) { parent = parent };
+            return new Face2d(facets, isInvisible) { parent = parent, neighbor=neighbor };
         }
         public virtual Face2d Recreate(List<Edge> edges) {
-            return new Face2d(edges, isInvisible) { parent = parent };
+            return new Face2d(edges, isInvisible) { parent = parent, neighbor=neighbor };
         }
         public virtual Face2d Recreate(List<Point> points) {
-            return new Face2d(points, isInvisible) { parent = parent };
+            return new Face2d(points, isInvisible) { parent = parent, neighbor=neighbor };
         }
         public IPolyhedron OpposingClone() {
             List<Edge> newEdges = new();
@@ -372,9 +370,8 @@ namespace D4BB.Geometry
             var index = edges.IndexOf(edge);
             Debug.Assert(index>=0);
 
-            edges.Insert(index,edge2);
+            edges[index]= edge2;
             edges.Insert(index,edge1);
-            edges.RemoveAt(index+2);
         }
         public SplitResult Split(HalfSpace cutPlane) {
             List<Edge> inner = new();
@@ -517,11 +514,15 @@ namespace D4BB.Geometry
             }
             IPolyhedron resInner = null;
             IPolyhedron resOuter = null;
-            if (inner.Count>0) {
+            if (inner.Count>0 && outer.Count>0) {
                 resInner = Recreate(inner);
-            }
-            if (outer.Count>0) {
                 resOuter = Recreate(outer);
+            } else if (inner.Count>0 && outer.Count==0) {
+                resInner = this;
+                resOuter = null;
+            } else if (inner.Count==0 && outer.Count>0) {
+                resInner = null;
+                resOuter = this;
             }
             Debug.Assert(innerCut.Count==2 && outerCut.Count==2 || innerCut.Count==0 && outerCut.Count==0,"3805925512");
             if (innerCut.Count==2) {
@@ -619,15 +620,15 @@ namespace D4BB.Geometry
             integerCell = ic;
         }
         public override Face2d Recreate(List<Edge> edges) {
-            return new Face2dWithIntegerCellAttribute(edges,isInvisible,integerCell);
+            return new Face2dWithIntegerCellAttribute(edges,isInvisible,integerCell) { parent=parent, neighbor=neighbor };
         }
         public override Face2d Recreate(List<Point> points)
         {
-            return new Face2dWithIntegerCellAttribute(points, isInvisible,integerCell);
+            return new Face2dWithIntegerCellAttribute(points, isInvisible,integerCell) { parent=parent, neighbor=neighbor};
         }
         public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) { 
 
-            return new Face2dWithIntegerCellAttribute(facets, isInvisible, integerCell);
+            return new Face2dWithIntegerCellAttribute(facets, isInvisible, integerCell) { parent=parent, neighbor=neighbor};
         }
     }
     public class Face2dOrientedEquality : IEqualityComparer<Face2d>

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using D4BB.Comb;
+using D4BB.Transforms;
 
 namespace D4BB.Geometry
 {
@@ -42,28 +43,18 @@ namespace D4BB.Geometry
                 outerCut.neighbor = innerCut;
                 outerCut.parent = outer;
 
-                // if (polyhedron.innerNeighborTemp!=null) { //neighbor was already split
-                //     Debug.Assert(polyhedron.outerNeighborTemp!=null,"0865182622");
-                //     inner.neighbor = polyhedron.innerNeighborTemp;
-                //     polyhedron.innerNeighborTemp.neighbor = inner;
-                //     outer.neighbor = polyhedron.outerNeighborTemp;
-                //     polyhedron.outerNeighborTemp.neighbor = outer;
-                //     polyhedron.innerNeighborTemp = null;
-                //     polyhedron.outerNeighborTemp = null;
-                // }
-                // else if (polyhedron.neighbor!=null) { //neighbor exists, but was not yet split
-                //     polyhedron.neighbor.neighbor = null;
-                //     polyhedron.neighbor.innerNeighborTemp = inner;
-                //     polyhedron.neighbor.outerNeighborTemp = outer;
-                //     inner.neighbor = polyhedron.neighbor;
-                //     outer.neighbor = polyhedron.neighbor;
-                // }
                 if (orig.neighbor!=null) {
                     //cut also the neighbor polyhedron
-                    Debug.Assert(orig.neighbor.neighbor==orig);
+                    Debug.Assert(orig.neighbor.neighbor==orig, $"5333039568 orig: {orig}, neighbor: {orig.neighbor}, nn: {orig.neighbor.neighbor}");
                     orig.neighbor.neighbor = null;
                     SplitResult sr = orig.neighbor.Split(hs).CrossReference(orig.neighbor,hs);
-                    orig.neighbor.parent.Replace(orig.neighbor,sr.inner,sr.outer);
+                    if (orig.neighbor.parent!=null) {
+                        orig.neighbor.parent.Replace(orig.neighbor,sr.inner,sr.outer);
+                    } else if (typeof(Face2dBC).IsAssignableFrom(orig.neighbor.GetType())) {
+                        var pbc = ((Face2dBC)orig.neighbor).pbc;
+                        pbc.Replace((Face2dBC)orig.neighbor,(Face2dBC)sr.inner,(Face2dBC)sr.outer);
+                    }
+
                     inner.neighbor = sr.inner;
                     sr.inner.neighbor = inner;
                     outer.neighbor = sr.outer;
@@ -314,7 +305,7 @@ namespace D4BB.Geometry
         }
         public virtual IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
         {
-            return new Polyhedron(_facets,isInvisible) { parent = parent };
+            return new Polyhedron(_facets,isInvisible) { parent = parent, neighbor=neighbor };
         }
         public virtual IPolyhedron OpposingClone() {
             //we have no orientation, so opposingClone is just a copy

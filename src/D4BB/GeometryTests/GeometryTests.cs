@@ -465,7 +465,6 @@ public class Geom3dTests
         var leftLower = (Face2d)sr.inner;
         var leftLowerEdge = sr.innerCut;
         //left edge of right half is precut by the cut of the left half
-        //Assert.That(rightEdge.outerNeighborTemp,Is.Not.Null);
         Assert.That(leftUpper.edges[2].neighbor,Is.SameAs(right.edges[4]));
         Assert.That(leftUpper.edges[2]         ,Is.SameAs(right.edges[4].neighbor));
         Assert.That(leftLower.edges[2].neighbor,Is.SameAs(right.edges[3]));

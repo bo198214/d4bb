@@ -12,8 +12,6 @@ namespace D4BB.Geometry
         public bool isInvisible {get; set;}
         public IPolyhedron parent {get;set;}
         public IPolyhedron neighbor {get;set;}
-        public IPolyhedron innerNeighborTemp {get;set;}
-        public IPolyhedron outerNeighborTemp {get;set;}
         protected readonly Point point;
 
         public HashSet<IPolyhedron> facets => new();
@@ -45,11 +43,11 @@ namespace D4BB.Geometry
 
         public IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
         {
-            return new Vertex(point, isInvisible) { parent = parent };
+            return new Vertex(point, isInvisible) { parent = parent, neighbor=neighbor };
         }
         //  public Vertex(IntegerCell ic, bool isInvisible) : this(new Point(ic.origin),isInvisible) {}
         public virtual IPolyhedron Recreate(Point point) {
-            return new Vertex(point,isInvisible) { parent = parent };
+            return new Vertex(point,isInvisible) { parent = parent, neighbor=neighbor };
         }
 
         public int Side(HalfSpace halfSpace) {
