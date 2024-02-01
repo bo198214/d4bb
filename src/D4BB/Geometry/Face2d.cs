@@ -6,6 +6,9 @@ using D4BB.Comb;
 
 namespace D4BB.Geometry
 {
+    public interface IPolyhedronWithIntegerCellAttribute : IPolyhedron {
+        public IntegerCell integerCell { get; }
+    }
     public class Face2d : IPolyhedron { // a more efficient implementation than the default Polyhedron
         public List<Edge> edges {get; protected set;}
         public bool isInvisible { get; set; }

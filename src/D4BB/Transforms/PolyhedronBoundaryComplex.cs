@@ -160,6 +160,22 @@ public class Polyhedron3dBoundaryComplex {
         }
         throw new Exception();
     }
+    public static void Split(HalfSpace halfSpace,List<Face2dBC> facets, List<Face2dBC> out_inner, List<Face2dBC> out_outer) {
+        foreach (var facet in facets) {
+            var split = facet.Split(halfSpace);
+            if (split.inner!=null)
+                out_inner.Add((Face2dBC)split.inner);
+            if (split.outer!=null)
+                out_outer.Add((Face2dBC)split.outer);
+            if (split.isContained) {
+                if (AOP.gt(facet.Normal().sc(halfSpace.normal),0)) {
+                    out_inner.Add(facet);
+                } else {
+                    out_outer.Add(facet);
+                }
+            }
+        }
+    }
     public void CutOut(HalfSpace[] halfSpaces) {
         List<Face2dBC> noSplit = new();
 
@@ -179,20 +195,7 @@ public class Polyhedron3dBoundaryComplex {
         List<Face2dBC> outerFacets = new();
         List<Face2dBC> innerFacets2 = new();
         foreach (var halfSpace in halfSpaces) {
-            foreach (var facet in innerFacets1) {
-                var split = facet.Split(halfSpace);
-                if (split.inner!=null)
-                    innerFacets2.Add((Face2dBC)split.inner);
-                if (split.outer!=null)
-                    outerFacets.Add((Face2dBC)split.outer);
-                if (split.isContained) {
-                    if (AOP.gt(facet.Normal().sc(halfSpace.normal),0)) {
-                        innerFacets2.Add(facet);
-                    } else {
-                        outerFacets.Add(facet);
-                    }
-                }
-            }
+            Split(halfSpace,innerFacets1,innerFacets2,outerFacets);
             innerFacets1=innerFacets2;
             innerFacets2 = new();
         }

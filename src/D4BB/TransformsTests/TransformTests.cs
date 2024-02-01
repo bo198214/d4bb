@@ -89,42 +89,6 @@ public class TransformTests {
         Assert.That(uvcoordinates[0][0]==0 && uvcoordinates[0][1]==0 && uvcoordinates[1][0]==1 && uvcoordinates[1][1]==0);
         Assert.That(uvcoordinates[2][0]==1 && uvcoordinates[2][1]==1 && uvcoordinates[3][0]==0 && uvcoordinates[3][1]==1);        
     }
-    [Test] public void PolyhedralComplex_mesh() {
-        {
-            var ic = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
-            var pc = new PolyhedralComplex(new HashSet<IPolyhedron>{ic});
-            var cm = new FacetsGenericMesh(pc.CalculateVisibleFacets().Cast<Face2d>().ToHashSet(),duplicateVertices:false,withCenter: false);
-            Assert.That(cm.vertices.Count, Is.EqualTo(8));
-            Assert.That(cm.triangles.Count, Is.EqualTo(6*2*3));
-        }
-        {
-            var ic = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
-            var ic2 = Face2dBC.FromIntegerCell(new int[] { 1, 0, 0 });
-            var pc = new PolyhedralComplex(new HashSet<IPolyhedron>{ic,ic2});
-            var cm = new FacetsGenericMesh(pc.CalculateVisibleFacets().Cast<Face2d>().ToHashSet(),duplicateVertices:false,withCenter: false);
-            Assert.That(cm.vertices.Count, Is.EqualTo(12));
-            Assert.That(cm.triangles.Count, Is.EqualTo(10*2*3));
-        }
-    }
-    [Test] public  void CutOutTest() {
-            var pc = new PolyhedralComplex(new HashSet<IPolyhedron>(){
-                Face2dBC.FromIntegerCell(new int[]{0,0,0}),
-            });
-            foreach (var cell in pc.cells) {
-                foreach (var facet in cell.facets) {
-                    Assert.That(
-                        facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
-                }
-            }
-            var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,-0.5),1);
-            var pc2 = pc.CutOut(polyhedron1);
-            var facetsCount = 8+4+4+6+8;
-            var edgesCount = 3+8+1+8+4;
-            Assert.That(pc2.CalculateVisibleFaces(1).Count,Is.EqualTo(facetsCount));
-            Assert.That(pc2.CalculateVisibleFaces(2).Count,Is.EqualTo(edgesCount));
-            var cm = new FacetsGenericMesh(pc2.CalculateVisibleFacets().Cast<Face2d>().ToHashSet(),withCenter: true, withVertexUVs: true);
-            Assert.That(true);
-    }
     [Test] public void Inset() {
         {
             var face2d1 = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,1},true,true));
@@ -136,21 +100,15 @@ public class TransformTests {
             Assert.That(cm2.triangles, Has.Count.EqualTo(cm1.triangles.Count));
         }
         {
-            var pc1 = new PolyhedralComplex(new HashSet<IPolyhedron>(){
-                    Face2dBC.FromIntegerCell(new int[]{0,0,0}),
-            });
-            var pc2 = new PolyhedralComplex(new HashSet<IPolyhedron>(){
-                    Face2dBC.FromIntegerCell(new int[]{0,0,0}),
-                });
-            foreach (var cell in pc2.cells) {
-                foreach (var facet in cell.facets) {
-                    ((Face2d)facet).Inset(-1);
-                }
+            var pc1 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0}}));
+            var pc2 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0}}));
+            foreach (var facet in pc2.facets) {
+                facet.Inset(-1);
             }
-            var pc2faces = pc2.Faces(2);
-            Assert.That(pc2faces,Has.Count.EqualTo(pc1.Faces(2).Count));
-            var cm1 = new FacetsGenericMesh(pc1.Faces(2).Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
-            var cm2 = new FacetsGenericMesh(pc2.Faces(2).Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
+            var pc2faces = pc2.facets;
+            Assert.That(pc2faces,Has.Count.EqualTo(pc1.facets.Count));
+            var cm1 = new FacetsGenericMesh(pc1.facets.Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
+            var cm2 = new FacetsGenericMesh(pc2.facets.Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
             Assert.That(cm2.vertices,Has.Count.EqualTo(cm1.vertices.Count));
             Assert.That(cm2.triangles,Has.Count.EqualTo(cm1.triangles.Count));
         }

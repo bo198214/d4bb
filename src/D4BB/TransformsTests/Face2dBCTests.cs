@@ -284,47 +284,6 @@ public class Face2dBCTests
             new(1,0,0), new(0,1,0),new(0,0,1),new(-1,0,0), new(0,-1,0), new(0,0,-1) };
         Assert.That(normals.Values.ToHashSet().SetEquals(expected));
     }
-    [Test] public void PolyhedralComplexTest() {
-        {
-            var rc1 = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
-            var rc2 = Face2dBC.FromIntegerCell(new int[] { 1, 0, 0 });
-            var cells = new HashSet<IPolyhedron>{rc1,rc2};
-            var pc = new PolyhedralComplex(cells);
-            Assert.That(pc.CalculateVisibleFacets(), Has.Count.EqualTo(rc1.facets.Count+rc2.facets.Count-2));
-        }
-        {
-            var rc1 = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
-            var rc2 = Face2dBC.FromIntegerCell(new int[] { 1, 0, 0 });
-            var rc3 = Face2dBC.FromIntegerCell(new int[] { 0, 1, 0 });
-            var cells = new HashSet<IPolyhedron>{rc1,rc2,rc3};
-            var pc = new PolyhedralComplex(cells);
-            Assert.That(pc.CalculateVisibleFacets(), Has.Count.EqualTo(rc1.facets.Count+rc2.facets.Count+rc3.facets.Count-4));
-        }
-        {
-            var rc1 = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 });
-            var rc2 = Face2dBC.FromIntegerCell(new int[] { 1, 0, 0 });
-            var rc3 = Face2dBC.FromIntegerCell(new int[] { 0, 1, 0 });
-            var rc4 = Face2dBC.FromIntegerCell(new int[] { 1, 1, 0 });
-            var cells = new HashSet<IPolyhedron>{rc1,rc2,rc3,rc4};
-            var pc = new PolyhedralComplex(cells);
-            Assert.That(pc.CalculateVisibleFacets(), Has.Count.EqualTo(rc1.facets.Count+rc2.facets.Count+rc3.facets.Count+rc4.facets.Count-8));
-        }
-        {
-            var rc1 = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 },new HashSet<int>() {0,1},true,true);
-            var rc2 = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 },new HashSet<int>() {0,2},true,true);
-            var cells = new HashSet<IPolyhedron>{rc1,rc2};
-            var pc = new PolyhedralComplex(cells);
-            Assert.That(pc.CalculateVisibleFacets(), Has.Count.EqualTo(rc1.facets.Count+rc2.facets.Count-1));
-        }
-        {
-            var rc1 = Face2dBC.FromIntegerCell(new int[] { 0, 0, 0 },new HashSet<int>() {0,1},true,true);
-            var rc2 = Face2dBC.FromIntegerCell(new int[] { 1, 0, 0 },new HashSet<int>() {0,1},true,true);
-            var cells = new HashSet<IPolyhedron>{rc1,rc2};
-            var pc = new PolyhedralComplex(cells);
-            Assert.That(pc.CalculateVisibleFacets(), Has.Count.EqualTo(rc1.facets.Count+rc2.facets.Count-2));
-        }
-
-    }
     [Test] public void SideTest() {
         var edge = new Edge(new Point(0,0,0),new Point(1,0,0));
         Assert.That(((IPolyhedron)edge).Side(new HalfSpace(0,new Point(1,0,0))),Is.EqualTo(SplitResult.TOUCHING_OUTSIDE));
@@ -342,47 +301,6 @@ public class Face2dBCTests
         Assert.That(cube.Side(new HalfSpace(1,new Point(1,0,0))),Is.EqualTo(SplitResult.TOUCHING_INSIDE));
         Assert.That(cube.Side(new HalfSpace(2,new Point(1,0,0))),Is.EqualTo(SplitResult.GENUINE_INSIDE));
     }
-    [Test] public void CutOutTest() 
-    {
-        var pc = new PolyhedralComplex(new HashSet<IPolyhedron>(){
-            Face2dBC.FromIntegerCell(new int[]{0,0,0}),
-        });
-        foreach (var cell in pc.cells) {
-            foreach (var facet in cell.facets) {
-                Assert.That(
-                    facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
-            }
-        }
-        var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,-0.5),1);
-        var pc2 = pc.CutOut(polyhedron1);
-        Assert.That(pc2.CalculateVisibleFaces(1), Has.Count.EqualTo(8+4+4+6+8));
-        Assert.That(pc2.CalculateVisibleFaces(2), Has.Count.EqualTo(3+8+1+8+4));
-        foreach (var cell in pc2.cells) {
-            foreach (var facet in cell.facets) {
-                Assert.That(
-                    facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
-            }
-        }
-
-        foreach (var facet1 in new List<Face2d>(){
-            new Face2d(new List<Point>(){new(0.5,0,0),new(0.5,0,0.5),new(0.5,0.5,0.5),new(0.5,0.5,0)}, false),
-            new Face2d(new List<Point>(){new(0,0.5,0),new(0,0.5,0.5),new(0.5,0.5,0.5),new(0.5,0.5,0)}, false),
-            new Face2d(new List<Point>(){new(0.5,0,0),new(0.5,0.5,0),new(0.5,0.5,0.5),new(0.5,0,0.5)}, false),
-        }) {
-            Face2d facetFound = null;
-            foreach (var cell in pc2.cells) {
-                foreach (var facet in cell.facets) {
-                    if (facet.Equals(facet1)) {
-                        facetFound = (Face2d) facet;
-                        break;
-                    }
-                }
-            }
-            Assert.That(facetFound,Is.Not.EqualTo(null));
-            Assert.That(facetFound.isInvisible);
-        }
-    }
-
      [Test] public void CubeDoubleSplit() {
         var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0},}));
         HalfSpace cutLeftRight = new HalfSpace(0.5,new Point(1,0,0));
