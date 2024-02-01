@@ -63,12 +63,23 @@ public static class Precision {
         double rounded = t - (t - d);
         return rounded;
     }
-    public static void mantissaExponent(double d, out long mantissa, out int exponent)
+    public static double TruncateBinary(this double d, int binaryDigits)
+    {
+        long bits = BitConverter.DoubleToInt64Bits(d);
+        // Note that the shift is sign-extended, hence the test against -1 not 1
+        var negative = (bits & (1L << 63)) != 0;
+        var exponent = (int) ((bits >> 52) & 0x7ffL);
+        var shift = 53 - binaryDigits; // IEEE 754 doubles have 53 bits of significand, but one bit is "implied" and not stored.
+        var mantissa = bits &   0xfffffffffffffL;
+        ulong significandMask = (0xffffffffffffffffL >> shift) << shift;
+        return BitConverter.Int64BitsToDouble((long)((ulong)bits & significandMask));
+    }
+    public static void MantissaExponent(double d, out long mantissa, out int exponent, out bool negative)
     {
         // Translate the double into sign, exponent and mantissa.
         long bits = BitConverter.DoubleToInt64Bits(d);
         // Note that the shift is sign-extended, hence the test against -1 not 1
-        bool negative = (bits & (1L << 63)) != 0;
+        negative = (bits & (1L << 63)) != 0;
         exponent = (int) ((bits >> 52) & 0x7ffL);
         mantissa = bits & 0xfffffffffffffL;
 

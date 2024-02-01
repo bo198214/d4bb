@@ -3,10 +3,61 @@ using NUnit.Framework;
 using System.Linq;
 using System;
 using D4BB.Comb;
+using Microsoft.VisualBasic;
 
 namespace D4BB.Geometry {
 public class PrecisionTests
 {
+    [Test] public void DoubleTruncation() {
+        {
+            Precision.MantissaExponent(4,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(2));
+            Assert.That(mantissa,Is.EqualTo(1));
+        }
+        {
+            Precision.MantissaExponent(8,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(3));
+            Assert.That(mantissa,Is.EqualTo(1));
+        }
+        {
+            Precision.MantissaExponent(-8,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(3));
+            Assert.That(mantissa,Is.EqualTo(1));
+            Assert.That(negative,Is.True);
+        }
+        {
+            Precision.MantissaExponent(-1.0/8,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(-3));
+            Assert.That(mantissa,Is.EqualTo(1));
+            Assert.That(negative,Is.True);
+        }
+        {
+            Precision.MantissaExponent(8+4,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(2));
+            Assert.That(mantissa,Is.EqualTo(2+1));
+        }
+        {
+            Precision.MantissaExponent(8+4+2,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(1));
+            Assert.That(mantissa,Is.EqualTo(4+2+1));
+        }
+        {
+            Precision.MantissaExponent((8+4+2+1)/16.0,out var mantissa, out var exponent, out var negative);
+            Assert.That(exponent,Is.EqualTo(-4));
+            Assert.That(mantissa,Is.EqualTo(8+4+2+1));
+        }
+    }
+    [Test] public void RoundBinaryTest() {
+        Assert.That(Precision.RoundBinary((8+4+2+1)/16.0,4),Is.EqualTo((8+4+2+1)/16.0));
+        Assert.That(Precision.RoundBinary((8+4+2+1)/16.0,3),Is.EqualTo(1));
+        Assert.That(Precision.RoundBinary((16+8+4+2+1)/32.0,4),Is.EqualTo(1));
+    }
+    [Test] public void TruncateBinaryTest() {
+        Assert.That(Precision.TruncateBinary((8+4+2+1)/16.0,4),Is.EqualTo((8+4+2+1)/16.0));
+        Assert.That(Precision.TruncateBinary(8+4+2+1,3),Is.EqualTo(8+4+2));
+        Assert.That(Precision.TruncateBinary((8+4+2+1)/16.0,3),Is.EqualTo((8+4+2)/16.0));
+        Assert.That(Precision.TruncateBinary((8+4+2+1)/16.0,2),Is.EqualTo((8+4)/16.0));
+    }
     [Test] public void PointEquality1dim() {
         {
             Point a = new(new double[]{2.15});
