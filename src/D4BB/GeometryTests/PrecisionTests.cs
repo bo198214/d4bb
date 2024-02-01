@@ -54,9 +54,11 @@ public class PrecisionTests
     }
     [Test] public void TruncateBinaryTest() {
         Assert.That(Precision.TruncateBinary((8+4+2+1)/16.0,4),Is.EqualTo((8+4+2+1)/16.0));
-        Assert.That(Precision.TruncateBinary(8+4+2+1,3),Is.EqualTo(8+4+2));
+        Assert.That(Precision.TruncateBinary(8+4+2+1,-1),Is.EqualTo(8+4+2));
         Assert.That(Precision.TruncateBinary((8+4+2+1)/16.0,3),Is.EqualTo((8+4+2)/16.0));
         Assert.That(Precision.TruncateBinary((8+4+2+1)/16.0,2),Is.EqualTo((8+4)/16.0));
+        Assert.That(Precision.TruncateBinary(1/64.0,5),Is.EqualTo(0));
+        Assert.That(Precision.TruncateBinary(1/64.0,6),Is.EqualTo(1/64.0));
     }
     [Test] public void PointEquality1dim() {
         {
