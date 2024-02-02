@@ -28,12 +28,11 @@ public class InFrontOfComponentComparer : IComparer<HashSet<OrientedIntegerCell>
 		 //this works only if c1 and c2 are essentially disjunct
 		public static int IsInFrontOf(
 				HashSet<OrientedIntegerCell> cells1,
-				HashSet<OrientedIntegerCell> cells2, 
-				bool debug=false) {
+				HashSet<OrientedIntegerCell> cells2) {
 			foreach (var cell1 in cells1) {
 				foreach (var cell2 in cells2) {
 					var compare = InFrontOfCellComparer.IsInFrontOf(cell1,cell2);
-					if (!debug) {
+					if (!Debugger.IsAttached) {
 						if (compare!=0) {
 							return compare;
 						}

@@ -11,7 +11,7 @@ namespace D4BB.Transforms
 {public class Scene4d {
     public ICamera4d camera { get; set; }
     public readonly Piece[] pieces;
-    public bool debug;
+    public bool showInvisibleEdges;
     public readonly List<List<IntegerBoundaryComplex>> culledSorted3d;
     public readonly List<Component> components3d = new();
     //public FacetsGenericMesh facetsMesh;
@@ -62,9 +62,9 @@ namespace D4BB.Transforms
             return res;
         }
     }
-    public Scene4d(int[][][] pieces, ICamera4d camera, bool debug=false) {
+    public Scene4d(int[][][] pieces, ICamera4d camera, bool showInvisibleEdges=false) {
         this.camera = camera;
-        this.debug=debug;
+        this.showInvisibleEdges=showInvisibleEdges;
         this.pieces = new Piece[pieces.Length];
         for (int i=0;i<pieces.Length;i++) {
             this.pieces[i] = new Piece(pieces[i]);
@@ -138,7 +138,7 @@ namespace D4BB.Transforms
                     var component3d = new Component(){
                         piece=piece,
                         cells=component3dCells,
-                        pbc=new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(component3dCells),camera,debug),
+                        pbc=new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(component3dCells),camera,showInvisibleEdges),
                     };
                     foreach (var cell3d in component3dCells) {
                         mapping[cell3d] = component3d;
@@ -149,23 +149,23 @@ namespace D4BB.Transforms
                     components3d.Add(component3d);
                 }
             }
-            foreach (var component3d in piece.components3d) {
-                foreach (var iCell3d in component3d.cells) {
-                    foreach (var iFacet2d in iCell3d.Facets()) {
-                        if (!component3d.pbc.i2p.ContainsKey(iFacet2d)) continue; //consider boundary facets
-                        var iOther3d = pieceIBC.neighborOfVia[iCell3d][iFacet2d];
-                        if (mapping.TryGetValue(iOther3d,out var otherComp3d)) {
-                            Debug.Assert(component3d.pbc.i2p.ContainsKey(iFacet2d), "4840513521");
-                            Debug.Assert(otherComp3d.pbc.i2p.ContainsKey(iFacet2d), "4840513522");
-                            var otherPFace2d = otherComp3d.pbc.i2p[iFacet2d];
-                            var thisPFace2d = component3d.pbc.i2p[iFacet2d];
-                            otherPFace2d.neighbor = thisPFace2d;
-                            thisPFace2d.neighbor = otherPFace2d;
-                        }
-                    }
-                }
-            }
-            if (debug) foreach (var component3d in piece.components3d) {
+            // foreach (var component3d in piece.components3d) {
+            //     foreach (var iCell3d in component3d.cells) {
+            //         foreach (var iFacet2d in iCell3d.Facets()) {
+            //             if (!component3d.pbc.i2p.ContainsKey(iFacet2d)) continue; //consider boundary facets
+            //             var iOther3d = pieceIBC.neighborOfVia[iCell3d][iFacet2d];
+            //             if (mapping.TryGetValue(iOther3d,out var otherComp3d)) {
+            //                 Debug.Assert(component3d.pbc.i2p.ContainsKey(iFacet2d), "4840513521");
+            //                 Debug.Assert(otherComp3d.pbc.i2p.ContainsKey(iFacet2d), "4840513522");
+            //                 var otherPFace2d = otherComp3d.pbc.i2p[iFacet2d];
+            //                 var thisPFace2d = component3d.pbc.i2p[iFacet2d];
+            //                 otherPFace2d.neighbor = thisPFace2d;
+            //                 thisPFace2d.neighbor = otherPFace2d;
+            //             }
+            //         }
+            //     }
+            // }
+            if (Debugger.IsAttached) foreach (var component3d in piece.components3d) {
                 foreach (var pFacet in component3d.pbc.facets) {
                     foreach (var pEdge in pFacet.facets) {
                         Debug.Assert(pEdge.neighbor!=null, "2662198159");
@@ -196,10 +196,9 @@ namespace D4BB.Transforms
             for (int j=i+1;j<components3d.Count;j++) {
                 foreach (var halfSpaces in components3d[j].definingHalfSpaces) {
                     components3d[i].pbc.CutOut(halfSpaces);
-                    if (debug) foreach (var component3d in components3d) {
+                    if (Debugger.IsAttached) foreach (var component3d in components3d) {
                         foreach (var pFacet in component3d.pbc.facets) {
                             foreach (var pEdge in pFacet.facets) {
-                                //Debug.Assert(pEdge.neighbor!=null, $"2692198159 {pFacet} {pEdge} null neighbor");
                                 if (pEdge.neighbor!=null) Debug.Assert(pEdge.neighbor.neighbor==pEdge,
                                      $"2362198160 {pFacet} {pEdge} neighbor: {pEdge.neighbor}, nn: {pEdge.neighbor.neighbor}");
                             }

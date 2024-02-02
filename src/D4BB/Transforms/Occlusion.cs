@@ -13,11 +13,11 @@ public class InFrontOfComponentComparer : IComparer<Component> {
 		 * returns <0 if d2 is in front of (or greater than) d1
 		 */
 		 //this works only if c1 and c2 are essentially disjunct
-		public static int IsInFrontOf(Component c1, Component c2, bool debug=false) {
+		public static int IsInFrontOf(Component c1, Component c2) {
 			foreach (var cell1 in c1.cells) {
 				foreach (var cell2 in c2.cells) {
 					var compare = InFrontOfCellComparer.IsInFrontOf(cell1,cell2);
-					if (!debug) {
+					if (!Debugger.IsAttached) {
 						if (compare!=0) {
 							return compare;
 						}
