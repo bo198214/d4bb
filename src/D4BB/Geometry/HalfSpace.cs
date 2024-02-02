@@ -41,7 +41,7 @@ namespace D4BB.Geometry
 			length = _length;
 		}
 		public HalfSpace(Point orig, Point _normal) {
-			Debug.Assert(AOP.eq(_normal.len(),1),"0416830688");
+			Debug.Assert(AOP.eq(_normal.len(),1),$"0416830688 {_normal} is not normal, len: {_normal.len()}");
 			normal = _normal;
 			length = normal.sc(orig);
 		}

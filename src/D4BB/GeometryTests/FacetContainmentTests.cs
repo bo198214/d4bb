@@ -98,6 +98,17 @@ namespace D4BB.GeometryTests
             Assert.That(triangle1.Contains(triangle2));
             Assert.That(triangle2.Contains(triangle1));
         }
+        [Test] public void Praxis1() {
+            Face2d facet1 = new(new List<Point>{new(0,0,1),new(1,0,1),new(1,1,1),new(0,1,1)});
+            Face2d facet2 = new(new List<Point>{new(0.998331819044478,1,0.33568643679723),new(1,1,0.335555403033893),new(1,1,0.330079227503619)});
+            Assert.That(facet2.Contains(facet1),Is.False);
+            Assert.That(facet1.Contains(facet2),Is.False);
+        }
+        [Test] public void Praxis2() {
+            Face2d containee = new(new List<Point>{new(0.962,1.000,0.340),new(1.000,1.000,0.335),new(1.000,1.000,0.225)});
+            Face2d container = new(new List<Point>{new(0.000,1.000,0.473),new(0.000,1.000,1.000),new(1.000,1.000,1.000),new(1.000,1.000,0.335),new(0.962,1.000,0.340)});
+            Assert.That(container.Contains(containee),Is.False);
+        }
 
     }
 }

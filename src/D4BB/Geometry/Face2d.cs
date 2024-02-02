@@ -246,7 +246,8 @@ namespace D4BB.Geometry
             // if (cross.len()<0.000001) {
             //     Debug.Assert(false);
             // }
-            return cross.normalize();
+            cross.normalize();
+            return cross;
         }
         public HalfSpace HalfSpaceOf() {
             return new HalfSpace(edges[0].a.getPoint(),Normal());
@@ -572,7 +573,7 @@ namespace D4BB.Geometry
                 if (side==HalfSpace.OUTSIDE) return side;
                 if (side==HalfSpace.CONTAINED) {
                     var t = ab.sc(p.clone().subtract(a));
-                    if (0<=t && t<=1) return 0;
+                    if (t<0 || t>1) return 1;
                 }
             }
             return -1;
@@ -590,6 +591,32 @@ namespace D4BB.Geometry
             }
             return true;         
         }
+        /// <summary>
+        /// Calculates minimum and maximum distances of the points in this facet
+        /// </summary>
+        /// <param name="facet"></param>
+        /// <param name="min"></param>
+        /// <param name="max"></param>
+        public void Dist(out double min, out double max) {
+            max = 0;
+            min = Double.MaxValue;
+            foreach (var e1 in edges) {
+                foreach (var e2 in edges) {
+                    if (e1==e2) continue;
+                    var p1 = e1.a.PointRef();
+                    var p2 = e2.a.PointRef();
+                    double d = p1.clone().subtract(p2).len();
+                    if (d>max) {
+                        max = d; 
+                    }
+                    if (d<min) {
+                        min = d;
+                    }
+                }
+            }
+
+        }
+        
     }
     public class OrientedFace2d : Face2d {
         public OrientedFace2d(Face2d face2d) : base(face2d) {}

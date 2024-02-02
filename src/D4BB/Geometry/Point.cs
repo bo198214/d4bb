@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 
 namespace D4BB.Geometry
@@ -75,7 +76,7 @@ namespace D4BB.Geometry
         {
             var res = "<";
             for (int i=0;i<x.Length;i++) {
-                res += " " + x[i].ToString();
+                res += " " + x[i].ToString("0.000", CultureInfo.InvariantCulture);
             }
             res += ">"; 
             return res;
@@ -204,15 +205,13 @@ namespace D4BB.Geometry
         /** scales this Point to having length 1 */
         public Point normalize() {
             double l = len();
-            if (l >= AOP.ERR) {
+            if (l > 0) {
                 for (int i=0;i<x.Length;i++) {
                     x[i] /= l;
                 }
             }
             else {
-                for (int i=0;i< x.Length;i++) {
-                    x[i]=0;
-                }
+                throw new Exception($"Can not normalize 0 point");
             }
             Debug.Assert(Math.Abs(len()-1) < AOP.ERR || len() < AOP.ERR,"2062111805");
             return this;
