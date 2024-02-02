@@ -210,23 +210,4 @@ public class FacetsGenericMesh {
             }
         }
     }
-    public Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> ContainedFacetsInComponents() {
-        Dictionary<Face2dWithIntegerCellAttribute,Face2dWithIntegerCellAttribute> res = new();
-        List<Face2dWithIntegerCellAttribute> pool = new(debugPolyTriangles);
-        foreach (var facet1 in debugPolyTriangles) {
-            pool.Remove(facet1);
-            foreach (var facet2 in pool) {
-                // try {
-                // var containment = facet1.Containment(facet2.CenterPoint());
-                //     }
-                // } catch (Face2d.NotInPlaneException) {
-
-                //    if (containment==HalfSpace.INSIDE) {
-                    if (facet1.Contains(facet2)) {
-                        res[facet2]=facet1;
-                }
-            }
-        }
-        return res;
-    }
 }}
