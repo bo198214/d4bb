@@ -41,7 +41,7 @@ namespace D4BB.Geometry
 			length = _length;
 		}
 		public HalfSpace(Point orig, Point _normal) {
-			Debug.Assert(AOP.eq(_normal.len(),1),"0416830688");
+			Debug.Assert(AOP.eq(_normal.len(),1),$"0416830688 {_normal} is not normal, len: {_normal.len()}");
 			normal = _normal;
 			length = normal.sc(orig);
 		}
@@ -136,11 +136,11 @@ namespace D4BB.Geometry
 }
 public class HalfSpaceEqualityComparer : IEqualityComparer<HalfSpace>
 {
-	public readonly int precision;
+	public readonly int binaryPrecision;
 	public readonly double err;
-	public HalfSpaceEqualityComparer(int precision) {
-		this.precision = precision;
-		this.err = Math.Pow(10,-precision);
+	public HalfSpaceEqualityComparer(int binaryPrecision) {
+		this.binaryPrecision = binaryPrecision;
+		this.err = Math.Pow(10,-binaryPrecision);
 	}
     public bool Equals(HalfSpace a, HalfSpace b)
     {
@@ -151,9 +151,9 @@ public class HalfSpaceEqualityComparer : IEqualityComparer<HalfSpace>
     public int GetHashCode(HalfSpace obj)
     {
         
-		int res = Math.Round(obj.length,precision).GetHashCode();
+		int res = Precision.TruncateBinary(obj.length,binaryPrecision).GetHashCode();
 		foreach (double x in obj.normal.x) {
-			res += Math.Round(x,precision).GetHashCode();
+			res +=Precision.TruncateBinary(x,binaryPrecision).GetHashCode();
 		}
 		return res;
     }

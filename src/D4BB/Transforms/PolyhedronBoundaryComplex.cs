@@ -137,10 +137,10 @@ public class Polyhedron3dBoundaryComplex {
     public Dictionary<IntegerCell,Face2dBC> i2p = new();
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
-    bool debug;
+    bool showInvisibleEdges;
 
-    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool debug=false) {
-        this.debug = debug;
+    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool showInvisibleEdges=false) {
+        this.showInvisibleEdges = showInvisibleEdges;
         foreach (var ic in ibc.cells) {
             var pc = new Face2dBC(ic, cam) { pbc = this};
             i2p[ic] = pc;
@@ -176,11 +176,11 @@ public class Polyhedron3dBoundaryComplex {
             if (split.outer!=null)
                 out_outer.Add((Face2dBC)split.outer);
             if (split.isContained) {
-                if (AOP.gt(facet.Normal().sc(halfSpace.normal),0)) {
+//                if (AOP.gt(facet.Normal().sc(halfSpace.normal),0)) {
                     out_inner.Add(facet);
-                } else {
-                    out_outer.Add(facet);
-                }
+//                } else {
+//                    out_outer.Add(facet);
+//                }
             }
         }
     }
@@ -226,7 +226,7 @@ public class Polyhedron3dBoundaryComplex {
         HashSet<EdgeBC> res = new();
         foreach (var facet in facets) {
             foreach (var edge in facet.facets) {
-                if (debug || !edge.isInvisible || edge.neighbor==null) {
+                if (showInvisibleEdges || !edge.isInvisible || edge.neighbor==null) {
                     res.Add((EdgeBC)edge);
                 }
             }

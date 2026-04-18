@@ -59,9 +59,9 @@ public class EdgesGenericMesh {
             var edge = (Edge)edge_;
 
             List<ushort> target;
-            if (edge.neighbor==null) {
+            if (edge.isInvisible && edge.neighbor==null) {
                 target = triangles1;
-            } else if (edge.neighbor.isInvisible) {
+            } else if (edge.neighbor!=null && edge.neighbor.isInvisible) {
                 target = triangles2;
             }
             else {

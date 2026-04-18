@@ -63,7 +63,7 @@ public static class Precision {
         double rounded = t - (t - d);
         return rounded;
     }
-    public static double TruncateBinary(this double d, int binaryDigits)
+    public static double TruncateBinaryDigits(this double d, int binaryDigits)
     {
         long bits = BitConverter.DoubleToInt64Bits(d);
         // Note that the shift is sign-extended, hence the test against -1 not 1
@@ -73,6 +73,15 @@ public static class Precision {
         var mantissa = bits &   0xfffffffffffffL;
         ulong significandMask = (0xffffffffffffffffL >> shift) << shift;
         return BitConverter.Int64BitsToDouble((long)((ulong)bits & significandMask));
+    }
+    public static double TruncateBinary(this double d, int binaryDigits) {
+        if (binaryDigits>=0) {
+            int i = (int)(d * (1L<<binaryDigits));
+            return ((double)i)/(1L<<binaryDigits);
+        } else {
+            int i = (int)(d / (1L<<-binaryDigits));
+            return ((double)i)*(1L<<-binaryDigits);
+        }
     }
     public static void MantissaExponent(double d, out long mantissa, out int exponent, out bool negative)
     {
