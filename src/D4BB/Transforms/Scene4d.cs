@@ -120,6 +120,10 @@ namespace D4BB.Transforms
         }
         return res;
     }
+    public void UpdatePiece(int index, int[][] newOrigins) {
+        pieces[index].origins = newOrigins;
+        ReCalculate();
+    }
     public void ReCalculate() {
         //Take the pieces and calculate the 3d IntegerBoundaryComplexes
         components3d.Clear();
