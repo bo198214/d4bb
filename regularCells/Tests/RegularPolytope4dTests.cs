@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
+using System.Text.RegularExpressions;
 using D4BB.Geometry;
 using NUnit.Framework;
 
@@ -33,11 +33,7 @@ public class RegularPolytope4dTests
             if (File.Exists(path))
             {
                 var json = File.ReadAllText(path);
-                var doc  = JsonDocument.Parse(json);
-                return doc.RootElement.GetProperty("vertices")
-                    .EnumerateArray()
-                    .Select(row => row.EnumerateArray().Select(x => x.GetDouble()).ToArray())
-                    .ToList();
+                return ParseVertices(json);
             }
         throw new FileNotFoundException($"Cannot find {name}.json");
     }
@@ -95,6 +91,22 @@ public class RegularPolytope4dTests
         var vis  = poly.VisibleCells(eye);
         Assert.That(vis.Count, Is.GreaterThan(0).And.LessThan(poly.cells.Count),
             $"{e.name}: back-face culling should remove some cells");
+    }
+
+    static List<double[]> ParseVertices(string json)
+    {
+        var result = new List<double[]>();
+        var m = Regex.Match(json, @"""vertices""\s*:\s*(\[[\s\S]*\])\s*[,}]");
+        if (!m.Success) throw new FormatException("No 'vertices' array found in JSON");
+        string outer = m.Groups[1].Value;
+        foreach (Match row in Regex.Matches(outer, @"\[([^\[\]]+)\]"))
+        {
+            var nums = row.Groups[1].Value.Split(',')
+                .Select(s => double.Parse(s.Trim(), System.Globalization.CultureInfo.InvariantCulture))
+                .ToArray();
+            result.Add(nums);
+        }
+        return result;
     }
 
     static double Dist(double[] a, double[] b)

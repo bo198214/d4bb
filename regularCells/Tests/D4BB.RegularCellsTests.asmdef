@@ -1,0 +1,15 @@
+{
+    "name": "D4BB.RegularCellsTests",
+    "references": [ "D4BB.RegularCells" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "autoReferenced": false
+}
