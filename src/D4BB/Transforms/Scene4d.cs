@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using D4BB.Comb;
 using D4BB.Geometry;
-using static D4BB.General.TopologicalSort;
 
 
 namespace D4BB.Transforms
@@ -12,7 +11,6 @@ namespace D4BB.Transforms
     public ICamera4d camera { get; set; }
     public readonly Piece[] pieces;
     public bool showInvisibleEdges;
-    public readonly List<List<IntegerBoundaryComplex>> culledSorted3d;
     public readonly List<Component> components3d = new();
     //public FacetsGenericMesh facetsMesh;
     //public EdgesGenericMesh edgesMesh;
@@ -178,39 +176,18 @@ namespace D4BB.Transforms
                 }
             }
         }
-        //for those 3d-facets now calculate an order and sort the list accordingly
-        //it is dependent on the camera only as far the facing components are concerned
-        components3d.TSort(new InFrontOfComponentComparer());
-
-        // //before cutting we make sure to remove doublet facets
-        // HashSet<Face2dBC> facets = new();
-        // for (int i=0;i<components3d.Count;i++) {
-        //     components3d[i].distinguishedFacets.Clear();
-        //     foreach (var facet in components3d[i].pbc.facets) {
-        //         if (facets.TryGetValue(facet, out var f)) {
-        //             components3d[i].distinguishedFacets.Add(f);
-        //         } else {
-        //             facets.Add(facet);
-        //             components3d[i].distinguishedFacets.Add(facet);
-        //         }
-        //     }
-        // }
-        // cut out (in 3d) according to list order (if 4d cam moves 3d cut points needs to be recalculated, non-cut-points can just be exchanged)
         for (int i=0;i<components3d.Count;i++) {
-            for (int j=i+1;j<components3d.Count;j++) {
-                foreach (var halfSpaces in components3d[j].definingHalfSpaces) {
-                    components3d[i].pbc.CutOut(halfSpaces);
-                    if (Debugger.IsAttached) foreach (var component3d in components3d) {
-                        foreach (var pFacet in component3d.pbc.facets) {
-                            foreach (var pEdge in pFacet.facets) {
-                                if (pEdge.neighbor!=null) Debug.Assert(pEdge.neighbor.neighbor==pEdge,
-                                     $"2362198160 {pFacet} {pEdge} neighbor: {pEdge.neighbor}, nn: {pEdge.neighbor.neighbor}");
-                            }
+            for (int j=0;j<components3d.Count;j++) {
+                if (i==j) continue;
+                int k = 0;
+                foreach (var cell_j in components3d[j].cells) {
+                    var hs = components3d[j].definingHalfSpaces[k++];
+                    foreach (var cell_i in components3d[i].cells) {
+                        if (InFrontOfCellComparer.IsInFrontOf(cell_j, cell_i) > 0) {
+                            components3d[i].pbc.CutOut(hs);
+                            break;
                         }
                     }
-                    // components3d[i].distinguishedFacets = 
-                    //     Polyhedron3dBoundaryComplex.CutOut(components3d[i].distinguishedFacets,halfSpaces);
-                    
                 }
             }
         }

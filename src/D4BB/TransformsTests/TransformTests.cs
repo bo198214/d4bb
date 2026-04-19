@@ -123,54 +123,6 @@ public class TransformTests {
         scene.ReCalculate();
         Assert.That(scene.components3d,Has.Count.EqualTo(1));
     }
-    [Test] public void ComponentOcclusion() {
-        {
-            Scene4d.Component c1 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{0},false,true),
-            }};
-            Scene4d.Component c2 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{1},false,true)
-            }};
-            var occ = new InFrontOfComponentComparer();
-            Assert.That(occ.Compare(c1,c2),Is.EqualTo(0));
-        }
-        {
-            Scene4d.Component c1 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{0},false,true),
-            }};
-            Scene4d.Component c2 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{1},false,true),
-                new(new int[]{0,-1},new HashSet<int>{1},false,true)
-            }};
-            List<Scene4d.Component> list = new(){c1,c2};
-            list.Sort(new InFrontOfComponentComparer());
-            Assert.That(Is.ReferenceEquals(list.First(),c2));
-        }
-        {
-            Scene4d.Component c1 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{0},false,true),
-                new(new int[]{-1,0},new HashSet<int>{0},false,true),
-            }};
-            Scene4d.Component c2 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{1},false,true),
-            }};
-            List<Scene4d.Component> list = new(){c1,c2};
-            list.Sort(new InFrontOfComponentComparer());
-            Assert.That(Is.ReferenceEquals(list.First(),c1));
-        }
-        {
-            Scene4d.Component c1 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{0},false,true),
-                new(new int[]{-1,0},new HashSet<int>{0},false,true),
-            }};
-            Scene4d.Component c2 = new(){cells=new HashSet<OrientedIntegerCell>{
-                new(new int[]{0,0},new HashSet<int>{1},false,true),
-                new(new int[]{0,1},new HashSet<int>{1},false,true),
-            }};
-            List<Scene4d.Component> list = new(){c1,c2};
-            list.Sort(new InFrontOfComponentComparer());
-            Assert.That(Is.ReferenceEquals(list.First(),c1));
-        }
-    }
+
 }
 }

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using D4BB.Comb;
+using D4BB.Transforms;
 
 namespace D4BB.Game
 {
@@ -121,6 +122,20 @@ public class GameTests
         var bar = ObjectiveCatalog.Bar;
         Assert.That(bar.goal.Length, Is.EqualTo(3));
         Assert.That(bar.pieces.Length, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void Scene4d_AllObjectives_Load()
+    {
+        var camera = new Camera4dOrthographic();
+        var catalog = ObjectiveCatalog.Values();
+        foreach (var obj in catalog)
+        {
+            Assert.DoesNotThrow(() => {
+                var scene = new Scene4d(obj.pieces, camera);
+                Assert.That(scene.pieces.Length, Is.EqualTo(obj.pieces.Length), $"Level '{obj.name}': wrong piece count");
+            }, $"Level '{obj.name}' threw an exception");
+        }
     }
 }
 }
