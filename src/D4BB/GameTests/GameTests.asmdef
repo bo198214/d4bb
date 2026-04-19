@@ -1,0 +1,15 @@
+{
+    "name": "GameTests",
+    "references": [ "General", "Comb", "Geometry", "Transforms", "Game" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "autoReferenced": false
+}
