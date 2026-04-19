@@ -46,7 +46,6 @@ namespace D4BB.Transforms
         public Piece piece;
         public HashSet<OrientedIntegerCell> cells;
         public Polyhedron3dBoundaryComplex pbc;
-        public List<HalfSpace[]> definingHalfSpaces = new();
         // public List<Face2dBC> distinguishedFacets = new();
         public override bool Equals(object obj)
         {
@@ -144,7 +143,6 @@ namespace D4BB.Transforms
                     };
                     foreach (var cell3d in component3dCells) {
                         mapping[cell3d] = component3d;
-                        component3d.definingHalfSpaces.Add(DefiningHalfSpaces(cell3d,camera));
                     }
                     Debug.Assert(!components3d.Contains(component3d), "4840513520");
                     piece.components3d.Add(component3d);
@@ -179,9 +177,8 @@ namespace D4BB.Transforms
         for (int i=0;i<components3d.Count;i++) {
             for (int j=0;j<components3d.Count;j++) {
                 if (i==j) continue;
-                int k = 0;
                 foreach (var cell_j in components3d[j].cells) {
-                    var hs = components3d[j].definingHalfSpaces[k++];
+                    var hs = DefiningHalfSpaces(cell_j,camera);
                     foreach (var cell_i in components3d[i].cells) {
                         if (InFrontOfCellComparer.IsInFrontOf(cell_j, cell_i) > 0) {
                             components3d[i].pbc.CutOut(hs);
