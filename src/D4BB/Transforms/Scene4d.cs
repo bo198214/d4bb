@@ -175,6 +175,27 @@ namespace D4BB.Transforms
             }
         }
         
+        // Each 2D IntegerCell that appears in multiple PBCs represents a shared boundary face.
+        // When IsInFrontOf=0 (same 4D depth), neither component cuts the other, so both keep
+        // the shared face. Subsequent CutOut operations can then modify the copies differently,
+        // producing non-identical duplicates that survive into the final mesh.
+        // Fix: assign each 2D cell to exactly one PBC (first component wins); remove from others.
+        {
+            var claimedCells = new HashSet<IntegerCell>();
+            foreach (var component in components3d) {
+                var toRemove = new List<Face2dBC>();
+                foreach (var kvp in component.pbc.i2p) {
+                    if (!claimedCells.Add(kvp.Key))
+                        toRemove.Add(kvp.Value);
+                }
+                foreach (var facet in toRemove) {
+                    component.pbc.facets.Remove(facet);
+                    foreach (IPolyhedron edge in facet.facets)
+                        if (edge.neighbor != null) edge.neighbor.neighbor = null;
+                }
+            }
+        }
+
         Dictionary<OrientedIntegerCell,HalfSpace[]> halfSpaces = new();
         foreach (var component in components3d)
             foreach (var cell in component.cells)
