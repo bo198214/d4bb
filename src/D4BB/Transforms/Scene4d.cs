@@ -137,7 +137,7 @@ namespace D4BB.Transforms
                 //Point originDir = origin.clone().subtract(camera.eye);
                 bool isInFront  = camera.Proj3d(origin) != null;
                 bool isFacing   = camera.IsFacedBy(origin,normal);
-                if (isInFront && isFacing) {
+                if (isInFront && (isFacing || !enable4dOcclusion)) {
                     var component3d = new Component(){
                         piece=piece,
                         cells=component3dCells,
