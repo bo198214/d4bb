@@ -10,6 +10,7 @@ namespace D4BB.Transforms
 {public class Scene4d {
     public ICamera4d camera { get; set; }
     public readonly Piece[] pieces;
+    public int[][] goal;
     public bool showInvisibleEdges;
     public bool enable4dOcclusion = true;
     public readonly List<Component> components3d = new();
