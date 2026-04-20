@@ -32,6 +32,16 @@ public class Camera4dOrthographic : ICamera4d
         res.multiply(zoom3d);
         return res;
     }
+	public Point3d Proj3dNoClip(Point point4d) {
+        var w = v[3].sc(point4d);
+		var ew = -eye.x[3];
+        Point3d res = new Point3d();
+		res.x[0] = v[0].sc(point4d) + eye.x[0]/ew*w;
+		res.x[1] = v[1].sc(point4d) + eye.x[1]/ew*w;
+		res.x[2] = v[2].sc(point4d) + eye.x[2]/ew*w;
+        res.multiply(zoom3d);
+        return res;
+	}
 	public bool IsFacedBy(Point origin, Point normal) {
 		return normal.sc(eye) > 0;
 	}
