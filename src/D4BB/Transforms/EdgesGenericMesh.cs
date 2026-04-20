@@ -46,6 +46,8 @@ public static class VolumetricLineVertexData
 
 public class EdgesGenericMesh {
     public List<double[]> vertices = new();
+    public List<double[]> vertices4d = new();
+    public List<double[]> normals4d = new();
     public List<ushort> triangles0 = new(); //regular
     public List<ushort> triangles1 = new(); //cut
     public List<ushort> triangles2 = new(); //debug
@@ -78,6 +80,8 @@ public class EdgesGenericMesh {
                 double[] bc = b.PointRef().x;
                 vertices.Add(new double[] {ac[0],ac[1],ac[2]});
                 normals.Add( new double[] {bc[0],bc[1],bc[2]});
+                vertices4d.Add(a.pos4d);
+                normals4d.Add(b.pos4d);
        			uv0s.Add(VolumetricLineVertexData.TexCoords[i]);
        			uv1s.Add(VolumetricLineVertexData.VertexOffsets[i]);
             }
@@ -87,6 +91,8 @@ public class EdgesGenericMesh {
                 double[] bc = b.PointRef().x;
                 vertices.Add(new double[] {bc[0],bc[1],bc[2]});
                 normals.Add( new double[] {ac[0],ac[1],ac[2]});
+                vertices4d.Add(b.pos4d);
+                normals4d.Add(a.pos4d);
        			uv0s.Add(VolumetricLineVertexData.TexCoords[4+i]);
        			uv1s.Add(VolumetricLineVertexData.VertexOffsets[4+i]);
             }
