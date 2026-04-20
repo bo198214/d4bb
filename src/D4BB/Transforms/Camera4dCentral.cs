@@ -1,13 +1,9 @@
-using System;
 using D4BB.Geometry;
 
 namespace D4BB.Transforms {
 public interface ICamera4d {
     public Point4d eye {get;}
     public Point3d Proj3d(Point point4d);
-    // Like Proj3d but never returns null — clamps behind-plane vertices to the near plane.
-    // Use this for animation vertex transforms where intermediate positions can go behind the camera.
-    public Point3d Proj3dNoClip(Point point4d);
     public bool IsFacedBy(Point origin, Point normal);
     public Point4d viewNormal {get;}
 	public void SetPerspective(Point4d point);
@@ -56,21 +52,6 @@ public class Camera4dCentral : ICamera4d {
 		res.x[0] = x0 + (eye.x[0]-x0)/(w+ew)*w;
 		res.x[1] = x1 + (eye.x[1]-x1)/(w+ew)*w;
 		res.x[2] = x2 + (eye.x[2]-x2)/(w+ew)*w;
-        res.multiply(zoom3d);
-        return res;
-	}
-	public Point3d Proj3dNoClip(Point point4d) {
-        var w = v[3].sc(point4d);
-		var ew = -eye.x[3];
-		// Clamp to near plane so we never divide by near-zero
-		var we = Math.Max(w + ew, clipDist);
-        Point3d res = new Point3d();
-		var x0 = v[0].sc(point4d);
-		var x1 = v[1].sc(point4d);
-		var x2 = v[2].sc(point4d);
-		res.x[0] = x0 + (eye.x[0]-x0)/we*w;
-		res.x[1] = x1 + (eye.x[1]-x1)/we*w;
-		res.x[2] = x2 + (eye.x[2]-x2)/we*w;
         res.multiply(zoom3d);
         return res;
 	}

@@ -133,10 +133,8 @@ namespace D4BB.Transforms
             foreach (var component3dCells in pieceIBC.Components()) {
                 Point origin = new(component3dCells.First().origin);
                 Point normal = new(component3dCells.First().Normal());
-                //Point originDir = origin.clone().subtract(camera.eye);
-                bool isInFront  = camera.Proj3d(origin) != null;
-                bool isFacing   = camera.IsFacedBy(origin,normal);
-                if (isInFront && (isFacing || !enable4dOcclusion)) {
+                bool isFacing = camera.IsFacedBy(origin,normal);
+                if (isFacing || !enable4dOcclusion) {
                     var component3d = new Component(){
                         piece=piece,
                         cells=component3dCells,
