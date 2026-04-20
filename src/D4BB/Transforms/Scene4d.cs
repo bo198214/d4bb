@@ -11,6 +11,7 @@ namespace D4BB.Transforms
     public ICamera4d camera { get; set; }
     public readonly Piece[] pieces;
     public bool showInvisibleEdges;
+    public bool enable4dOcclusion = true;
     public readonly List<Component> components3d = new();
     //public FacetsGenericMesh facetsMesh;
     //public EdgesGenericMesh edgesMesh;
@@ -196,19 +197,21 @@ namespace D4BB.Transforms
             }
         }
 
-        Dictionary<OrientedIntegerCell,HalfSpace[]> halfSpaces = new();
-        foreach (var component in components3d)
-            foreach (var cell in component.cells)
-                halfSpaces[cell] = DefiningHalfSpaces(cell,camera);
+        if (enable4dOcclusion) {
+            Dictionary<OrientedIntegerCell,HalfSpace[]> halfSpaces = new();
+            foreach (var component in components3d)
+                foreach (var cell in component.cells)
+                    halfSpaces[cell] = DefiningHalfSpaces(cell,camera);
 
-        for (int i=0;i<components3d.Count;i++) {
-            for (int j=0;j<components3d.Count;j++) {
-                if (i==j) continue;
-                foreach (var cell_j in components3d[j].cells) {
-                    foreach (var cell_i in components3d[i].cells) {
-                        if (InFrontOfCellComparer.IsInFrontOf(cell_j, cell_i) > 0) {
-                            components3d[i].pbc.CutOut(halfSpaces[cell_j]);
-                            break;
+            for (int i=0;i<components3d.Count;i++) {
+                for (int j=0;j<components3d.Count;j++) {
+                    if (i==j) continue;
+                    foreach (var cell_j in components3d[j].cells) {
+                        foreach (var cell_i in components3d[i].cells) {
+                            if (InFrontOfCellComparer.IsInFrontOf(cell_j, cell_i) > 0) {
+                                components3d[i].pbc.CutOut(halfSpaces[cell_j]);
+                                break;
+                            }
                         }
                     }
                 }
