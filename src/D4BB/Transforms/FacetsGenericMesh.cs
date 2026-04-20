@@ -23,6 +23,7 @@ public class RawVertexEquality : IEqualityComparer<Vertex>
     
 public class FacetsGenericMesh {
     public List<double[]> vertices;
+    public List<double[]> vertices4d;
     public List<ushort> triangles;
     public List<double[]> uvs;
     public List<double[]> normals;
@@ -146,7 +147,8 @@ public class FacetsGenericMesh {
             vertexNumbers = new();
          }
 
-        vertices = new List<double[]>();
+        vertices   = new List<double[]>();
+        vertices4d = new List<double[]>();
         if (faces2d!=null)     triangles = new();
         if (withVertexUVs)     uvs        = new();
         if (withVertexNormals) normals   = new();
@@ -191,6 +193,7 @@ public class FacetsGenericMesh {
                 if (!vertexNumbers.ContainsKey(v)) {
                     vertexNumbers[v] = (ushort)vertices.Count;
                     vertices.Add(p.x);
+                    vertices4d.Add(v.pos4d);
                     
                     normals?.Add(normal.x);
                     if (pt.isInvisible) {

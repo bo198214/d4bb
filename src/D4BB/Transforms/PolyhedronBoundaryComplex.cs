@@ -22,6 +22,8 @@ public class EdgeBC : Edge
             cam == null ? new Point(ic.EdgeB().origin) : cam.Proj3d(new Point4d(ic.EdgeB().origin))
         ) {
         Debug.Assert(ic.Dim()==1,"1163775061");
+        a.pos4d = ic.EdgeA().origin.Select(v => (double)v).ToArray();
+        b.pos4d = ic.EdgeB().origin.Select(v => (double)v).ToArray();
     }
     public override IPolyhedron Recreate(Vertex a, Vertex b) {
         return new EdgeBC(a,b,isInvisible) { parent = parent, neighbor=neighbor };

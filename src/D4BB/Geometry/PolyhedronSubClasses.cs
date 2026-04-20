@@ -74,6 +74,7 @@ namespace D4BB.Geometry
         }
     }
     public class Vertex : RawVertex {
+        public double[] pos4d;
         public Vertex(Point point, bool isInvisible=false) : base(point,isInvisible) {
         }
         public Vertex(double x, double y, double z, bool isInvisible=false) : this(new Point(x,y,z),isInvisible) {}
