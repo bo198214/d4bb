@@ -116,11 +116,12 @@ public class TransformTests {
 
     [Test] public void Scene4dSingleTest() {
         var camera = new Camera4dCentral();
-        var scene = new Scene4d(new int[][][] { new int[][] { new int[] {0,0,0,0}}},camera);
+        var origins = new int[][][] { new int[][] { new int[] {0,0,0,0}}};
+        var scene = new Scene4d(origins, camera);
         Assert.That(scene.components3d,Has.Count.EqualTo(4));
 
         camera.eye = new Point4d(0.5,0.5,0.5,-1);
-        scene.ReCalculate();
+        scene.Update(origins);
         Assert.That(scene.components3d,Has.Count.EqualTo(1));
     }
 

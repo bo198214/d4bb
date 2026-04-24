@@ -41,8 +41,10 @@ namespace D4BB.Transforms
             Update(origins);
         }
 
+        public int PieceCount => components3d.Select(c => c.pieceIndex).DefaultIfEmpty(-1).Max() + 1;
+
         public HashSet<Face2d> VisibleFacets(int pieceIndex)
-        {
+{
             HashSet<Face2d> res = new(new Face2dUnOrientedEquality(AOP.binaryPrecision));
             foreach (var comp in components3d)
             {
