@@ -1,4 +1,19 @@
 {
-	"name": "Geometry",
-	"references": [ "Comb", "General" ]
+    "name": "Geometry",
+    "rootNamespace": "D4BB.Geometry",
+    "references": [
+        "Comb",
+        "General"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "MIConvexHull.NET Core.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

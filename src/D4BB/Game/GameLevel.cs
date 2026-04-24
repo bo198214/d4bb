@@ -13,6 +13,10 @@ namespace D4BB.Game
         public GameStatus status = GameStatus.None;
 
         public event Action OnChanged;
+        public event Action<int, IntegerSignedAxis> OnTranslate;
+        public event Action<int, int, int, int[]> OnRotate;
+        public event Action<int> OnCombine;
+        public event Action OnReset;
 
         public GameLevel(Objective obj)
         {
@@ -35,6 +39,7 @@ namespace D4BB.Game
         {
             var c = Selected;
             if (c == null) return false;
+            int idx = selectedIndex;
             c.Translate(axis);
             if (IsOverlapping())
             {
@@ -42,21 +47,37 @@ namespace D4BB.Game
                 return false;
             }
             PropagateStatus();
+            OnTranslate?.Invoke(idx, axis);
             OnChanged?.Invoke();
             return true;
         }
 
-        public bool RotateSelected(int v, int w)
+        public bool RotateSelected(int v, int w, int[] pivotOrigin = null)
         {
             var c = Selected;
             if (c == null) return false;
-            c.Rotate(v, w);
+            int idx = selectedIndex;
+
+            var pivot = pivotOrigin != null
+                ? new IntegerCenter(pivotOrigin)
+                : new IntegerCenter(c.origins, asCubes: true);
+
+            // 1. Apply rotation to origins
+            foreach (var o in c.origins) 
+                IntegerOps.RotateAsCenters(o, pivot, v, w);
+
+            // 2. Check for collisions
             if (IsOverlapping())
             {
-                c.Rotate(w, v); // counter-rotation
+                // Revert if blocked
+                foreach (var o in c.origins) 
+                    IntegerOps.RotateAsCenters(o, pivot, w, v);
                 return false;
             }
+
+            // 3. Success: Commit and notify
             PropagateStatus();
+            OnRotate?.Invoke(idx, v, w, pivotOrigin);
             OnChanged?.Invoke();
             return true;
         }
@@ -73,6 +94,18 @@ namespace D4BB.Game
             // Keep selectedIndex pointing to c0 (still in list)
             selectedIndex = compounds.IndexOf(c0);
             PropagateStatus();
+            OnCombine?.Invoke(selectedIndex);
+            OnChanged?.Invoke();
+        }
+
+        public void Reset(Objective obj)
+        {
+            compounds.Clear();
+            foreach (var piece in obj.pieces)
+                compounds.Add(new Compound(piece));
+            selectedIndex = 0;
+            PropagateStatus();
+            OnReset?.Invoke();
             OnChanged?.Invoke();
         }
 

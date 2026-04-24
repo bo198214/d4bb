@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Reflection;
 using D4BB.Comb;
 
@@ -17,7 +18,8 @@ namespace D4BB.Game
                     new int[] { -1, 1, 0, 0 }
                 },
                 new int[][] { new int[] { 1,0,0,0 } }
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Two_Cuboids = new Objective("Two Cuboids",
@@ -43,7 +45,8 @@ namespace D4BB.Game
                     new int[] { 0,1,1,1 },
                     new int[] { 1,1,1,1 },
                 }, new int[] { 3,0,0,-1 }),
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Worm = new Objective("Worm",
@@ -60,7 +63,8 @@ namespace D4BB.Game
                 new int[][] { new int[] { 2,0,0,0 } },
                 new int[][] { new int[] { 0,2,0,0 } },
                 new int[][] { new int[] { 2,2,0,0 } },
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Star = new Objective("Star",
@@ -75,7 +79,8 @@ namespace D4BB.Game
                 new int[][] { new int[] { 0,0,-2,0 } },
                 new int[][] { new int[] { 0,0,0,2 } },
                 new int[][] { new int[] { 0,0,0,-2 } },
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Twirled_Pieces = new Objective("Twirled Pieces",
@@ -101,7 +106,8 @@ namespace D4BB.Game
                     new int[] { 1,1,0,1 },
                     new int[] { 1,0,0,1 },
                 }, new int[] { 3,0,0,0 })
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective D3Box = new Objective("3D Box",
@@ -131,7 +137,8 @@ namespace D4BB.Game
                 new int[][] {
                     new int[] { 4,1,1,0 },
                 }
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Mirrored_Worms = new Objective("Mirrored Worms",
@@ -150,7 +157,8 @@ namespace D4BB.Game
                     new int[] { 2,0,0,0 }, new int[] { 3,0,0,0 },
                     new int[] { 3,1,0,0 }, new int[] { 3,1,1,0 }, new int[] { 3,1,1,-1 },
                 },
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Plug = new Objective("Plug",
@@ -168,7 +176,8 @@ namespace D4BB.Game
                     new int[] { 0,0,1,1 }, new int[] { 1,0,1,1 }, new int[] { 0,1,1,1 },
                     new int[] { 1,1,1,1 },
                 }, new int[] { 3,0,0,0 }),
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective TwoRings = new Objective("Two Rings",
@@ -191,7 +200,8 @@ namespace D4BB.Game
                     new int[] { 2,1,1,0 }, new int[] { 3,1,1,0 }, new int[] { 3,1,0,0 },
                     new int[] { 3,1,-1,0 }, new int[] { 2,1,-1,0 },
                 }
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Clamp = new Objective("4D Clamp",
@@ -223,7 +233,8 @@ namespace D4BB.Game
                     new int[] { 4,0,1,0 },
                     new int[] { 4,2,1,0 },
                 }
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective TriClamp = new Objective("Triclamp",
@@ -255,7 +266,8 @@ namespace D4BB.Game
                     new int[] { 5,1,0,0 }, new int[] { 5,0,1,0 }, new int[] { 5,2,1,0 },
                     new int[] { 6,1,1,0 }, new int[] { 4,1,1,0 }, new int[] { 5,1,2,0 },
                 }
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static readonly Objective Exam = new Objective("4 Tesseract Pieces",
@@ -277,7 +289,8 @@ namespace D4BB.Game
                     new int[] { 0,1,1,0 }, new int[] { 0,1,1,1 },
                     new int[] { 1,1,1,1 }, new int[] { 1,1,1,0 },
                 }, 3, 1), new int[] { 3,3,-1,1 }),
-            }
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } }
         );
 
         public static Objective[] Values()

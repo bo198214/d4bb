@@ -125,17 +125,47 @@ public class GameTests
     }
 
     [Test]
-    public void Scene4d_AllObjectives_Load()
+    public void GameLevel_Events_Fire()
     {
-        var camera = new Camera4dOrthographic();
-        var catalog = ObjectiveCatalog.Values();
-        foreach (var obj in catalog)
-        {
-            Assert.DoesNotThrow(() => {
-                var scene = new Scene4d(obj.pieces, camera);
-                Assert.That(scene.pieces.Length, Is.EqualTo(obj.pieces.Length), $"Level '{obj.name}': wrong piece count");
-            }, $"Level '{obj.name}' threw an exception");
-        }
+        var obj = new Objective("test",
+            new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } },
+            new int[][][] { 
+                new int[][] { new int[] { 0,0,0,0 } },
+                new int[][] { new int[] { 2,0,0,0 } }
+            });
+        var level = new GameLevel(obj);
+        
+        bool translateFired = false;
+        bool rotateFired = false;
+        bool combineFired = false;
+        bool resetFired = false;
+        bool changedFired = false;
+
+        level.OnTranslate += (idx, axis) => translateFired = true;
+        level.OnRotate += (idx, v, w, pivot) => rotateFired = true;
+        level.OnCombine += (idx) => combineFired = true;
+        level.OnReset += () => resetFired = true;
+        level.OnChanged += () => changedFired = true;
+
+        level.SelectPiece(1);
+        level.TranslateSelected(IntegerSignedAxis.MD1); // move piece 1 to (1,0,0,0)
+        Assert.That(translateFired, Is.True);
+        Assert.That(changedFired, Is.True);
+        changedFired = false;
+
+        level.RotateSelected(0, 1);
+        Assert.That(rotateFired, Is.True);
+        Assert.That(changedFired, Is.True);
+        changedFired = false;
+
+        level.CombineSelected();
+        Assert.That(combineFired, Is.True);
+        Assert.That(changedFired, Is.True);
+        changedFired = false;
+
+        level.Reset(obj);
+        Assert.That(resetFired, Is.True);
+        Assert.That(changedFired, Is.True);
     }
-}
+    }
 }

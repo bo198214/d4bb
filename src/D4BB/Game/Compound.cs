@@ -22,7 +22,8 @@ namespace D4BB.Game
 
         public void Rotate(int v, int w)
         {
-            IntegerOps.Rotate(origins, center, v, w);
+            foreach (var o in origins)
+                IntegerOps.RotateAsCenters(o, center, v, w);
         }
 
         public void Combine(IEnumerable<Compound> others)
