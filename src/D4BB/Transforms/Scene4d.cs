@@ -10,7 +10,6 @@ namespace D4BB.Transforms
     public class Scene4d
     {
         public ICamera4d camera { get; set; }
-        public int[][][] pieceOrigins;
         public bool showInvisibleEdges;
         public bool enable4dOcclusion = true;
         public readonly List<Component> components3d = new();
@@ -35,15 +34,12 @@ namespace D4BB.Transforms
             }
         }
 
-        public Scene4d(int[][][] pieceOrigins, ICamera4d camera, bool showInvisibleEdges = false)
+        public Scene4d(int[][][] origins, ICamera4d camera, bool showInvisibleEdges = false)
         {
             this.camera = camera;
             this.showInvisibleEdges = showInvisibleEdges;
-            this.pieceOrigins = pieceOrigins;
-            ReCalculate();
+            Update(origins);
         }
-
-        public int PieceCount => pieceOrigins?.Length ?? 0;
 
         public HashSet<Face2d> VisibleFacets(int pieceIndex)
         {
@@ -71,13 +67,7 @@ namespace D4BB.Transforms
             return res;
         }
 
-        public void UpdatePiece(int index, int[][] newOrigins)
-        {
-            pieceOrigins[index] = newOrigins;
-            ReCalculate();
-        }
-
-        public void ReCalculate()
+        public void Update(int[][][] pieceOrigins)
         {
             components3d.Clear();
             if (pieceOrigins == null) return;
@@ -105,7 +95,7 @@ namespace D4BB.Transforms
                 }
             }
 
-            // Occlusion: assign each 2D cell to exactly one PBC (first component wins); remove from others.
+            // Occlusion logic
             {
                 var claimedCells = new HashSet<IntegerCell>();
                 foreach (var component in components3d)
@@ -158,7 +148,6 @@ namespace D4BB.Transforms
             HalfSpace[] res = new HalfSpace[6];
             var center = new Point(3);
             var vertices = cell.Vertices();
-            Debug.Assert(vertices.Length == 8, "3249408123");
             foreach (var corner in vertices)
                 center.add(cam.Proj3d(new Point4d(corner)));
             center.multiply(1.0 / 8);
@@ -173,33 +162,7 @@ namespace D4BB.Transforms
                 var d1st = p1st.subtract(o).normalize();
                 var d2nd = p2nd.subtract(o).normalize();
                 var normal = AOP.cross(d1st, d2nd).normalize();
-                {
-                    var sc = o.clone().subtract(center).sc(normal);
-                    Debug.Assert(sc > 0, "1529589158 " + sc + " " + cell + " " + facet);
-                }
                 res[i++] = new HalfSpace(o, normal);
-            }
-            return res;
-        }
-
-        public Dictionary<Face2dBC, Face2dBC> ContainedFacetsInComponents()
-        {
-            Dictionary<Face2dBC, Face2dBC> res = new();
-            List<Face2dBC> pool = new();
-            foreach (var component3d in components3d)
-                pool.AddRange(component3d.pbc.facets);
-
-            foreach (var component3d in components3d)
-            {
-                foreach (var facet1 in component3d.pbc.facets)
-                {
-                    pool.Remove(facet1);
-                    foreach (var facet2 in pool)
-                    {
-                        if (facet1.Contains(facet2))
-                            res[facet2] = facet1;
-                    }
-                }
             }
             return res;
         }

@@ -12,6 +12,8 @@ namespace D4BB.Game
         public int[][] goal;
         public GameStatus status = GameStatus.None;
 
+        public int[][][] PieceOrigins => compounds.Select(c => c.origins).ToArray();
+
         public event Action OnChanged;
         public event Action<int, IntegerSignedAxis> OnTranslate;
         public event Action<int, int, int, int[]> OnRotate;
