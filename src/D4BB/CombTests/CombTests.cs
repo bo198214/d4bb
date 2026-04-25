@@ -315,8 +315,8 @@ public class CombTests
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(new int[][] { new int[] { 0, 0 }, new int[] { 0, 1 } });
         Assert.That(compound.cells.Count, Is.EqualTo(6));
 
-        var components = compound.Components();
-        Assert.That(components.Count,Is.EqualTo(4));
+        var sssbps = compound.SameSubSpaceBoundaryParts();
+        Assert.That(sssbps.Count,Is.EqualTo(4));
 
         Assert.That(compound.cells.Count, Is.EqualTo(6));
         HashSet<IntegerCell> facets0 = compound.PrunedSkeletonCellsOfDim(0);
@@ -327,7 +327,7 @@ public class CombTests
     {
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(new List<IntegerCell>() { new IntegerCell(new int[] { 0, 0 }), new IntegerCell(new int[] { 0, 1 }) });
         Assert.That(compound.cells.Count, Is.EqualTo(6));
-        Assert.That(compound.PrunedSkeletonComponentsOfDim(0).Count, Is.EqualTo(4));
+        Assert.That(compound.PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(0).Count, Is.EqualTo(4));
     }
 
     [Test] public void Complex2d_separateSquares_connectA()
@@ -427,7 +427,7 @@ public class CombTests
             complex.ConnectCell(new IntegerCell(cell));
         }
         //complex.ConnectComplex(complexB);
-        Assert.That(complex.Components().Count,Is.EqualTo(6));
+        Assert.That(complex.SameSubSpaceBoundaryParts().Count,Is.EqualTo(6));
     }
     [Test] public void Complex3d_random() {
         var mapping = new Dictionary<int[],int>() {
@@ -485,7 +485,7 @@ public class CombTests
         foreach (var cell in b) {
             complex.ConnectCell(new IntegerCell(cell));
         }
-        Assert.That(complex.Components().Count,Is.EqualTo(6));
+        Assert.That(complex.SameSubSpaceBoundaryParts().Count,Is.EqualTo(6));
     }
 
     void Complex_square(int sidelen)
@@ -504,7 +504,7 @@ public class CombTests
         }
 
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(origins);
-        Assert.That(compound.Components().Count,Is.EqualTo(4));
+        Assert.That(compound.SameSubSpaceBoundaryParts().Count,Is.EqualTo(4));
         HashSet<IntegerCell> c0 = compound.PrunedSkeletonCellsOfDim(0);
         Assert.That(c0.Count, Is.EqualTo(4));
     }
@@ -540,7 +540,7 @@ public class CombTests
         }
 
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(origins);
-        Assert.That(compound.Components().Count,Is.EqualTo(6));
+        Assert.That(compound.SameSubSpaceBoundaryParts().Count,Is.EqualTo(6));
         HashSet<IntegerCell> c0 = compound.PrunedSkeletonCellsOfDim(0);
         Assert.That(c0.Count, Is.EqualTo(8));
     }
@@ -593,11 +593,11 @@ public class CombTests
         //     var complexA = new IntegerBoundaryComplex(a.ToArray());
         //     var complexB = new IntegerBoundaryComplex(b.ToArray());
         //     complexA.ConnectComplex(complexB);
-        //     Assert.That(complexA.Components().Count,Is.EqualTo(8));
+        //     Assert.That(complexA.SameSubSpaceBoundaryParts().Count,Is.EqualTo(8));
         //     return complexA;
         // } else {
             IntegerBoundaryComplex compound = new IntegerBoundaryComplex(origins);
-            Assert.That(compound.Components().Count,Is.EqualTo(8));
+            Assert.That(compound.SameSubSpaceBoundaryParts().Count,Is.EqualTo(8));
             HashSet<IntegerCell> c0 = compound.PrunedSkeletonCellsOfDim(0);
             Assert.That(c0.Count, Is.EqualTo(16));
             return compound;
@@ -640,8 +640,8 @@ public class CombTests
         {
             cellsCopy.Add(cell);
         }
-        List<HashSet<OrientedIntegerCell>> components = compound.Components(cellsCopy);
-        Assert.That(components.Count, Is.EqualTo(4));
+        List<HashSet<OrientedIntegerCell>> sssbps = compound.SameSubSpaceBoundaryParts(cellsCopy);
+        Assert.That(sssbps.Count, Is.EqualTo(4));
     }
 
     [Test] public void Complex_2_separated_squares()
@@ -654,32 +654,32 @@ public class CombTests
         }
 
         //compound.MarkSameSubspaceInvisible();
-        List<HashSet<OrientedIntegerCell>> components = compound.Components(cellsCopy);
-        Assert.That(components.Count, Is.EqualTo(8));
+        List<HashSet<OrientedIntegerCell>> sssbps = compound.SameSubSpaceBoundaryParts(cellsCopy);
+        Assert.That(sssbps.Count, Is.EqualTo(8));
     }
 
     [Test] public void Complex_2_connected_squares()
     {
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(new int[][] { new int[] { 0, 0 }, new int[] { 1, 0 } });
-        List<HashSet<OrientedIntegerCell>> components = compound.Components(compound.cells);
-        Assert.That(components.Count, Is.EqualTo(4));
+        List<HashSet<OrientedIntegerCell>> sssbps = compound.SameSubSpaceBoundaryParts(compound.cells);
+        Assert.That(sssbps.Count, Is.EqualTo(4));
     }
 
     [Test] public void Complex_tesseract_5x5x5x5()
     {
         IntegerBoundaryComplex compound = Complex_tesseract(5);
-        List<HashSet<OrientedIntegerCell>> components = compound.Components(compound.cells);
-        Assert.That(components.Count, Is.EqualTo(8));
+        List<HashSet<OrientedIntegerCell>> sssbps = compound.SameSubSpaceBoundaryParts(compound.cells);
+        Assert.That(sssbps.Count, Is.EqualTo(8));
     }
 
     [Test] public void Complex3d_2_connected_cubes()
     {
         IntegerBoundaryComplex compound = new IntegerBoundaryComplex(new int[][] { new int[] { 0, 0, 0 }, new int[] { 1, 0, 0 } });
         Assert.That(compound.cells.Count, Is.EqualTo(10));
-        var sidesComponents = compound.Skeleton();
-        Assert.That(sidesComponents.Count, Is.EqualTo(6));
-        Assert.That(compound.PrunedSkeletonComponentsOfDim(2).Count, Is.EqualTo(1));
-        var edgesComplexes = compound.PrunedSkeletonComponentsOfDim(1);
+        var sssbps = compound.Skeleton();
+        Assert.That(sssbps.Count, Is.EqualTo(6));
+        Assert.That(compound.PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(2).Count, Is.EqualTo(1));
+        var edgesComplexes = compound.PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(1);
         Assert.That(edgesComplexes.Count, Is.EqualTo(6));
         foreach (IntegerBoundaryComplex edgesComplex in edgesComplexes)
         {
@@ -687,11 +687,11 @@ public class CombTests
             Assert.True(n == 4 || n == 6);
         }
 
-        Assert.That(compound.PrunedSkeletonComponentsOfDim(2).Count, Is.EqualTo(1));
+        Assert.That(compound.PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(2).Count, Is.EqualTo(1));
         Assert.That(compound.PrunedSkeletonCellsOfDim(2).Count, Is.EqualTo(10));
-        Assert.That(compound.PrunedSkeletonComponentsOfDim(1).Count, Is.EqualTo(6));
+        Assert.That(compound.PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(1).Count, Is.EqualTo(6));
         Assert.That(compound.PrunedSkeletonCellsOfDim(1).Count, Is.EqualTo(16));
-        var c0hs = compound.PrunedSkeletonComponentsOfDim(0);
+        var c0hs = compound.PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(0);
         IntegerBoundaryComplex[] c0 = c0hs.ToArray();
         int equalityCounter = 0;
         for (int i = 0; i < c0.Length; i++)

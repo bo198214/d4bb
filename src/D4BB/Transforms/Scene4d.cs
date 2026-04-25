@@ -12,9 +12,9 @@ namespace D4BB.Transforms
         public ICamera4d camera { get; set; }
         public bool showInvisibleEdges;
         public bool enable4dOcclusion = true;
-        public readonly List<Component> components3d = new();
+        public readonly List<D3SameSubSpaceBoundaryPart> d3sssbps = new();
 
-        public class Component
+        public class D3SameSubSpaceBoundaryPart
         {
             public int pieceIndex;
             public HashSet<OrientedIntegerCell> cells;
@@ -22,7 +22,7 @@ namespace D4BB.Transforms
 
             public override bool Equals(object obj)
             {
-                var other = (Component)obj;
+                var other = (D3SameSubSpaceBoundaryPart)obj;
                 return this.cells.SetEquals(other.cells);
             }
 
@@ -41,12 +41,12 @@ namespace D4BB.Transforms
             Update(origins);
         }
 
-        public int PieceCount => components3d.Select(c => c.pieceIndex).DefaultIfEmpty(-1).Max() + 1;
+        public int PieceCount => d3sssbps.Select(c => c.pieceIndex).DefaultIfEmpty(-1).Max() + 1;
 
         public HashSet<Face2d> VisibleFacets(int pieceIndex)
 {
             HashSet<Face2d> res = new(new Face2dUnOrientedEquality(AOP.binaryPrecision));
-            foreach (var comp in components3d)
+            foreach (var comp in d3sssbps)
             {
                 if (comp.pieceIndex == pieceIndex)
                 {
@@ -59,7 +59,7 @@ namespace D4BB.Transforms
         public HashSet<IPolyhedron> VisibleEdges(int pieceIndex)
         {
             HashSet<IPolyhedron> res = new();
-            foreach (var comp in components3d)
+            foreach (var comp in d3sssbps)
             {
                 if (comp.pieceIndex == pieceIndex)
                 {
@@ -71,28 +71,28 @@ namespace D4BB.Transforms
 
         public void Update(int[][][] pieceOrigins)
         {
-            components3d.Clear();
+            d3sssbps.Clear();
             if (pieceOrigins == null) return;
 
             for (int i = 0; i < pieceOrigins.Length; i++)
             {
                 var origins = pieceOrigins[i];
-                var pieceIBC = new IntegerBoundaryComplex(origins);
+                var d4PieceIBC = new IntegerBoundaryComplex(origins);
 
-                foreach (var component3dCells in pieceIBC.Components())
+                foreach (var d3sssbpRaw in d4PieceIBC.SameSubSpaceBoundaryParts())
                 {
-                    Point origin = new(component3dCells.First().origin);
-                    Point normal = new(component3dCells.First().Normal());
+                    Point origin = new(d3sssbpRaw.First().origin);
+                    Point normal = new(d3sssbpRaw.First().Normal());
                     bool isFacing = camera.IsFacedBy(origin, normal);
                     if (isFacing || !enable4dOcclusion)
                     {
-                        var component3d = new Component()
+                        var d3sssbp = new D3SameSubSpaceBoundaryPart()
                         {
                             pieceIndex = i,
-                            cells = component3dCells,
-                            pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(component3dCells), camera, showInvisibleEdges),
+                            cells = d3sssbpRaw,
+                            pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(d3sssbpRaw), camera, showInvisibleEdges),
                         };
-                        components3d.Add(component3d);
+                        d3sssbps.Add(d3sssbp);
                     }
                 }
             }
@@ -100,17 +100,17 @@ namespace D4BB.Transforms
             // Occlusion logic
             {
                 var claimedCells = new HashSet<IntegerCell>();
-                foreach (var component in components3d)
+                foreach (var d3sssbp in d3sssbps)
                 {
                     var toRemove = new List<Face2dBC>();
-                    foreach (var kvp in component.pbc.i2p)
+                    foreach (var kvp in d3sssbp.pbc.i2p)
                     {
                         if (!claimedCells.Add(kvp.Key))
                             toRemove.Add(kvp.Value);
                     }
                     foreach (var facet in toRemove)
                     {
-                        component.pbc.facets.Remove(facet);
+                        d3sssbp.pbc.d2faces.Remove(facet);
                         foreach (IPolyhedron edge in facet.facets)
                             if (edge.neighbor != null) edge.neighbor.neighbor = null;
                     }
@@ -120,22 +120,22 @@ namespace D4BB.Transforms
             if (enable4dOcclusion)
             {
                 Dictionary<OrientedIntegerCell, HalfSpace[]> halfSpaces = new();
-                foreach (var component in components3d)
-                    foreach (var cell in component.cells)
+                foreach (var d3sssbp in d3sssbps)
+                    foreach (var cell in d3sssbp.cells)
                         halfSpaces[cell] = DefiningHalfSpaces(cell, camera);
 
-                for (int i = 0; i < components3d.Count; i++)
+                for (int i = 0; i < d3sssbps.Count; i++)
                 {
-                    for (int j = 0; j < components3d.Count; j++)
+                    for (int j = 0; j < d3sssbps.Count; j++)
                     {
                         if (i == j) continue;
-                        foreach (var cell_j in components3d[j].cells)
+                        foreach (var cell_j in d3sssbps[j].cells)
                         {
-                            foreach (var cell_i in components3d[i].cells)
+                            foreach (var cell_i in d3sssbps[i].cells)
                             {
                                 if (InFrontOfCellComparer.IsInFrontOf(cell_j, cell_i) > 0)
                                 {
-                                    components3d[i].pbc.CutOut(halfSpaces[cell_j]);
+                                    d3sssbps[i].pbc.CutOut(halfSpaces[cell_j]);
                                     break;
                                 }
                             }

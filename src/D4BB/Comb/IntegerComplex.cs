@@ -123,7 +123,7 @@ public class IntegerBoundaryComplex {
         }
         return res;
     }
-    public List<HashSet<OrientedIntegerCell>> Components(HashSet<OrientedIntegerCell> outAllCubes)
+    public List<HashSet<OrientedIntegerCell>> SameSubSpaceBoundaryParts(HashSet<OrientedIntegerCell> outAllCubes)
     {
         List<HashSet<OrientedIntegerCell>> res = new();
         while (outAllCubes.Count() > 0)
@@ -134,17 +134,17 @@ public class IntegerBoundaryComplex {
         }
         return res;
     }
-    public List<HashSet<OrientedIntegerCell>> Components()
+    public List<HashSet<OrientedIntegerCell>> SameSubSpaceBoundaryParts()
     {
-        return Components(new HashSet<OrientedIntegerCell>(neighborOfVia.Keys));
+        return SameSubSpaceBoundaryParts(new HashSet<OrientedIntegerCell>(neighborOfVia.Keys));
     }
     public HashSet<IntegerBoundaryComplex> Skeleton()            
     {
-        List<HashSet<OrientedIntegerCell>> components = Components();
+        List<HashSet<OrientedIntegerCell>> sssbps = SameSubSpaceBoundaryParts();
         HashSet<IntegerBoundaryComplex> skeletons = new();
-        foreach (HashSet<OrientedIntegerCell> component in components)
+        foreach (HashSet<OrientedIntegerCell> icFace in sssbps)
         {
-            var skeleton = new IntegerBoundaryComplex(component);
+            var skeleton = new IntegerBoundaryComplex(icFace);
             skeletons.Add(skeleton);
         }
         return skeletons;
@@ -163,7 +163,7 @@ public class IntegerBoundaryComplex {
         throw new Exception();
     }
 
-    public HashSet<IntegerBoundaryComplex> PrunedSkeletonComponentsOfDim(int d)
+    public HashSet<IntegerBoundaryComplex> PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(int d)
     {
         if (d > Dim())
         {
@@ -184,11 +184,11 @@ public class IntegerBoundaryComplex {
 
             //d < dim()-1
             HashSet<IntegerBoundaryComplex> res = new();
-            var d1Components = PrunedSkeletonComponentsOfDim(d + 1);
-            foreach (IntegerBoundaryComplex d1Component in d1Components)
+            var d1Faces = PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(d + 1);
+            foreach (IntegerBoundaryComplex d1Face in d1Faces)
             {
-                var d0Components = d1Component.Skeleton();
-                res.UnionWith(d0Components);
+                var d0Faces = d1Face.Skeleton();
+                res.UnionWith(d0Faces);
             }
 
             return res;
@@ -197,10 +197,10 @@ public class IntegerBoundaryComplex {
     public HashSet<IntegerCell> PrunedSkeletonCellsOfDim(int d)
     {
         HashSet<IntegerCell> res = new();
-        var components = PrunedSkeletonComponentsOfDim(d);
-        foreach (var component in components)
+        var faces = PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(d);
+        foreach (var face in faces)
         {
-            res.UnionWith(component.cells);
+            res.UnionWith(face.cells);
         }
 
         return res;
@@ -213,9 +213,9 @@ public class IntegerBoundaryComplex {
     public static HashSet<IntegerCell> Skel2cells(HashSet<IntegerBoundaryComplex> skel)
     {
         var res = new HashSet<IntegerCell>();
-        foreach (var component in skel)
+        foreach (var sssbp in skel)
         {
-            res.UnionWith(component.cells);
+            res.UnionWith(sssbp.cells);
         }
 
         return res;

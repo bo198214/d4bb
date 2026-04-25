@@ -475,8 +475,8 @@ public class FacetsOrientationTests {
     [Test] public void Complex2CellsTest() {
         Camera4dCentral cam = new();
         var ibc = new IntegerBoundaryComplex(new int[][] { new int[] {0,0,0,0},new int[] {1,0,0,0}});
-        foreach (var component in ibc.Components()) 
-        foreach (var cell3d in component) {
+        foreach (var sssbp in ibc.SameSubSpaceBoundaryParts()) 
+        foreach (var cell3d in sssbp) {
             foreach (var cell2d in cell3d.Facets()) {
                 Assert.That(CheckOrientation3d(cell3d,cell2d), cell3d + "->" + cell2d);
                 Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);
@@ -487,8 +487,8 @@ public class FacetsOrientationTests {
         Camera4dCentral cam = new();
         var ibc = new IntegerBoundaryComplex(new int[][] { 
             new int[] {0,0,0,0},new int[] {1,0,0,0},new int[] {1,1,0,0}});
-        foreach (var component in ibc.Components()) 
-        foreach (var cell3d in component) {
+        foreach (var sssbp in ibc.SameSubSpaceBoundaryParts()) 
+        foreach (var cell3d in sssbp) {
             foreach (var cell2d in cell3d.Facets()) {
                 Assert.That(CheckOrientation3d(cell3d,cell2d), cell3d + "->" + cell2d);
                 Assert.That(CheckClockwiseProj(cell3d,cell2d,cam), cell3d + "->" + cell2d);

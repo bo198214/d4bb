@@ -102,13 +102,13 @@ public class TransformTests {
         {
             var pc1 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0}}));
             var pc2 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0}}));
-            foreach (var facet in pc2.facets) {
+            foreach (var facet in pc2.d2faces) {
                 facet.Inset(-1);
             }
-            var pc2faces = pc2.facets;
-            Assert.That(pc2faces,Has.Count.EqualTo(pc1.facets.Count));
-            var cm1 = new FacetsGenericMesh(pc1.facets.Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
-            var cm2 = new FacetsGenericMesh(pc2.facets.Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
+            var pc2faces = pc2.d2faces;
+            Assert.That(pc2faces,Has.Count.EqualTo(pc1.d2faces.Count));
+            var cm1 = new FacetsGenericMesh(pc1.d2faces.Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
+            var cm2 = new FacetsGenericMesh(pc2.d2faces.Cast<Face2d>().ToHashSet(),withCenter: false,withVertexUVs: true);
             Assert.That(cm2.vertices,Has.Count.EqualTo(cm1.vertices.Count));
             Assert.That(cm2.triangles,Has.Count.EqualTo(cm1.triangles.Count));
         }
@@ -118,11 +118,11 @@ public class TransformTests {
         var camera = new Camera4dCentral();
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0}}};
         var scene = new Scene4d(origins, camera);
-        Assert.That(scene.components3d,Has.Count.EqualTo(4));
+        Assert.That(scene.d3sssbps,Has.Count.EqualTo(4));
 
         camera.eye = new Point4d(0.5,0.5,0.5,-1);
         scene.Update(origins);
-        Assert.That(scene.components3d,Has.Count.EqualTo(1));
+        Assert.That(scene.d3sssbps,Has.Count.EqualTo(1));
     }
 
 }

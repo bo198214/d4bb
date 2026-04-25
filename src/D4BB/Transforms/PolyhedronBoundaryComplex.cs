@@ -135,24 +135,24 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
 }
 
 public class Polyhedron3dBoundaryComplex {
-    public List<Face2dBC> facets = new();
+    public List<Face2dBC> d2faces = new();
     public Dictionary<IntegerCell,Face2dBC> i2p = new();
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
     bool showInvisibleEdges;
 
-    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex ibc, ICamera4d cam=null,bool showInvisibleEdges=false) {
+    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null,bool showInvisibleEdges=false) {
         this.showInvisibleEdges = showInvisibleEdges;
-        foreach (var ic in ibc.cells) {
-            var pc = new Face2dBC(ic, cam) { pbc = this};
-            i2p[ic] = pc;
-            facets.Add(pc);
+        foreach (var i2dc in i3bc.cells) {
+            var pc = new Face2dBC(i2dc, cam) { pbc = this};
+            i2p[i2dc] = pc;
+            d2faces.Add(pc);
         }
-        var visibleIEdges = ibc.PrunedSkeletonCellsOfDim(1);
-        foreach (var ic1 in ibc.cells) {
+        var visibleIEdges = i3bc.PrunedSkeletonCellsOfDim(1);
+        foreach (var ic1 in i3bc.cells) {
             var pc = i2p[ic1];
             foreach (var iEdge in ic1.Facets()) {
-                var ic2 = ibc.neighborOfVia[ic1][iEdge];
+                var ic2 = i3bc.neighborOfVia[ic1][iEdge];
                 var pEdge1 = i2p[ic1].i2p[iEdge];
                 var pEdge2 = i2p[ic2].i2p[iEdge];
                 Debug.Assert(pEdge2!=null, "5395413579");
@@ -165,7 +165,7 @@ public class Polyhedron3dBoundaryComplex {
         }
     }
     public int Dim() {
-        foreach (var facet in facets) {
+        foreach (var facet in d2faces) {
             return facet.Dim();
         }
         throw new Exception();
@@ -190,7 +190,7 @@ public class Polyhedron3dBoundaryComplex {
         List<Face2dBC> noSplit = new();
 
         List<Face2dBC> innerFacets1 = new();
-        foreach (var facet in facets) {
+        foreach (var facet in d2faces) {
             bool outSideOneHalfSpace = false;
             foreach (var halfSpace in halfSpaces) {
                 var side = ((IPolyhedron)facet).Side(halfSpace);
@@ -215,18 +215,18 @@ public class Polyhedron3dBoundaryComplex {
             }
         }
         outerFacets.AddRange(noSplit);
-        facets = outerFacets;
+        d2faces = outerFacets;
     }
     public void CutOut(IPolyhedron polyhedron) {
         Debug.Assert(polyhedron.Dim()==polyhedron.SpaceDim(),"6715569833");
         CutOut(polyhedron.HalfSpaces().Values.ToArray());
     }
     public List<Face2dBC> VisibleFacets() {
-        return facets;
+        return d2faces;
     }
     public HashSet<EdgeBC> VisibleEdges() {
         HashSet<EdgeBC> res = new();
-        foreach (var facet in facets) {
+        foreach (var facet in d2faces) {
             foreach (var edge in facet.facets) {
                 if (showInvisibleEdges || !edge.isInvisible || edge.neighbor==null) {
                     res.Add((EdgeBC)edge);
@@ -236,10 +236,10 @@ public class Polyhedron3dBoundaryComplex {
         return res;
     }
     public void Replace(Face2dBC ab,Face2dBC a,Face2dBC b) {
-        int index = facets.IndexOf(ab);
+        int index = d2faces.IndexOf(ab);
         if (index==-1) throw new Exception($"Replacing non-existing value {ab}");
-        facets[index]=b;
-        facets.Insert(index,a);
+        d2faces[index]=b;
+        d2faces.Insert(index,a);
     }
 }
 }

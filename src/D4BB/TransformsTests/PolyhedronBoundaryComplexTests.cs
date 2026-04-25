@@ -17,15 +17,15 @@ public class PolyhedronBoundaryComplexTests {
         var front = new Face2dBC(iFront);
         var left  = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{1,2},true,true));
         var bottom= new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,2},true,true));
-        var frontIndex = cube.facets.IndexOf(front);
-        var bottomIndex = cube.facets.IndexOf(bottom);
-        var leftIndex = cube.facets.IndexOf(left);
+        var frontIndex = cube.d2faces.IndexOf(front);
+        var bottomIndex = cube.d2faces.IndexOf(bottom);
+        var leftIndex = cube.d2faces.IndexOf(left);
         Assert.That(frontIndex,Is.GreaterThanOrEqualTo(0));
         Assert.That(bottomIndex,Is.GreaterThanOrEqualTo(0));
         Assert.That(leftIndex,Is.GreaterThanOrEqualTo(0));
-        var frontInCube  = cube.facets[frontIndex];
-        var bottomInCube = cube.facets[bottomIndex];
-        var leftInCube   = cube.facets[leftIndex];
+        var frontInCube  = cube.d2faces[frontIndex];
+        var bottomInCube = cube.d2faces[bottomIndex];
+        var leftInCube   = cube.d2faces[leftIndex];
         var frontLeftEdge = frontInCube.i2p[new IntegerCell(new int[]{0,0,0},new HashSet<int>{1})];
         var leftFrontEdge =  leftInCube.i2p[new IntegerCell(new int[]{0,0,0},new HashSet<int>{1})];
         Assert.That(frontLeftEdge.neighbor,Is.SameAs(leftFrontEdge));
@@ -48,12 +48,12 @@ public class PolyhedronBoundaryComplexTests {
         var cubes = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][] {new int[]{0,0,0},new int[]{1,0,0}}));
         var front1 = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,1},true,true));
         var front2 = new Face2dBC(new OrientedIntegerCell(new int[]{1,0,0},new HashSet<int>{0,1},true,true));
-        var front1Index = cubes.facets.IndexOf(front1);
-        var front2Index = cubes.facets.IndexOf(front2);
+        var front1Index = cubes.d2faces.IndexOf(front1);
+        var front2Index = cubes.d2faces.IndexOf(front2);
         Assert.That(front1Index,Is.GreaterThanOrEqualTo(0));
         Assert.That(front2Index,Is.GreaterThanOrEqualTo(0));
-        var front1InComplex = cubes.facets[front1Index];
-        var front2InComplex = cubes.facets[front2Index];
+        var front1InComplex = cubes.d2faces[front1Index];
+        var front2InComplex = cubes.d2faces[front2Index];
         var front1RightEdge = front1InComplex.i2p[new IntegerCell(new int[]{1,0,0},new HashSet<int>{1})];
         var front2LeftEdge =  front2InComplex.i2p[new IntegerCell(new int[]{1,0,0},new HashSet<int>{1})];
         Assert.That(front1RightEdge.neighbor,Is.SameAs(front2LeftEdge));
@@ -81,7 +81,7 @@ public class PolyhedronBoundaryComplexTests {
 
         var edgeToFind = new Edge(new Point(0.5,0.5,0),new Point(0.5,1,0),true);
         List<EdgeBC> foundEdges = new();
-        foreach (var facet in pbc.facets) {
+        foreach (var facet in pbc.d2faces) {
             foreach (var edge in facet.facets) {
                 if (edge.Equals(edgeToFind)) foundEdges.Add((EdgeBC)edge);
             }
@@ -98,7 +98,7 @@ public class PolyhedronBoundaryComplexTests {
     [Test] public void CutOutTest() 
     {
         var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
-        foreach (var facet in pbc.facets) {
+        foreach (var facet in pbc.d2faces) {
                 Assert.That(facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
                 foreach (var edge in facet.facets) {
                     Assert.That(edge.GetType(), Is.EqualTo(typeof(EdgeBC)));
@@ -108,7 +108,7 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(edges, Has.Count.EqualTo(12));
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,-0.5),1);
         pbc.CutOut(polyhedron1);
-        foreach (var facet in pbc.facets) {
+        foreach (var facet in pbc.d2faces) {
                 Assert.That(facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
                 foreach (var edge in facet.facets) {
                     Assert.That(edge.GetType(), Is.EqualTo(typeof(EdgeBC)));
@@ -116,7 +116,7 @@ public class PolyhedronBoundaryComplexTests {
         }
         //Assert.That(pbc.VisibleFacets(), Has.Count.EqualTo(8+1+8+4));
         //Assert.That(pbc.VisibleEdges(), Has.Count.EqualTo(8+4+4+3+8));
-        foreach (var facet in pbc.facets) {
+        foreach (var facet in pbc.d2faces) {
             Assert.That(
                 facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
         }
@@ -126,11 +126,11 @@ public class PolyhedronBoundaryComplexTests {
             new Face2d(new List<Point>(){new(0,0.5,0),new(0,0.5,0.5),new(0.5,0.5,0.5),new(0.5,0.5,0)}, false),
             new Face2d(new List<Point>(){new(0.5,0,0),new(0.5,0.5,0),new(0.5,0.5,0.5),new(0.5,0,0.5)}, false),
         }) {
-            Assert.That(pbc.facets,Does.Not.Contains(facet));
+            Assert.That(pbc.d2faces,Does.Not.Contains(facet));
         }
     }
     static void CheckReferentialIntegrity(Polyhedron3dBoundaryComplex pbc) {
-        foreach (var facet in pbc.facets) {
+        foreach (var facet in pbc.d2faces) {
             foreach (var edge in facet.facets) {
                 if (edge.neighbor!=null) {
                     Assert.That(Is.ReferenceEquals(edge.neighbor.neighbor,edge));
@@ -161,16 +161,16 @@ public class PolyhedronBoundaryComplexTests {
         
         CheckReferentialIntegrity(pbc1);
         CheckReferentialIntegrity(pbc2);
-        Assert.That(pbc1.facets,Has.Count.EqualTo(6));
-        Assert.That(pbc1.facets.Contains(pCut1));
-        Assert.That(pbc2.facets,Has.Count.EqualTo(6));
-        Assert.That(pbc2.facets.Contains(pCut2));
+        Assert.That(pbc1.d2faces,Has.Count.EqualTo(6));
+        Assert.That(pbc1.d2faces.Contains(pCut1));
+        Assert.That(pbc2.d2faces,Has.Count.EqualTo(6));
+        Assert.That(pbc2.d2faces.Contains(pCut2));
         var toCutOut = PolyhedronCreate.Cube3dAt(new Point(0,-0.5,0),1);
         pbc1.CutOut(toCutOut);
-        Assert.That(pbc1.facets,Has.Count.EqualTo(5));
-        Assert.That(pbc1.facets.Contains(pCut1),Is.False);
-        Assert.That(pbc2.facets,Has.Count.EqualTo(7));
-        Assert.That(pbc2.facets.Contains(pCut2),Is.False);
+        Assert.That(pbc1.d2faces,Has.Count.EqualTo(5));
+        Assert.That(pbc1.d2faces.Contains(pCut1),Is.False);
+        Assert.That(pbc2.d2faces,Has.Count.EqualTo(7));
+        Assert.That(pbc2.d2faces.Contains(pCut2),Is.False);
         CheckReferentialIntegrity(pbc1);
         CheckReferentialIntegrity(pbc2);
     }

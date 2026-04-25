@@ -308,14 +308,14 @@ public class Face2dBCTests
         pbc.CutOut(new HalfSpace[] {cutLeftRight,cutUpDown});
         var visibleFacets = pbc.VisibleFacets();
         Assert.That(visibleFacets, Has.Count.EqualTo(8));
-        var cm = new FacetsGenericMesh(pbc.facets.Cast<Face2d>().ToHashSet());
+        var cm = new FacetsGenericMesh(pbc.d2faces.Cast<Face2d>().ToHashSet());
     }
     [Test] public void DiagonalCubeSplit() {
         IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
         var pbc = new Polyhedron3dBoundaryComplex(ibc);
         HalfSpace diagonal = new HalfSpace(Math.Sqrt(2.0)/2,new Point(1,1,0).normalize());
         pbc.CutOut(new HalfSpace[]{diagonal});
-        Assert.That(pbc.facets,Has.Count.EqualTo(4));
+        Assert.That(pbc.d2faces,Has.Count.EqualTo(4));
     }
     [Test] public void PreSplittedCut3d() {
         var nonSplittedFront = new Face2d(new List<Point>{new(0,0,0),new(0,1,0),new(1,1,0),new(1,0,0)});
@@ -325,13 +325,13 @@ public class Face2dBCTests
         IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
         var pbc = new Polyhedron3dBoundaryComplex(ibc);
         var indexFront = -1;
-        for (int i=0;i<pbc.facets.Count;i++) if (pbc.facets[i].Equals(nonSplittedFront)) {indexFront=i;break;}
+        for (int i=0;i<pbc.d2faces.Count;i++) if (pbc.d2faces[i].Equals(nonSplittedFront)) {indexFront=i;break;}
         Assert.That(indexFront,Is.Not.EqualTo(-1)); //==2
-        var frontFace = pbc.facets[indexFront];
+        var frontFace = pbc.d2faces[indexFront];
         var indexBack = -1;
-        for (int i=0;i<pbc.facets.Count;i++) if (pbc.facets[i].Equals(nonSplittedBack)) {indexBack=i;break;}
+        for (int i=0;i<pbc.d2faces.Count;i++) if (pbc.d2faces[i].Equals(nonSplittedBack)) {indexBack=i;break;}
         Assert.That(indexBack,Is.Not.EqualTo(-1));  //==5
-        var backFace = pbc.facets[indexBack];
+        var backFace = pbc.d2faces[indexBack];
         //indexTop == 4
 
         HalfSpace halfSpace = new HalfSpace(0.5,new Point(new double[]{1,0,0}).normalize());
@@ -345,20 +345,20 @@ public class Face2dBCTests
         Assert.That(srBack.inner,Is.Not.Null);
         Assert.That(srBack.outer,Is.Not.Null);
         pbc.Replace(backFace,(Face2dBC)srBack.inner,(Face2dBC)srBack.outer);
-        Assert.That(pbc.facets,Has.Count.EqualTo(8));
+        Assert.That(pbc.d2faces,Has.Count.EqualTo(8));
 
         var indexTop = -1;
-        for (int i=0;i<pbc.facets.Count;i++) if (pbc.facets[i].Equals(preSplittedTop)) {indexTop=i;break;}
+        for (int i=0;i<pbc.d2faces.Count;i++) if (pbc.d2faces[i].Equals(preSplittedTop)) {indexTop=i;break;}
         Assert.That(indexTop,Is.Not.EqualTo(-1));
-        var topFace = pbc.facets[indexTop];
+        var topFace = pbc.d2faces[indexTop];
         SplitResult srTop = topFace.Split(halfSpace);
         Assert.That(srTop.inner,Is.Not.Null);
         Assert.That(srTop.outer,Is.Not.Null);
         pbc.Replace(topFace,(Face2dBC)srTop.inner,(Face2dBC)srTop.outer);
-        Assert.That(pbc.facets,Has.Count.EqualTo(9));
+        Assert.That(pbc.d2faces,Has.Count.EqualTo(9));
 
         pbc.CutOut(new HalfSpace[]{halfSpace});
-        Assert.That(pbc.facets,Has.Count.EqualTo(5));
+        Assert.That(pbc.d2faces,Has.Count.EqualTo(5));
     }
     [Test] public void DiagSplittedCube() {
         IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
@@ -369,18 +369,18 @@ public class Face2dBCTests
         {
             var pbc = new Polyhedron3dBoundaryComplex(ibc);
             pbc.CutOut(new HalfSpace[]{hs1});
-            Assert.That(pbc.facets,Has.Count.EqualTo(4));
+            Assert.That(pbc.d2faces,Has.Count.EqualTo(4));
         }
         {
             var pbc = new Polyhedron3dBoundaryComplex(ibc);
             pbc.CutOut(new HalfSpace[]{hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(4));
+            Assert.That(pbc.d2faces,Has.Count.EqualTo(4));
         }
         {
             var pbc = new Polyhedron3dBoundaryComplex(ibc);
             List<Face2dBC> i = new();
             List<Face2dBC> o = new();
-            Polyhedron3dBoundaryComplex.Split(hs1,pbc.facets,i,o);
+            Polyhedron3dBoundaryComplex.Split(hs1,pbc.d2faces,i,o);
             Assert.That(i,Has.Count.EqualTo(6));
             Assert.That(o,Has.Count.EqualTo(4));
             List<Face2dBC> ii = new();
@@ -392,7 +392,7 @@ public class Face2dBCTests
         {
             var pbc = new Polyhedron3dBoundaryComplex(ibc);
             pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(7));
+            Assert.That(pbc.d2faces,Has.Count.EqualTo(7));
         }
     }
     [Test] public void CutOutGroove() {
@@ -402,21 +402,21 @@ public class Face2dBCTests
             HalfSpace hs1 = new HalfSpace(new Point(0.5,0.5,0),new Point(1,1,0).normalize());
             HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
             pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(7));
+            Assert.That(pbc.d2faces,Has.Count.EqualTo(7));
         }
         {
             var pbc = new Polyhedron3dBoundaryComplex(ibc);
             HalfSpace hs1 = new HalfSpace(new Point(0.6,0.5,0),new Point(1,1,0).normalize());
             HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
             pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(7));
+            Assert.That(pbc.d2faces,Has.Count.EqualTo(7));
         }
         {
             var pbc = new Polyhedron3dBoundaryComplex(ibc);
             HalfSpace hs1 = new HalfSpace(new Point(0.4,0.5,0),new Point(1,1,0).normalize());
             HalfSpace hs2 = new HalfSpace(new Point(0.5,0.5,0),new Point(-1,1,0).normalize());
             pbc.CutOut(new HalfSpace[]{hs1,hs2});
-            Assert.That(pbc.facets,Has.Count.EqualTo(8));
+            Assert.That(pbc.d2faces,Has.Count.EqualTo(8));
         }
     }
 }
