@@ -35,16 +35,12 @@ public class D4BSPofCells {
         return node;
     }
 
-    public IEnumerable<OrientedIntegerCell> TraverseFrontToBack(double[] camPos) {
-        if (camPos[splitAxis] >= splitValue) {
-            if (right != null) foreach (var c in right.TraverseFrontToBack(camPos)) yield return c;
-            foreach (var c in planeCells) yield return c;
-            if (left  != null) foreach (var c in left.TraverseFrontToBack(camPos))  yield return c;
-        } else {
-            if (left  != null) foreach (var c in left.TraverseFrontToBack(camPos))  yield return c;
-            foreach (var c in planeCells) yield return c;
-            if (right != null) foreach (var c in right.TraverseFrontToBack(camPos)) yield return c;
-        }
+    // Visible cells always have camera on the positive side (IsFacedBy guarantees this),
+    // so right (higher coordinate) is always the near side.
+    public IEnumerable<OrientedIntegerCell> TraverseFrontToBack() {
+        if (right != null) foreach (var c in right.TraverseFrontToBack()) yield return c;
+        foreach (var c in planeCells) yield return c;
+        if (left  != null) foreach (var c in left.TraverseFrontToBack())  yield return c;
     }
 }
 }

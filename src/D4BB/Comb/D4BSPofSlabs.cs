@@ -44,16 +44,12 @@ public class D4BSPofSlabs {
         return node;
     }
 
-    public IEnumerable<HashSet<OrientedIntegerCell>> TraverseFrontToBack(double[] camPos) {
-        if (camPos[splitAxis] >= splitValue) {
-            if (right != null) foreach (var s in right.TraverseFrontToBack(camPos)) yield return s;
-            foreach (var s in slabs) yield return s;
-            if (left  != null) foreach (var s in left.TraverseFrontToBack(camPos))  yield return s;
-        } else {
-            if (left  != null) foreach (var s in left.TraverseFrontToBack(camPos))  yield return s;
-            foreach (var s in slabs) yield return s;
-            if (right != null) foreach (var s in right.TraverseFrontToBack(camPos)) yield return s;
-        }
+    // Visible slabs always have camera on the positive side (IsFacedBy guarantees this),
+    // so right (higher coordinate) is always the near side.
+    public IEnumerable<HashSet<OrientedIntegerCell>> TraverseFrontToBack() {
+        if (right != null) foreach (var s in right.TraverseFrontToBack()) yield return s;
+        foreach (var s in slabs) yield return s;
+        if (left  != null) foreach (var s in left.TraverseFrontToBack())  yield return s;
     }
 }
 }
