@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using D4BB.Comb;
 
-namespace D4BB.Comb {
+namespace D4BB.Transforms {
 public class D4BSPofCells {
     public int splitAxis;
     public int splitValue;
-    public List<OrientedIntegerCell> planeCells = new();
+    public List<CellBoundary> planeCells = new();
     public D4BSPofCells left;   // origin[splitAxis] < splitValue
     public D4BSPofCells right;  // origin[splitAxis] >= splitValue (outside planeCells)
 
@@ -15,27 +16,27 @@ public class D4BSPofCells {
         throw new Exception("No normal axis found");
     }
 
-    public static D4BSPofCells Build(IList<OrientedIntegerCell> cells) {
+    public static D4BSPofCells Build(IList<CellBoundary> cells) {
         if (cells.Count == 0) return null;
         // Prefer a pivot whose hyperplane contains exactly one cell (unique split),
         // so planeCells never mixes cells from different depth layers.
         var pivot = cells[0];
         foreach (var candidate in cells) {
-            int k = NormalAxis(candidate), v = candidate.origin[k];
+            int k = NormalAxis(candidate.cell), v = candidate.cell.origin[k];
             bool unique = true;
             foreach (var c in cells)
-                if (c != candidate && NormalAxis(c) == k && c.origin[k] == v) { unique = false; break; }
+                if (c != candidate && NormalAxis(c.cell) == k && c.cell.origin[k] == v) { unique = false; break; }
             if (unique) { pivot = candidate; break; }
         }
-        int axis  = NormalAxis(pivot);
-        int value = pivot.origin[axis];
+        int axis  = NormalAxis(pivot.cell);
+        int value = pivot.cell.origin[axis];
         var node = new D4BSPofCells { splitAxis = axis, splitValue = value };
-        var leftList  = new List<OrientedIntegerCell>();
-        var rightList = new List<OrientedIntegerCell>();
+        var leftList  = new List<CellBoundary>();
+        var rightList = new List<CellBoundary>();
         foreach (var c in cells) {
-            if (NormalAxis(c) == axis && c.origin[axis] == value)
+            if (NormalAxis(c.cell) == axis && c.cell.origin[axis] == value)
                 node.planeCells.Add(c);
-            else if (c.origin[axis] < value)
+            else if (c.cell.origin[axis] < value)
                 leftList.Add(c);
             else
                 rightList.Add(c);
@@ -48,7 +49,7 @@ public class D4BSPofCells {
     // Back-to-front: what is further along viewNormal comes first.
     // viewNormal[splitAxis] > 0 → right (larger coordinate) is further → right first.
     // viewNormal[splitAxis] < 0 → left (smaller coordinate) is further → left first.
-    public IEnumerable<List<OrientedIntegerCell>> TraverseBackToFront(double[] viewNormal) {
+    public IEnumerable<List<CellBoundary>> TraverseBackToFront(double[] viewNormal) {
         bool rightIsFar = viewNormal[splitAxis] > 0;
         var far  = rightIsFar ? right : left;
         var near = rightIsFar ? left  : right;

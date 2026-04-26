@@ -1,18 +1,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using D4BB.Transforms;
 
 namespace D4BB.Comb {
 
 public class D4BSPofCellsTests {
 
-    static List<OrientedIntegerCell> CellsOf(int[] origin) =>
-        new IntegerBoundaryComplex(origin).cells.ToList();
+    static List<CellBoundary> CellsOf(int[] origin) =>
+        new IntegerBoundaryComplex(origin).cells
+            .Select(c => new CellBoundary(c, null))
+            .ToList();
 
     // In back-to-front traversal, all cells of 'far' must appear before all cells of 'near'.
     static void AssertFarBeforeNear(
-        List<OrientedIntegerCell> near,
-        List<OrientedIntegerCell> far,
+        List<CellBoundary> near,
+        List<CellBoundary> far,
         double[] viewNormal)
     {
         var allCells = near.Concat(far).ToList();

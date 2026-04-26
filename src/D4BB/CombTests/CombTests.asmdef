@@ -1,6 +1,6 @@
 {
 	"name": "CombTests",
-	"references": [ "General", "Comb" ],
+	"references": [ "General", "Comb", "Transforms" ],
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll"

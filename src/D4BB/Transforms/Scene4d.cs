@@ -34,14 +34,14 @@ namespace D4BB.Transforms
             }
         }
 
+        private D4BSPofCells _bsp;
+
         public Scene4d(int[][][] origins, ICamera4d camera, bool showInvisibleEdges = false)
         {
             this.camera = camera;
             this.showInvisibleEdges = showInvisibleEdges;
             Update(origins);
         }
-
-        public int PieceCount => slabs.Select(s => s.pieceIndex).DefaultIfEmpty(-1).Max() + 1;
 
         public HashSet<Face2d> VisibleFacets(int pieceIndex)
         {
@@ -61,9 +61,23 @@ namespace D4BB.Transforms
             return res;
         }
 
+        // Full rebuild: call when pieceOrigins change. Also rebuilds the BSP.
         public void Update(int[][][] pieceOrigins)
         {
-            slabs.Clear();
+            RebuildSlabs(pieceOrigins, camera, enable4dOcclusion, showInvisibleEdges, slabs);
+            _bsp = RebuildBSP(slabs);
+            ApplyCameraOcclusion();
+        }
+
+        // Partial rebuild: call when only the camera changes. Reuses the cached BSP.
+        public void UpdateCamera()
+        {
+            ApplyCameraOcclusion();
+        }
+
+        private static void RebuildSlabs(int[][][] pieceOrigins, ICamera4d camera, Boolean enable4dOcclusion, Boolean showInvisibleEdges, List<Slab> slabsOut)
+        {
+            slabsOut.Clear();
             if (pieceOrigins == null) return;
 
             for (int i = 0; i < pieceOrigins.Length; i++)
@@ -73,8 +87,8 @@ namespace D4BB.Transforms
                 {
                     Point origin = new(slabCells.First().origin);
                     Point normal = new(slabCells.First().Normal());
-                    if (camera.IsFacedBy(origin, normal) || !enable4dOcclusion)
-                        slabs.Add(new Slab {
+                    if (camera.IsFacedBy(origin, normal) || !enable4dOcclusion) //TODO: rebuild when occlusion toggled, should also be rebuild when camera positioning changes
+                        slabsOut.Add(new Slab {
                             pieceIndex = i,
                             cells = slabCells,
                             pbc = new Polyhedron3dBoundaryComplex(slabCells, camera, showInvisibleEdges),
@@ -84,56 +98,50 @@ namespace D4BB.Transforms
 
             // 3D occlusion: shared 2-faces between slabs cancel.
             // Remove from main pbc.d2faces AND from each CellBoundary's mini-pbc.
+            // {
+            //     var claimedCells = new HashSet<IntegerCell>();
+            //     foreach (var slab in slabsOut)
+            //     {
+            //         var toRemove = new List<Face2dBC>();
+            //         foreach (var kvp in slab.pbc.i2p)
+            //             if (!claimedCells.Add(kvp.Key))
+            //                 toRemove.Add(kvp.Value);
+            //         foreach (var facet in toRemove)
+            //         {
+            //             slab.pbc.d2faces.Remove(facet);
+            //             foreach (IPolyhedron edge in facet.facets)
+            //                 if (edge.neighbor != null) edge.neighbor.neighbor = null;
+            //             if (slab.pbc.cellBoundaries != null)
+            //                 foreach (var cb in slab.pbc.cellBoundaries)
+            //                     cb.pbc.d2faces.Remove(facet);
+            //         }
+            //     }
+            // }
+        }
+
+        private static D4BSPofCells RebuildBSP(List<Slab> slabs)
+        {
+            var allCells = new List<CellBoundary>();
+            foreach (var slab in slabs)
+                foreach (var cb in slab.pbc.cellBoundaries)
+                    allCells.Add(cb);
+            return D4BSPofCells.Build(allCells);
+        }
+
+        private void ApplyCameraOcclusion()
+        {
+            if (!enable4dOcclusion) return;
+
+            var viewNormal = camera.viewNormal.x;
+            var back = new List<CellBoundary>();
+            foreach (var batch in _bsp.TraverseBackToFront(viewNormal))
             {
-                var claimedCells = new HashSet<IntegerCell>();
-                foreach (var slab in slabs)
-                {
-                    var toRemove = new List<Face2dBC>();
-                    foreach (var kvp in slab.pbc.i2p)
-                        if (!claimedCells.Add(kvp.Key))
-                            toRemove.Add(kvp.Value);
-                    foreach (var facet in toRemove)
-                    {
-                        slab.pbc.d2faces.Remove(facet);
-                        foreach (IPolyhedron edge in facet.facets)
-                            if (edge.neighbor != null) edge.neighbor.neighbor = null;
-                        if (slab.pbc.cellBoundaries != null)
-                            foreach (var cb in slab.pbc.cellBoundaries)
-                                cb.pbc.d2faces.Remove(facet);
-                    }
-                }
-            }
-
-            if (enable4dOcclusion)
-            {
-                var allCells  = new List<OrientedIntegerCell>();
-                var cellToCB  = new Dictionary<OrientedIntegerCell, CellBoundary>();
-                var halfSpaces = new Dictionary<OrientedIntegerCell, HalfSpace[]>();
-
-                foreach (var slab in slabs)
-                    if (slab.pbc.cellBoundaries != null)
-                        foreach (var cb in slab.pbc.cellBoundaries)
-                        {
-                            allCells.Add(cb.cell);
-                            cellToCB[cb.cell]   = cb;
-                            halfSpaces[cb.cell] = DefiningHalfSpaces(cb.cell, camera);
-                        }
-
-                var bsp = D4BSPofCells.Build(allCells);
-                if (bsp != null)
-                {
-                    var viewNormal = camera.viewNormal.x;
-                    var back = new List<OrientedIntegerCell>();
-                    foreach (var batch in bsp.TraverseBackToFront(viewNormal))
-                    {
-                        // batch is NEARER than all cells in `back`.
-                        // Near cells occlude far cells → cut far cells using near cells' halfspaces.
-                        foreach (var nearCell in batch)
-                            foreach (var farCell in back)
-                                cellToCB[farCell].pbc.CutOut(halfSpaces[nearCell]);
-                        back.AddRange(batch);
-                    }
-                }
+                // batch is NEARER than all cells in `back`.
+                // Near cells occlude far cells → cut far cells using near cells' halfspaces.
+                foreach (var nearCell in batch)
+                    foreach (var farCell in back)
+                        farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
+                back.AddRange(batch);
             }
         }
 
