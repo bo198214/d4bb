@@ -45,6 +45,65 @@ namespace D4BB.CombTests
             Assert.That(new InFrontOfViewNormalComparer(new double[]{1,0}).Compare(edge1, edge2), Is.GreaterThan(0));
             Assert.That(new InFrontOfViewNormalComparer(new double[]{-1,0}).Compare(edge2, edge1), Is.GreaterThan(0));
         }
+        // --- InFrontOfViewNormalComparer tests ---
+
+        // Helper: IntegerCell from a 4D hypercube face (normalAxis inferred from span).
+        static OrientedIntegerCell Face4d(int[] origin, int normalAxis, bool inverted = false) {
+            var span = new HashSet<int>{0,1,2,3};
+            span.Remove(normalAxis);
+            return new OrientedIntegerCell(origin, span, inverted, false);
+        }
+
+        [Test] public void ViewNormalComparer_SameAxis_NearerFirst() {
+            // Two cells with same normalAxis=3. viewNormal=(0,0,0,1): x3=0 is nearer than x3=2.
+            var near = Face4d(new[]{0,0,0,0}, normalAxis: 3);
+            var far  = Face4d(new[]{0,0,0,2}, normalAxis: 3);
+            var cmp = new InFrontOfViewNormalComparer(new double[]{0,0,0,1});
+            Assert.That(cmp.Compare(near, far), Is.GreaterThan(0), "near (x3=0) should be in front of far (x3=2)");
+            Assert.That(cmp.Compare(far, near), Is.LessThan(0));
+        }
+
+        [Test] public void ViewNormalComparer_SameAxis_ReverseDirection() {
+            // viewNormal=(0,0,0,-1): x3=2 is now nearer (camera looks in -x3).
+            var a = Face4d(new[]{0,0,0,0}, normalAxis: 3);
+            var b = Face4d(new[]{0,0,0,2}, normalAxis: 3);
+            var cmp = new InFrontOfViewNormalComparer(new double[]{0,0,0,-1});
+            Assert.That(cmp.Compare(b, a), Is.GreaterThan(0), "x3=2 is nearer for viewNormal=-w");
+        }
+
+        [Test] public void ViewNormalComparer_CrossAxis_CorrectDepth() {
+            // normalAxis=1 cell from cube [0,0]: center[0]=0.5, depth=0.5.
+            // normalAxis=1 cell from cube [2,0]: center[0]=2.5, depth=2.5.
+            // viewNormal=(1,0): first is nearer.
+            var span1 = new HashSet<int>{0};
+            var near = new IntegerCell(new[]{0,0}, span1); // normalAxis=1
+            var far  = new IntegerCell(new[]{2,0}, span1);
+            var cmp = new InFrontOfViewNormalComparer(new double[]{1,0});
+            Assert.That(cmp.Compare(near, far), Is.GreaterThan(0),
+                "cell at x0≈0.5 should be in front of cell at x0≈2.5");
+        }
+
+        [Test] public void ViewNormalComparer_SameDepth_ReturnsZero() {
+            // Two normalAxis=1 cells from the same cube: both have center[0]=0.5 → same depth.
+            var span = new HashSet<int>{0};
+            var a = new IntegerCell(new[]{0,0}, span);
+            var b = new IntegerCell(new[]{0,1}, span);
+            var cmp = new InFrontOfViewNormalComparer(new double[]{1,0});
+            Assert.That(cmp.Compare(a, b), Is.EqualTo(0),
+                "cells with same depth along viewNormal should return 0");
+        }
+
+        [Test] public void ViewNormalComparer_PerpendicularAxis_SameDepth_Zero() {
+            // normalAxis=1 cells where viewNormal[1]=0: their x1 position is irrelevant,
+            // depth = viewNormal·center depends only on x0. Both at center[0]=0.5 → depth equal.
+            var span = new HashSet<int>{0};
+            var a = new IntegerCell(new[]{0,0}, span); // center[0]=0.5
+            var b = new IntegerCell(new[]{0,2}, span); // center[0]=0.5 (x0 not origin[1])
+            var cmp = new InFrontOfViewNormalComparer(new double[]{1,0});
+            Assert.That(cmp.Compare(a, b), Is.EqualTo(0),
+                "cells perpendicular to viewNormal with same depth must return 0 (not occlude each other)");
+        }
+
         [Test] public void InFrontOfComponentComparerTest4d() {
             var behind = new IntegerCell(new int[]{0,0,0,2});
             var inFront = new IntegerCell(new int[]{0,0,0,0});
