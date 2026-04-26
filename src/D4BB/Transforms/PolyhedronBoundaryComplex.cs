@@ -141,8 +141,26 @@ public class Polyhedron3dBoundaryComplex {
     // public List<VertexBC> visibleVertices = new();
     bool showInvisibleEdges;
 
+    public List<CellBoundary> cellBoundaries;
+    internal Polyhedron3dBoundaryComplex(List<Face2dBC> prebuiltFaces, bool showInvisibleEdges) {
+        this.showInvisibleEdges = showInvisibleEdges;
+        d2faces = prebuiltFaces;
+        foreach (var face in d2faces)
+            i2p[face.integerCell] = face;
+    }
     public Polyhedron3dBoundaryComplex(HashSet<OrientedIntegerCell> cells3, ICamera4d cam=null, bool showInvisibleEdges=false)
-            : this(new IntegerBoundaryComplex(cells3), cam, showInvisibleEdges) {}
+            : this(new IntegerBoundaryComplex(cells3), cam, showInvisibleEdges) {
+        cellBoundaries = new List<CellBoundary>();
+        foreach (var c3 in cells3) {
+            var cellFaces = new List<Face2dBC>();
+            foreach (var c2 in c3.Facets())
+                if (i2p.TryGetValue(c2, out var face))
+                    cellFaces.Add(face);
+            if (cellFaces.Count == 0) continue;
+            cellBoundaries.Add(new CellBoundary(c3,
+                new Polyhedron3dBoundaryComplex(cellFaces, showInvisibleEdges)));
+        }
+    }
     public Polyhedron3dBoundaryComplex(int[] origin, ICamera4d cam=null, bool showInvisibleEdges=false)
             : this(new IntegerBoundaryComplex(origin), cam, showInvisibleEdges) {}
     public Polyhedron3dBoundaryComplex(int[][] origins, ICamera4d cam=null, bool showInvisibleEdges=false)
