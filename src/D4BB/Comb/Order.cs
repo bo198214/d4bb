@@ -20,4 +20,18 @@ public class InFrontOfCellComparer : IComparer<OrientedIntegerCell> {
 			return IsInFrontOf(d1,d2);
 		}
 }
+
+public class InFrontOfViewNormalComparer : IComparer<IntegerCell> {
+        public double[] viewNormal;
+        public InFrontOfViewNormalComparer(double[] viewNormal) {
+            this.viewNormal = viewNormal;
+        }
+        public int Compare(IntegerCell d1, IntegerCell d2) {
+            var inverted1 = viewNormal[d1.NormalAxis()] >= 0;
+            var inverted2 = viewNormal[d2.NormalAxis()] >= 0;
+            var od1 = new OrientedIntegerCell(d1.origin, d1.span, inverted1, false);
+            var od2 = new OrientedIntegerCell(d2.origin, d2.span, inverted2, false);
+            return InFrontOfCellComparer.IsInFrontOf(od1, od2);
+        }
+    }
 }
