@@ -51,7 +51,9 @@ public class IntegerCell
         IntegerCell f = (IntegerCell)o;
         return IntegerOps.VecEqual(origin, f.origin) && span.SetEquals(f.span);
     }
-
+    public int NormalAxis() {
+        return FullSpan().Except(span).First();
+    }
     override public int GetHashCode()
     {
 
