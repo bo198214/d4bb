@@ -12,6 +12,39 @@ namespace D4BB.CombTests
 {
     public class OrderTests
     {
+        [Test] public void InFrontOfComponentComparerTest2dOrth()
+        {
+            var edge1 = new OrientedIntegerCell(new int[] { 0, 0}, new HashSet<int>{0}, false, true);
+            Assert.That(edge1.NormalAxis(), Is.EqualTo(1));
+            Assert.That(edge1.Normal(), Is.EqualTo(new int[]{0,1}));
+            var edge2 = new OrientedIntegerCell(new int[] { 0, 0}, new HashSet<int>{1}, false, true);
+            Assert.That(edge2.NormalAxis(), Is.EqualTo(0));
+            Assert.That(edge2.Normal(), Is.EqualTo(new int[]{1,0}));
+            Assert.That(InFrontOfCellComparer.IsInFrontOf(edge1, edge2), Is.EqualTo(0));
+        }
+        [Test] public void InFrontOfComponentComparerTest2dParallelOpposite()
+        {
+            var edge1 = new OrientedIntegerCell(new int[] { 0, 0}, new HashSet<int>{1}, false, true);
+            Assert.That(edge1.NormalAxis(), Is.EqualTo(0));
+            Assert.That(edge1.Normal(), Is.EqualTo(new int[]{1,0}));
+            var edge2 = new OrientedIntegerCell(new int[] { 1, 0}, new HashSet<int>{1}, true, true);
+            Assert.That(edge2.NormalAxis(), Is.EqualTo(0));
+            Assert.That(edge2.Normal(), Is.EqualTo(new int[]{-1,0}));
+            Assert.That(InFrontOfCellComparer.IsInFrontOf(edge1, edge2), Is.EqualTo(0));
+        }
+        [Test] public void InFrontOfComponentComparerTest2dParallelAligned()
+        {
+            var edge1 = new OrientedIntegerCell(new int[] { 0, 0}, new HashSet<int>{1}, false, true);
+            Assert.That(edge1.NormalAxis(), Is.EqualTo(0));
+            Assert.That(edge1.Normal(), Is.EqualTo(new int[]{1,0}));
+            var edge2 = new OrientedIntegerCell(new int[] { 1, 0}, new HashSet<int>{1}, false, true);
+            Assert.That(edge2.NormalAxis(), Is.EqualTo(0));
+            Assert.That(edge2.Normal(), Is.EqualTo(new int[]{1,0}));
+            Assert.That(InFrontOfCellComparer.IsInFrontOf(edge2, edge1), Is.GreaterThan(0));
+            
+            Assert.That(new InFrontOfViewNormalComparer(new double[]{1,0}).Compare(edge1, edge2), Is.GreaterThan(0));
+            Assert.That(new InFrontOfViewNormalComparer(new double[]{-1,0}).Compare(edge2, edge1), Is.GreaterThan(0));
+        }
         [Test] public void InFrontOfComponentComparerTest4d() {
             var behind = new IntegerCell(new int[]{0,0,0,2});
             var inFront = new IntegerCell(new int[]{0,0,0,0});
