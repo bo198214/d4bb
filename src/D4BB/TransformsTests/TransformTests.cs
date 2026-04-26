@@ -100,8 +100,8 @@ public class TransformTests {
             Assert.That(cm2.triangles, Has.Count.EqualTo(cm1.triangles.Count));
         }
         {
-            var pc1 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0}}));
-            var pc2 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0}}));
+            var pc1 = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0}});
+            var pc2 = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0}});
             foreach (var facet in pc2.d2faces) {
                 facet.Inset(-1);
             }

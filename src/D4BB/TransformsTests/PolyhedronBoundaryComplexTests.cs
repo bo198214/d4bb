@@ -7,12 +7,12 @@ using NUnit.Framework;
 namespace D4BB.Transforms {
 public class PolyhedronBoundaryComplexTests {
     [Test] public void Polyhedron3dBoundaryComplex_SingleCube_Numbers() {
-        var cube = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
+        var cube = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         Assert.That(cube.VisibleFacets(),Has.Count.EqualTo(6));
         Assert.That(cube.VisibleEdges(),Has.Count.EqualTo(12));
     }
     [Test] public void Polyhedron3dBoundaryComplex_Links() {
-        var cube = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
+        var cube = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         var iFront = new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,1},true,true);
         var front = new Face2dBC(iFront);
         var left  = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{1,2},true,true));
@@ -40,12 +40,12 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(bottomFrontEdge.a.getPoint(),Is.EqualTo(new Point(0,0,0)));
     }
     [Test] public void Polyhedron3dBoundaryComplex_TwoCubes_Numbers() {
-        var cubes = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][] {new int[]{0,0,0},new int[]{1,0,0}}));
+        var cubes = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0},new int[]{1,0,0}});
         Assert.That(cubes.VisibleFacets(),Has.Count.EqualTo(10));
         Assert.That(cubes.VisibleEdges(),Has.Count.EqualTo(16));
     }
     [Test] public void Polyhedron3dBoundaryComplex_TwoCubes_Links() {
-        var cubes = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][] {new int[]{0,0,0},new int[]{1,0,0}}));
+        var cubes = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0},new int[]{1,0,0}});
         var front1 = new Face2dBC(new OrientedIntegerCell(new int[]{0,0,0},new HashSet<int>{0,1},true,true));
         var front2 = new Face2dBC(new OrientedIntegerCell(new int[]{1,0,0},new HashSet<int>{0,1},true,true));
         var front1Index = cubes.d2faces.IndexOf(front1);
@@ -65,7 +65,7 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(!cubes.i2p.ContainsKey(iSandwich));
     }
     [Test] public void CutOutTest_Half() {
-        var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
+        var pbc = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,0,0),1);
         pbc.CutOut(polyhedron1);
         var facets = pbc.VisibleFacets();
@@ -73,7 +73,7 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(pbc.VisibleEdges(), Has.Count.EqualTo(12));
     }
     [Test] public void CutOutTest_L() {
-        var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
+        var pbc = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,0),1);
         pbc.CutOut(polyhedron1);
         var visibleFacets = pbc.VisibleFacets();
@@ -97,7 +97,7 @@ public class PolyhedronBoundaryComplexTests {
     }
     [Test] public void CutOutTest() 
     {
-        var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[]{0,0,0}));
+        var pbc = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         foreach (var facet in pbc.d2faces) {
                 Assert.That(facet.GetType(), Is.EqualTo(typeof(Face2dBC)));
                 foreach (var edge in facet.facets) {
@@ -148,8 +148,8 @@ public class PolyhedronBoundaryComplexTests {
         var pCut = new Face2d(new List<Point>{new(0,0,0),new(0,0,1),new(0,1,1),new(0,1,0)});
         Assert.That(ibc.neighborOfVia[iFace3d1][iCut],Is.EqualTo(iFace3d2));
         var camera = new Camera4dOrthographic();
-        var pbc1 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(iFace3d1),camera);
-        var pbc2 = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(iFace3d2),camera);
+        var pbc1 = new Polyhedron3dBoundaryComplex(new HashSet<OrientedIntegerCell>{iFace3d1},camera);
+        var pbc2 = new Polyhedron3dBoundaryComplex(new HashSet<OrientedIntegerCell>{iFace3d2},camera);
         Assert.That(pbc1.i2p.ContainsKey(iCut));
         Assert.That(pbc2.i2p.ContainsKey(iCut));
         var pCut1 = pbc1.i2p[iCut];

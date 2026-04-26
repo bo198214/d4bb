@@ -302,7 +302,7 @@ public class Face2dBCTests
         Assert.That(cube.Side(new HalfSpace(2,new Point(1,0,0))),Is.EqualTo(SplitResult.GENUINE_INSIDE));
     }
      [Test] public void CubeDoubleSplit() {
-        var pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0},}));
+        var pbc = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0}});
         HalfSpace cutLeftRight = new HalfSpace(0.5,new Point(1,0,0));
         HalfSpace cutUpDown =    new HalfSpace(0.5,new Point(0,1,0));
         pbc.CutOut(new HalfSpace[] {cutLeftRight,cutUpDown});
