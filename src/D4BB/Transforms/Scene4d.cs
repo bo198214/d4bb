@@ -98,25 +98,25 @@ namespace D4BB.Transforms
 
             // 3D occlusion: shared 2-faces between slabs cancel.
             // Remove from main pbc.d2faces AND from each CellBoundary's mini-pbc.
-            // {
-            //     var claimedCells = new HashSet<IntegerCell>();
-            //     foreach (var slab in slabsOut)
-            //     {
-            //         var toRemove = new List<Face2dBC>();
-            //         foreach (var kvp in slab.pbc.i2p)
-            //             if (!claimedCells.Add(kvp.Key))
-            //                 toRemove.Add(kvp.Value);
-            //         foreach (var facet in toRemove)
-            //         {
-            //             slab.pbc.d2faces.Remove(facet);
-            //             foreach (IPolyhedron edge in facet.facets)
-            //                 if (edge.neighbor != null) edge.neighbor.neighbor = null;
-            //             if (slab.pbc.cellBoundaries != null)
-            //                 foreach (var cb in slab.pbc.cellBoundaries)
-            //                     cb.pbc.d2faces.Remove(facet);
-            //         }
-            //     }
-            // }
+            {
+                var claimedCells = new HashSet<IntegerCell>();
+                foreach (var slab in slabsOut)
+                {
+                    var toRemove = new List<Face2dBC>();
+                    foreach (var kvp in slab.pbc.i2p)
+                        if (!claimedCells.Add(kvp.Key))
+                            toRemove.Add(kvp.Value);
+                    foreach (var facet in toRemove)
+                    {
+                        slab.pbc.d2faces.Remove(facet);
+                        foreach (IPolyhedron edge in facet.facets)
+                            if (edge.neighbor != null) edge.neighbor.neighbor = null;
+                        if (slab.pbc.cellBoundaries != null)
+                            foreach (var cb in slab.pbc.cellBoundaries)
+                                cb.pbc.d2faces.Remove(facet);
+                    }
+                }
+            }
         }
 
         private static D4BSPofCells RebuildBSP(List<Slab> slabs)
