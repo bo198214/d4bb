@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using D4BB.Comb;
+using NUnit.Framework;
 
 public class OrientedIntegerCell : IntegerCell {
     // inverted=true means that the outside normal with respect to the parent points opposite to a main direction 
     public readonly bool inverted; 
     public readonly bool parity;
 
+    /* Normal is always along a single axis in the positive direction, except if inverted */
     public OrientedIntegerCell(int[] _origin, HashSet<int> _span, bool inverted, bool parity) :
             base(_origin, _span) {
         this.inverted = inverted;
@@ -17,7 +19,7 @@ public class OrientedIntegerCell : IntegerCell {
     /* normal with respect to span */
     public int[] Normal(HashSet<int> superSpan) {
         Debug.Assert(span.Count+1==superSpan.Count,"0081763009 normal can only computed in d-1 subspace");
-        var normalAxis = superSpan.Except(span).First();
+        var normalAxis = NormalAxis();
         var res = new int[SpaceDim()];
         if (!inverted) {
             res[normalAxis] = 1;
