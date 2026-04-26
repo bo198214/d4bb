@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using D4BB.Comb;
 using D4BB.Geometry;
@@ -119,7 +118,7 @@ namespace D4BB.Transforms
             if (!enable4dOcclusion) return;
 
             var viewNormal = camera.viewNormal.x;
-            var cmp = new InFrontOfViewNormalComparer(viewNormal);
+            var cmp = new InFrontOfViewNormalComparer(viewNormal, reverse: true);
 
             // Collect all CellBoundaries and sort far-to-near (back-to-front).
             var allCells = new List<CellBoundary>();
@@ -133,7 +132,8 @@ namespace D4BB.Transforms
             foreach (var nearCell in allCells)
             {
                 foreach (var farCell in back)
-                    farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
+                    if (cmp.Compare(farCell.cell, nearCell.cell) != 0)
+                        farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
                 back.Add(nearCell);
             }
         }
