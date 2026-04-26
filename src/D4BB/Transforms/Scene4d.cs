@@ -34,8 +34,6 @@ namespace D4BB.Transforms
             }
         }
 
-        private D4BSPofCells _bsp;
-
         public Scene4d(int[][][] origins, ICamera4d camera, bool showInvisibleEdges = false)
         {
             this.camera = camera;
@@ -61,15 +59,12 @@ namespace D4BB.Transforms
             return res;
         }
 
-        // Full rebuild: call when pieceOrigins change. Also rebuilds the BSP.
         public void Update(int[][][] pieceOrigins)
         {
             RebuildSlabs(pieceOrigins, camera, enable4dOcclusion, showInvisibleEdges, slabs);
-            _bsp = RebuildBSP(slabs);
             ApplyCameraOcclusion();
         }
 
-        // Partial rebuild: call when only the camera changes. Reuses the cached BSP.
         public void UpdateCamera()
         {
             ApplyCameraOcclusion();
@@ -119,29 +114,27 @@ namespace D4BB.Transforms
             }
         }
 
-        private static D4BSPofCells RebuildBSP(List<Slab> slabs)
-        {
-            var allCells = new List<CellBoundary>();
-            foreach (var slab in slabs)
-                foreach (var cb in slab.pbc.cellBoundaries)
-                    allCells.Add(cb);
-            return D4BSPofCells.Build(allCells);
-        }
-
         private void ApplyCameraOcclusion()
         {
             if (!enable4dOcclusion) return;
 
             var viewNormal = camera.viewNormal.x;
+            var cmp = new InFrontOfViewNormalComparer(viewNormal);
+
+            // Collect all CellBoundaries and sort far-to-near (back-to-front).
+            var allCells = new List<CellBoundary>();
+            foreach (var slab in slabs)
+                if (slab.pbc.cellBoundaries != null)
+                    allCells.AddRange(slab.pbc.cellBoundaries);
+            allCells.Sort((a, b) => cmp.Compare(b.cell, a.cell)); // descending depth = far first
+
+            // Accumulate: each cell cuts all previously seen (farther) cells.
             var back = new List<CellBoundary>();
-            foreach (var batch in _bsp.TraverseBackToFront(viewNormal))
+            foreach (var nearCell in allCells)
             {
-                // batch is NEARER than all cells in `back`.
-                // Near cells occlude far cells → cut far cells using near cells' halfspaces.
-                foreach (var nearCell in batch)
-                    foreach (var farCell in back)
-                        farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
-                back.AddRange(batch);
+                foreach (var farCell in back)
+                    farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
+                back.Add(nearCell);
             }
         }
 

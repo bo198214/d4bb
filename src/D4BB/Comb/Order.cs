@@ -27,11 +27,16 @@ public class InFrontOfViewNormalComparer : IComparer<IntegerCell> {
             this.viewNormal = viewNormal;
         }
         public int Compare(IntegerCell d1, IntegerCell d2) {
-            var inverted1 = viewNormal[d1.NormalAxis()] >= 0;
-            var inverted2 = viewNormal[d2.NormalAxis()] >= 0;
-            var od1 = new OrientedIntegerCell(d1.origin, d1.span, inverted1, false);
-            var od2 = new OrientedIntegerCell(d2.origin, d2.span, inverted2, false);
-            return InFrontOfCellComparer.IsInFrontOf(od1, od2);
+            var center1 = d1.Center();
+            var center2 = d2.Center();
+            double depth1 = 0, depth2 = 0;
+            for (int i = 0; i < viewNormal.Length; i++) {
+                depth1 += viewNormal[i] * center1[i];
+                depth2 += viewNormal[i] * center2[i];
+            }
+            if (depth1 < depth2) return 1;
+            if (depth1 > depth2) return -1;
+            return 0;
         }
     }
 }
