@@ -44,6 +44,15 @@ public static class VolumetricLineVertexData
     };
 }
 
+public struct EdgeClassInfo {
+    public int submesh;      // 0=regular, 1=cut, 2=debug
+    public double[] a;       // 3D start position
+    public double[] b;       // 3D end position
+    public bool isInvisible;
+    public bool neighborNull;
+    public bool neighborInvisible;
+}
+
 public class EdgesGenericMesh {
     public List<double[]> vertices = new();
     public List<double[]> vertices4d = new();
@@ -54,6 +63,7 @@ public class EdgesGenericMesh {
     public List<double[]> uv0s = new();
     public List<double[]> uv1s = new();
     public List<double[]> normals = new();
+    public List<EdgeClassInfo> edgeClassifications = new();
 
     public EdgesGenericMesh(HashSet<IPolyhedron> edgesIn) {
         Dictionary<Vertex, ushort> vertexNumbers = new(new RawVertexEquality());
@@ -61,17 +71,32 @@ public class EdgesGenericMesh {
             var edge = (Edge)edge_;
 
             List<ushort> target;
+            int submesh;
             if (edge.isInvisible && edge.neighbor==null) {
                 target = triangles1;
+                submesh = 1;
             } else if (edge.neighbor!=null && edge.neighbor.isInvisible) {
                 target = triangles2;
+                submesh = 2;
             }
             else {
                 target = triangles0;
+                submesh = 0;
             }
 
             var a = edge.a;
             var b = (Vertex)edge.b.neighbor; //because in the triangles we only use edge.a vertices
+
+            double[] ac0 = a.PointRef().x;
+            double[] bc0 = b.PointRef().x;
+            edgeClassifications.Add(new EdgeClassInfo {
+                submesh = submesh,
+                a = new double[]{ac0[0],ac0[1],ac0[2]},
+                b = new double[]{bc0[0],bc0[1],bc0[2]},
+                isInvisible = edge.isInvisible,
+                neighborNull = edge.neighbor == null,
+                neighborInvisible = edge.neighbor != null && edge.neighbor.isInvisible,
+            });
 
             var i0 = (ushort)vertices.Count;
             for (int i=0;i<4;i++) {
