@@ -140,11 +140,11 @@ public class IntegerBoundaryComplex {
     }
     public HashSet<IntegerBoundaryComplex> Skeleton()            
     {
-        List<HashSet<OrientedIntegerCell>> sssbps = Slabs();
+        List<HashSet<OrientedIntegerCell>> slabs = Slabs();
         HashSet<IntegerBoundaryComplex> skeletons = new();
-        foreach (HashSet<OrientedIntegerCell> icFace in sssbps)
+        foreach (HashSet<OrientedIntegerCell> slab in slabs)
         {
-            var skeleton = new IntegerBoundaryComplex(icFace);
+            var skeleton = new IntegerBoundaryComplex(slab);
             skeletons.Add(skeleton);
         }
         return skeletons;
@@ -213,9 +213,9 @@ public class IntegerBoundaryComplex {
     public static HashSet<IntegerCell> Skel2cells(HashSet<IntegerBoundaryComplex> skel)
     {
         var res = new HashSet<IntegerCell>();
-        foreach (var sssbp in skel)
+        foreach (var slab in skel)
         {
-            res.UnionWith(sssbp.cells);
+            res.UnionWith(slab.cells);
         }
 
         return res;

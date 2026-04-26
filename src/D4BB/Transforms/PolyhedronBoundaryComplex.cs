@@ -136,7 +136,7 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
 
 public class Polyhedron3dBoundaryComplex {
     public List<Face2dBC> d2faces = new();
-    public Dictionary<IntegerCell,Face2dBC> i2p = new();
+    public Dictionary<IntegerCell,Face2dBC> i2p = new(); // maps 2d integer cells to their corresponding Face2dBC, for quick access when building the complex. Does not consider cut faces.
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
     bool showInvisibleEdges;
@@ -152,11 +152,10 @@ public class Polyhedron3dBoundaryComplex {
             : this(new IntegerBoundaryComplex(cells3), cam, showInvisibleEdges) {
         cellBoundaries = new List<CellBoundary>();
         foreach (var c3 in cells3) {
-            var cellFaces = new List<Face2dBC>();
-            foreach (var c2 in c3.Facets())
+            var cellFaces = new List<Face2dBC>(); //collecting the projected 2d faces from this PBC that belong to c3
+            foreach (var c2 in c3.Facets()) 
                 if (i2p.TryGetValue(c2, out var face))
                     cellFaces.Add(face);
-            if (cellFaces.Count == 0) continue;
             cellBoundaries.Add(new CellBoundary(c3,
                 new Polyhedron3dBoundaryComplex(cellFaces, showInvisibleEdges)));
         }
@@ -167,9 +166,9 @@ public class Polyhedron3dBoundaryComplex {
             : this(new IntegerBoundaryComplex(origins), cam, showInvisibleEdges) {}
     public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null,bool showInvisibleEdges=false) {
         this.showInvisibleEdges = showInvisibleEdges;
-        foreach (var i2dc in i3bc.cells) {
-            var pc = new Face2dBC(i2dc, cam) { pbc = this};
-            i2p[i2dc] = pc;
+        foreach (var i2c in i3bc.cells) {
+            var pc = new Face2dBC(i2c, cam) { pbc = this};
+            i2p[i2c] = pc;
             d2faces.Add(pc);
         }
         var visibleIEdges = i3bc.PrunedSkeletonCellsOfDim(1);
