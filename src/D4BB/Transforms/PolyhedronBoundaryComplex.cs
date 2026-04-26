@@ -246,11 +246,19 @@ public class Polyhedron3dBoundaryComplex {
         CutOut(polyhedron.HalfSpaces().Values.ToArray());
     }
     public List<Face2dBC> VisibleFacets() {
+        if (cellBoundaries != null) {
+            var result = new List<Face2dBC>();
+            foreach (var cb in cellBoundaries) result.AddRange(cb.pbc.d2faces);
+            return result;
+        }
         return d2faces;
     }
     public HashSet<EdgeBC> VisibleEdges() {
         HashSet<EdgeBC> res = new();
-        foreach (var facet in d2faces) {
+        var faces = cellBoundaries != null
+            ? cellBoundaries.SelectMany(cb => cb.pbc.d2faces)
+            : (IEnumerable<Face2dBC>)d2faces;
+        foreach (var facet in faces) {
             foreach (var edge in facet.facets) {
                 if (showInvisibleEdges || !edge.isInvisible || edge.neighbor==null) {
                     res.Add((EdgeBC)edge);
