@@ -106,23 +106,34 @@ namespace D4BB.Transforms
 
             if (enable4dOcclusion)
             {
+                var allCells  = new List<OrientedIntegerCell>();
+                var cellToCB  = new Dictionary<OrientedIntegerCell, CellBoundary>();
                 var halfSpaces = new Dictionary<OrientedIntegerCell, HalfSpace[]>();
+
                 foreach (var slab in slabs)
                     if (slab.pbc.cellBoundaries != null)
                         foreach (var cb in slab.pbc.cellBoundaries)
+                        {
+                            allCells.Add(cb.cell);
+                            cellToCB[cb.cell]   = cb;
                             halfSpaces[cb.cell] = DefiningHalfSpaces(cb.cell, camera);
+                        }
 
-                for (int i = 0; i < slabs.Count; i++)
-                    for (int j = 0; j < slabs.Count; j++)
+                var bsp = D4BSPofCells.Build(allCells);
+                if (bsp != null)
+                {
+                    var viewNormal = camera.viewNormal.x;
+                    var back = new List<OrientedIntegerCell>();
+                    foreach (var batch in bsp.TraverseBackToFront(viewNormal))
                     {
-                        if (slabs[i].pieceIndex == slabs[j].pieceIndex) continue;
-                        if (slabs[i].pbc.cellBoundaries == null) continue;
-                        if (slabs[j].pbc.cellBoundaries == null) continue;
-                        foreach (var cbJ in slabs[j].pbc.cellBoundaries)
-                            foreach (var cbI in slabs[i].pbc.cellBoundaries)
-                                if (InFrontOfCellComparer.IsInFrontOf(cbJ.cell, cbI.cell) > 0)
-                                    cbI.pbc.CutOut(halfSpaces[cbJ.cell]);
+                        // batch is NEARER than all cells in `back`.
+                        // Near cells occlude far cells → cut far cells using near cells' halfspaces.
+                        foreach (var nearCell in batch)
+                            foreach (var farCell in back)
+                                cellToCB[farCell].pbc.CutOut(halfSpaces[nearCell]);
+                        back.AddRange(batch);
                     }
+                }
             }
         }
 
