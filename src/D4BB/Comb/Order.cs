@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace D4BB.Comb {
 public class InFrontOfCellComparer : IComparer<OrientedIntegerCell> {
@@ -23,8 +24,10 @@ public class InFrontOfCellComparer : IComparer<OrientedIntegerCell> {
 
 public class InFrontOfViewNormalComparer : IComparer<IntegerCell> {
         public double[] viewNormal;
-        public InFrontOfViewNormalComparer(double[] viewNormal) {
+        int sign = 1;
+        public InFrontOfViewNormalComparer(double[] viewNormal, bool reverse = false) {
             this.viewNormal = viewNormal;
+            if (reverse) sign = -1;
         }
         public int Compare(IntegerCell d1, IntegerCell d2) {
             var center1 = d1.Center();
@@ -34,8 +37,8 @@ public class InFrontOfViewNormalComparer : IComparer<IntegerCell> {
                 depth1 += viewNormal[i] * center1[i];
                 depth2 += viewNormal[i] * center2[i];
             }
-            if (depth1 < depth2) return 1;
-            if (depth1 > depth2) return -1;
+            if (depth1 < depth2) return 1*sign ;
+            if (depth1 > depth2) return -1*sign;
             return 0;
         }
     }
