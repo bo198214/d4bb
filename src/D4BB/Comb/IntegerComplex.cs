@@ -123,7 +123,7 @@ public class IntegerBoundaryComplex {
         }
         return res;
     }
-    public List<HashSet<OrientedIntegerCell>> SameSubSpaceBoundaryParts(HashSet<OrientedIntegerCell> outAllCubes)
+    public List<HashSet<OrientedIntegerCell>> Slabs(HashSet<OrientedIntegerCell> outAllCubes)
     {
         List<HashSet<OrientedIntegerCell>> res = new();
         while (outAllCubes.Count() > 0)
@@ -134,13 +134,13 @@ public class IntegerBoundaryComplex {
         }
         return res;
     }
-    public List<HashSet<OrientedIntegerCell>> SameSubSpaceBoundaryParts()
+    public List<HashSet<OrientedIntegerCell>> Slabs()
     {
-        return SameSubSpaceBoundaryParts(new HashSet<OrientedIntegerCell>(neighborOfVia.Keys));
+        return Slabs(new HashSet<OrientedIntegerCell>(neighborOfVia.Keys));
     }
     public HashSet<IntegerBoundaryComplex> Skeleton()            
     {
-        List<HashSet<OrientedIntegerCell>> sssbps = SameSubSpaceBoundaryParts();
+        List<HashSet<OrientedIntegerCell>> sssbps = Slabs();
         HashSet<IntegerBoundaryComplex> skeletons = new();
         foreach (HashSet<OrientedIntegerCell> icFace in sssbps)
         {
@@ -163,7 +163,7 @@ public class IntegerBoundaryComplex {
         throw new Exception();
     }
 
-    public HashSet<IntegerBoundaryComplex> PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(int d)
+    public HashSet<IntegerBoundaryComplex> PrunedSkeletonSlabsOfDim(int d)
     {
         if (d > Dim())
         {
@@ -184,7 +184,7 @@ public class IntegerBoundaryComplex {
 
             //d < dim()-1
             HashSet<IntegerBoundaryComplex> res = new();
-            var d1Faces = PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(d + 1);
+            var d1Faces = PrunedSkeletonSlabsOfDim(d + 1);
             foreach (IntegerBoundaryComplex d1Face in d1Faces)
             {
                 var d0Faces = d1Face.Skeleton();
@@ -197,7 +197,7 @@ public class IntegerBoundaryComplex {
     public HashSet<IntegerCell> PrunedSkeletonCellsOfDim(int d)
     {
         HashSet<IntegerCell> res = new();
-        var faces = PrunedSkeletonSameSubSpaceBoundaryPartsOfDim(d);
+        var faces = PrunedSkeletonSlabsOfDim(d);
         foreach (var face in faces)
         {
             res.UnionWith(face.cells);

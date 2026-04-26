@@ -12,9 +12,9 @@ namespace D4BB.Transforms
         public ICamera4d camera { get; set; }
         public bool showInvisibleEdges;
         public bool enable4dOcclusion = true;
-        public readonly List<D3SameSubSpaceBoundaryPart> d3sssbps = new();
+        public readonly List<Slab> slabs = new();
 
-        public class D3SameSubSpaceBoundaryPart
+        public class Slab
         {
             public int pieceIndex;
             public HashSet<OrientedIntegerCell> cells;
@@ -22,7 +22,7 @@ namespace D4BB.Transforms
 
             public override bool Equals(object obj)
             {
-                var other = (D3SameSubSpaceBoundaryPart)obj;
+                var other = (Slab)obj;
                 return this.cells.SetEquals(other.cells);
             }
 
@@ -41,17 +41,15 @@ namespace D4BB.Transforms
             Update(origins);
         }
 
-        public int PieceCount => d3sssbps.Select(c => c.pieceIndex).DefaultIfEmpty(-1).Max() + 1;
+        public int PieceCount => slabs.Select(s => s.pieceIndex).DefaultIfEmpty(-1).Max() + 1;
 
         public HashSet<Face2d> VisibleFacets(int pieceIndex)
-{
+        {
             HashSet<Face2d> res = new(new Face2dUnOrientedEquality(AOP.binaryPrecision));
-            foreach (var comp in d3sssbps)
+            foreach (var slab in slabs)
             {
-                if (comp.pieceIndex == pieceIndex)
-                {
-                    foreach (var facet in comp.pbc.VisibleFacets()) res.Add(facet);
-                }
+                if (slab.pieceIndex == pieceIndex)
+                    foreach (var facet in slab.pbc.VisibleFacets()) res.Add(facet);
             }
             return res;
         }
@@ -59,19 +57,17 @@ namespace D4BB.Transforms
         public HashSet<IPolyhedron> VisibleEdges(int pieceIndex)
         {
             HashSet<IPolyhedron> res = new();
-            foreach (var comp in d3sssbps)
+            foreach (var slab in slabs)
             {
-                if (comp.pieceIndex == pieceIndex)
-                {
-                    foreach (var edge in comp.pbc.VisibleEdges()) res.Add(edge);
-                }
+                if (slab.pieceIndex == pieceIndex)
+                    foreach (var edge in slab.pbc.VisibleEdges()) res.Add(edge);
             }
             return res;
         }
 
         public void Update(int[][][] pieceOrigins)
         {
-            d3sssbps.Clear();
+            slabs.Clear();
             if (pieceOrigins == null) return;
 
             for (int i = 0; i < pieceOrigins.Length; i++)
@@ -79,38 +75,37 @@ namespace D4BB.Transforms
                 var origins = pieceOrigins[i];
                 var d4PieceIBC = new IntegerBoundaryComplex(origins);
 
-                foreach (var d3sssbpRaw in d4PieceIBC.SameSubSpaceBoundaryParts())
+                foreach (var slabCells in d4PieceIBC.Slabs())
                 {
-                    Point origin = new(d3sssbpRaw.First().origin);
-                    Point normal = new(d3sssbpRaw.First().Normal());
+                    Point origin = new(slabCells.First().origin);
+                    Point normal = new(slabCells.First().Normal());
                     bool isFacing = camera.IsFacedBy(origin, normal);
                     if (isFacing || !enable4dOcclusion)
                     {
-                        var d3sssbp = new D3SameSubSpaceBoundaryPart()
+                        slabs.Add(new Slab()
                         {
                             pieceIndex = i,
-                            cells = d3sssbpRaw,
-                            pbc = new Polyhedron3dBoundaryComplex(new IntegerBoundaryComplex(d3sssbpRaw), camera, showInvisibleEdges),
-                        };
-                        d3sssbps.Add(d3sssbp);
+                            cells = slabCells,
+                            pbc = new Polyhedron3dBoundaryComplex(slabCells, camera, showInvisibleEdges),
+                        });
                     }
                 }
             }
 
-            // Occlusion logic
+            // remove duplicate d2faces
             {
                 var claimedCells = new HashSet<IntegerCell>();
-                foreach (var d3sssbp in d3sssbps)
+                foreach (var slab in slabs)
                 {
                     var toRemove = new List<Face2dBC>();
-                    foreach (var kvp in d3sssbp.pbc.i2p)
+                    foreach (var kvp in slab.pbc.i2p)
                     {
                         if (!claimedCells.Add(kvp.Key))
                             toRemove.Add(kvp.Value);
                     }
                     foreach (var facet in toRemove)
                     {
-                        d3sssbp.pbc.d2faces.Remove(facet);
+                        slab.pbc.d2faces.Remove(facet);
                         foreach (IPolyhedron edge in facet.facets)
                             if (edge.neighbor != null) edge.neighbor.neighbor = null;
                     }
@@ -120,22 +115,22 @@ namespace D4BB.Transforms
             if (enable4dOcclusion)
             {
                 Dictionary<OrientedIntegerCell, HalfSpace[]> halfSpaces = new();
-                foreach (var d3sssbp in d3sssbps)
-                    foreach (var cell in d3sssbp.cells)
+                foreach (var slab in slabs)
+                    foreach (var cell in slab.cells)
                         halfSpaces[cell] = DefiningHalfSpaces(cell, camera);
 
-                for (int i = 0; i < d3sssbps.Count; i++)
+                for (int i = 0; i < slabs.Count; i++)
                 {
-                    for (int j = 0; j < d3sssbps.Count; j++)
+                    for (int j = 0; j < slabs.Count; j++)
                     {
                         if (i == j) continue;
-                        foreach (var cell_j in d3sssbps[j].cells)
+                        foreach (var cell_j in slabs[j].cells)
                         {
-                            foreach (var cell_i in d3sssbps[i].cells)
+                            foreach (var cell_i in slabs[i].cells)
                             {
                                 if (InFrontOfCellComparer.IsInFrontOf(cell_j, cell_i) > 0)
                                 {
-                                    d3sssbps[i].pbc.CutOut(halfSpaces[cell_j]);
+                                    slabs[i].pbc.CutOut(halfSpaces[cell_j]);
                                     break;
                                 }
                             }

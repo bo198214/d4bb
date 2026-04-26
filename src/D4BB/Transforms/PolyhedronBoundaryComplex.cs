@@ -141,6 +141,8 @@ public class Polyhedron3dBoundaryComplex {
     // public List<VertexBC> visibleVertices = new();
     bool showInvisibleEdges;
 
+    public Polyhedron3dBoundaryComplex(HashSet<OrientedIntegerCell> cells3, ICamera4d cam=null, bool showInvisibleEdges=false)
+            : this(new IntegerBoundaryComplex(cells3), cam, showInvisibleEdges) {}
     public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null,bool showInvisibleEdges=false) {
         this.showInvisibleEdges = showInvisibleEdges;
         foreach (var i2dc in i3bc.cells) {
