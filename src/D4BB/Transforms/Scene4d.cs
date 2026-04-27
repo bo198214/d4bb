@@ -11,6 +11,9 @@ namespace D4BB.Transforms
         public ICamera4d camera { get; set; }
         public bool showInvisibleEdges;
         public bool enable4dOcclusion = true;
+        public bool stepMode = false;
+        public int stepIndex = 0;
+        public int maxSteps = 0;
         public readonly List<Slab> slabs = new();
 
         public class Slab
@@ -129,14 +132,24 @@ namespace D4BB.Transforms
 
             // Accumulate: each cell cuts all previously seen (farther) cells.
             var back = new List<CellBoundary>();
+            maxSteps = allCells.Count;
+            int i = 0;
             foreach (var nearCell in allCells)
             {
-                foreach (var farCell in back)
-                    if (cmp.Compare(farCell.cell, nearCell.cell) != 0)
-                        farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
-                back.Add(nearCell);
+                if (stepMode && i >= stepIndex)
+                {
+                    nearCell.pbc.d2faces.Clear();
+                }
+                else
+                {
+                    foreach (var farCell in back)
+                        if (cmp.Compare(farCell.cell, nearCell.cell) != 0)
+                            farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
+                    back.Add(nearCell);
+                }
+                i++;
             }
-        }
+}
 
         public static HalfSpace[] DefiningHalfSpaces(OrientedIntegerCell cell, ICamera4d cam)
         {
