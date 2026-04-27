@@ -6,7 +6,6 @@ public interface ICamera4d {
     public Point3d Proj3d(Point point4d);
     public bool IsFacedBy(Point origin, Point normal);
     public Point4d viewNormal {get;}
-	public void SetPerspective(Point4d point);
 }
 public class Camera4dCentral : ICamera4d {
     public Point4d eye {get; set; }
