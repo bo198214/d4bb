@@ -1,3 +1,4 @@
+using UnityEngine;
 using D4BB.Game;
 using D4BB.Geometry;
 using D4BB.Transforms;
@@ -17,8 +18,9 @@ namespace D4BB.TopLevel
             for ( int vertexBinary = 0; vertexBinary < 16; vertexBinary++)
             {
                 var vertex = new Point(4);
-                for (int k = 0; k < 4; k++)
+                for (int k = 0; k < 4; k++) {
                     vertex.x[k] = boundary4dMinMax[0][k] + ((vertexBinary >> k) & 1) * (boundary4dMinMax[1][k] - boundary4dMinMax[0][k]);
+                }
                 var vertex3d = camera.Proj3d(vertex);
                 for (int k=0; k<3; k++) {
                     if (vertex3d.x[k] < min[k]) min[k] = vertex3d.x[k];
@@ -27,13 +29,14 @@ namespace D4BB.TopLevel
             }
             return new double[][] { min, max };
         }
-        public static double[] center3d(int[][] boundary4dMinMax, ICamera4d camera, double z_offset = 1.0, double y_offset = 1.75)
-        {
-            var min_max = fieldBoundary3d(boundary4dMinMax, camera);
-            var x = (min_max[0][0] + min_max[1][0])/2;
-            var y = -y_offset + (min_max[0][1] + min_max[1][1])/2;
-            var z = -z_offset + min_max[0][2] + (min_max[1][2] - min_max[0][2])/2;
-            return new double[] { x, y, z };
+        public static double[] cavaliersFrontCenter(Objective objective, ICamera4d camera, double z_offset = 2.0, double y_offset = 0)
+        {   
+            var min_max = objective.BoundingBox();
+            var x = (min_max[0][0] + min_max[1][0])/2.0;
+            var y = (min_max[0][1] + min_max[1][1])/2.0;
+            var z = min_max[0][2];
+            Debug.Log($"min {min_max[0][0]}, {min_max[0][1]}, {min_max[0][2]}, max {min_max[1][0]}, {min_max[1][1]}, {min_max[1][2]}    , center {x}, {y}, {z}");
+            return new double[] { x, y-y_offset, z-z_offset};
         }
     }
 }

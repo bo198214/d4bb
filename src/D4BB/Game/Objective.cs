@@ -12,7 +12,7 @@ namespace D4BB.Game
         public int[][][] pieces;
         public int[][] boundary_min_max;
 
-        public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, padding)){}
+        public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, padding)) {}
         public Objective(string name, int[][] goal, int[][][] pieces, int[][] boundary_min_max)
         {
             this.name = name;
@@ -29,33 +29,56 @@ namespace D4BB.Game
             var data = JsonConvert.DeserializeObject<ObjectiveData>(json);
             if (data.BoundaryMinMax != null)
                 return new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);
+            if (data.Padding.HasValue)
+                return new Objective(data.Name, data.Goal, data.Pieces, data.Padding.Value);
             return new Objective(data.Name, data.Goal, data.Pieces);
         }
 
         private class ObjectiveData {
+            [JsonProperty("name")]
             public string Name { get; set; }
+            [JsonProperty("goal")]
             public int[][] Goal { get; set; }
+            [JsonProperty("pieces")]
             public int[][][] Pieces { get; set; }
             [JsonProperty("boundary_min_max")]
             public int[][] BoundaryMinMax { get; set; }
+            [JsonProperty("padding")]
+            public int? Padding { get; set; }
         }
 
+        public int[][] BoundingBox()
+        {
+            int[][] res = new int[2][];
+            res[0] = new int[4];
+            res[1] = new int[4];
+            for (int k = 0; k < 4; k++) {
+                res[0][k] = int.MaxValue;
+                res[1][k] = int.MinValue;
+                for (int i = 0; i < pieces.Length; i++)
+                    for (int j = 0; j < pieces[i].Length; j++) {
+                        if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
+                        if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
+                    }
+                res[1][k] += 1;
+            }
+            return res;
+        }
         public static int[][] BoundaryMinMax(int[][][] pieces, int padding)
         {
             int[][] res = new int[2][];
             res[0] = new int[4];
             res[1] = new int[4];
             for (int k = 0; k < 4; k++) {
-                int min = int.MaxValue, max = int.MinValue;
+                res[0][k] = int.MaxValue;
+                res[1][k] = int.MinValue;
                 for (int i = 0; i < pieces.Length; i++)
                     for (int j = 0; j < pieces[i].Length; j++) {
-                        if (pieces[i][j][k] < min) res[0][k] = pieces[i][j][k];
-                        if (pieces[i][j][k] > max) res[1][k] = pieces[i][j][k];
+                        if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
+                        if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
                     }
-            }
-            for (int k = 0; k < 4; k++) {
                 res[0][k] -= padding;
-                res[1][k] += padding;
+                res[1][k] += 1+padding;
             }
             return res;
         }
