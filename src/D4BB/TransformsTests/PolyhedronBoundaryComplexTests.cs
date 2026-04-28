@@ -147,7 +147,7 @@ public class PolyhedronBoundaryComplexTests {
         var iCut = new IntegerCell(new int[]{0,0,0,0},new(){1,2});
         var pCut = new Face2d(new List<Point>{new(0,0,0),new(0,0,1),new(0,1,1),new(0,1,0)});
         Assert.That(ibc.neighborOfVia[iFace3d1][iCut],Is.EqualTo(iFace3d2));
-        var camera = new Camera4dOrthographic();
+        var camera = new Camera4dParallel();
         var pbc1 = new Polyhedron3dBoundaryComplex(new HashSet<OrientedIntegerCell>{iFace3d1},camera);
         var pbc2 = new Polyhedron3dBoundaryComplex(new HashSet<OrientedIntegerCell>{iFace3d2},camera);
         Assert.That(pbc1.i2p.ContainsKey(iCut));

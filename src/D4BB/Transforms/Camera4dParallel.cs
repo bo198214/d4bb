@@ -2,7 +2,7 @@ using System;
 using D4BB.Geometry;
 
 namespace D4BB.Transforms {
-public class Camera4dOrthographic : ICamera4d
+public class Camera4dParallel : ICamera4d
 {
     public Point4d[] v;
     public Point4d viewNormal { get { return v[3]; } }
@@ -17,10 +17,10 @@ public class Camera4dOrthographic : ICamera4d
         set { if (!isIsometric) SetCavalier(value);  }
     }
 
-    public Camera4dOrthographic() {
+    public Camera4dParallel() {
         SetCavalier();
     }
-    public Camera4dOrthographic(Point4d eye) : this() {
+    public Camera4dParallel(Point4d eye) : this() {
         this.eye = eye;
     }
     public Point3d Proj3d(Point point4d) {

@@ -302,7 +302,7 @@ public class FacetsOrientationTests {
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
         Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dParallel(new(3,3,3,-2))));
     }
     [Test] public void SingleCell_0s012_0s01() {
         var cell4d = new IntegerCell(new int[]{0,0,0,0});
@@ -321,7 +321,7 @@ public class FacetsOrientationTests {
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
         Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dParallel(new(3,3,3,-2))));
     }
     [Test] public void SingleCell_0s012_0s02() {
         var cell4d = new IntegerCell(new int[]{0,0,0,0});
@@ -340,7 +340,7 @@ public class FacetsOrientationTests {
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
         Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dParallel(new(3,3,3,-2))));
     }
     [Test] public void SingleCell_1s012_0s12() {
         var cell4d = new IntegerCell(new int[]{0,0,0,0});
@@ -413,7 +413,7 @@ public class FacetsOrientationTests {
         Assert.That(CheckOrientation3d(cell3d,cell2d));
 
         Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dCentral(new(3,3,3,-2))), cell3d + "->" + cell2d);
-        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dOrthographic(new(3,3,3,-2))));
+        Assert.That(CheckClockwiseProj(cell3d,cell2d,new Camera4dParallel(new(3,3,3,-2))));
     }
 
     [Test] public void SingleCell_1s123_0s12() {
