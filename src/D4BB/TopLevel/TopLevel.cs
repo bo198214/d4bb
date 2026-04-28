@@ -27,6 +27,13 @@ namespace D4BB.TopLevel
             }
             return new double[][] { min, max };
         }
-
+        public static double[] center3d(int[][] boundary4dMinMax, ICamera4d camera, double z_offset = 1.0, double y_offset = 1.75)
+        {
+            var min_max = fieldBoundary3d(boundary4dMinMax, camera);
+            var x = (min_max[0][0] + min_max[1][0])/2;
+            var y = -y_offset + (min_max[0][1] + min_max[1][1])/2;
+            var z = -z_offset + min_max[0][2] + (min_max[1][2] - min_max[0][2])/2;
+            return new double[] { x, y, z };
+        }
     }
 }
