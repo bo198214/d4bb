@@ -23,7 +23,9 @@ namespace D4BB.Game
             this.boundary_min_max = boundary_min_max;
         }
         public static Objective FromJsonFile(string filePath) {
-            var json = File.ReadAllText(filePath);
+            return FromJson(File.ReadAllText(filePath));
+        }
+        public static Objective FromJson(string json) {
             var data = JsonConvert.DeserializeObject<ObjectiveData>(json);
             if (data.BoundaryMinMax != null)
                 return new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);

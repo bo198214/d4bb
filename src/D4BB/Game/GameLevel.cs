@@ -11,6 +11,7 @@ namespace D4BB.Game
         public int selectedIndex = 0;
         public int[][] goal;
         public GameStatus status = GameStatus.None;
+        public Objective Objective { get; private set; }
 
         public int[][][] PieceOrigins => compounds.Select(c => c.origins).ToArray();
 
@@ -22,6 +23,7 @@ namespace D4BB.Game
 
         public GameLevel(Objective obj)
         {
+            Objective = obj;
             goal = IntegerOps.Clone(obj.goal);
             foreach (var piece in obj.pieces)
                 compounds.Add(new Compound(piece));
@@ -100,10 +102,10 @@ namespace D4BB.Game
             OnChanged?.Invoke();
         }
 
-        public void Reset(Objective obj)
+        public void Reset()
         {
             compounds.Clear();
-            foreach (var piece in obj.pieces)
+            foreach (var piece in Objective.pieces)
                 compounds.Add(new Compound(piece));
             selectedIndex = 0;
             PropagateStatus();

@@ -163,7 +163,7 @@ public class GameTests
         Assert.That(changedFired, Is.True);
         changedFired = false;
 
-        level.Reset(obj);
+        level.Reset();
         Assert.That(resetFired, Is.True);
         Assert.That(changedFired, Is.True);
     }
