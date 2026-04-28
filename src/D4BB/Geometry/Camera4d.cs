@@ -1,9 +1,6 @@
-using System.Collections.Generic;
 using System.Diagnostics;
-using D4BB.Comb;
-using D4BB.Geometry;
 
-namespace D4BB.Transforms
+namespace D4BB.Geometry
 {public abstract class Camera {
 	public Point4d[] v;
 	public abstract void rotate(double ph, Point a, Point b, Point c);

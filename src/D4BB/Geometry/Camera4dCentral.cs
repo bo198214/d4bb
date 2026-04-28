@@ -1,6 +1,4 @@
-using D4BB.Geometry;
-
-namespace D4BB.Transforms {
+namespace D4BB.Geometry {
 public interface ICamera4d {
     public Point4d eye {get;}
     public Point3d Proj3d(Point point4d);

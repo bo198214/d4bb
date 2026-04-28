@@ -1,10 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
 using D4BB.Geometry;
-using D4BB.Comb;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System;
 
 namespace D4BB.Transforms
 {

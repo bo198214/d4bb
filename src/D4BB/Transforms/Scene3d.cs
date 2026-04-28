@@ -32,7 +32,6 @@ public class Scene3d
     }
 
     // BSP for 3D occlusion (analogous to D4BSPofCells, reused directly)
-    private D3BSPofCells _bsp;
 
     public Scene3d(int[][][] origins, ICamera3d camera, bool showInvisibleEdges = false)
     {
@@ -62,7 +61,6 @@ public class Scene3d
     public void Update(int[][][] pieceOrigins)
     {
         RebuildSlabs(pieceOrigins, camera, enable3dOcclusion, showInvisibleEdges, slabs);
-        _bsp = RebuildBSP(slabs);
         ApplyCameraOcclusion();
     }
 
@@ -91,15 +89,6 @@ public class Scene3d
                     });
             }
         }
-    }
-
-    private static D3BSPofCells RebuildBSP(List<Slab> slabs)
-    {
-        var allCells = new List<CellBoundary2d>();
-        foreach (var slab in slabs)
-            foreach (var cb in slab.pbc.cellBoundaries)
-                allCells.Add(cb);
-        return D3BSPofCells.Build(allCells);
     }
 
     private void ApplyCameraOcclusion()

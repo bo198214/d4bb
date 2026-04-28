@@ -1,6 +1,4 @@
-using D4BB.Geometry;
-
-namespace D4BB.Transforms {
+namespace D4BB.Geometry {
 public class Camera3dOrthographic : ICamera3d
 {
     public Point3d eye {get; set; } //absolute length of this vector doesn't matter

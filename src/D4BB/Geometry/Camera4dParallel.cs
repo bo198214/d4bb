@@ -1,7 +1,6 @@
 using System;
-using D4BB.Geometry;
 
-namespace D4BB.Transforms {
+namespace D4BB.Geometry {
 public class Camera4dParallel : ICamera4d
 {
     public Point4d[] v;
