@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace D4BB.Comb {
 public class InFrontOfCellComparer : IComparer<OrientedIntegerCell> {
