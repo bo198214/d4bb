@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using D4BB.Comb;
@@ -14,27 +13,7 @@ namespace D4BB.Transforms
         public bool stepMode = false;
         public int stepIndex = 0;
         public int maxSteps = 0;
-        public readonly List<Slab> slabs = new();
-
-        public class Slab
-        {
-            public int pieceIndex;
-            public HashSet<OrientedIntegerCell> cells;
-            public Polyhedron3dBoundaryComplex pbc;
-
-            public override bool Equals(object obj)
-            {
-                var other = (Slab)obj;
-                return this.cells.SetEquals(other.cells);
-            }
-
-            public override int GetHashCode()
-            {
-                int res = 0;
-                foreach (var cell in cells) { res += cell.GetHashCode(); }
-                return res;
-            }
-        }
+        public readonly List<CellBoundary> cells = new();
 
         public Scene4d(int[][][] origins, ICamera4d camera, bool showInvisibleEdges = false)
         {
@@ -46,24 +25,24 @@ namespace D4BB.Transforms
         public HashSet<Face2d> VisibleFacets(int pieceIndex)
         {
             var res = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
-            foreach (var slab in slabs)
-                if (slab.pieceIndex == pieceIndex)
-                    foreach (var facet in slab.pbc.VisibleFacets()) res.Add(facet);
+            foreach (var cb in cells)
+                if (cb.pieceIndex == pieceIndex)
+                    foreach (var facet in cb.pbc.d2faces) res.Add(facet);
             return res;
         }
 
         public HashSet<IPolyhedron> VisibleEdges(int pieceIndex)
         {
             var res = new HashSet<IPolyhedron>();
-            foreach (var slab in slabs)
-                if (slab.pieceIndex == pieceIndex)
-                    foreach (var edge in slab.pbc.VisibleEdges()) res.Add(edge);
+            foreach (var cb in cells)
+                if (cb.pieceIndex == pieceIndex)
+                    foreach (var edge in cb.pbc.VisibleEdges()) res.Add(edge);
             return res;
         }
 
         public void Update(int[][][] pieceOrigins)
         {
-            RebuildSlabs(pieceOrigins, camera, enable4dOcclusion, showInvisibleEdges, slabs);
+            RebuildCells(pieceOrigins, camera, enable4dOcclusion, showInvisibleEdges, cells);
             ApplyCameraOcclusion();
         }
 
@@ -72,9 +51,9 @@ namespace D4BB.Transforms
             ApplyCameraOcclusion();
         }
 
-        private static void RebuildSlabs(int[][][] pieceOrigins, ICamera4d camera, Boolean enable4dOcclusion, Boolean showInvisibleEdges, List<Slab> slabsOut)
+        private static void RebuildCells(int[][][] pieceOrigins, ICamera4d camera, bool enable4dOcclusion, bool showInvisibleEdges, List<CellBoundary> cellsOut)
         {
-            slabsOut.Clear();
+            cellsOut.Clear();
             if (pieceOrigins == null) return;
 
             for (int i = 0; i < pieceOrigins.Length; i++)
@@ -84,35 +63,25 @@ namespace D4BB.Transforms
                 {
                     Point origin = new(slabCells.First().origin);
                     Point normal = new(slabCells.First().Normal());
-                    if (camera.IsFacedBy(origin, normal) || !enable4dOcclusion) //TODO: rebuild when occlusion toggled, should also be rebuild when camera positioning changes
-                        slabsOut.Add(new Slab {
-                            pieceIndex = i,
-                            cells = slabCells,
-                            pbc = new Polyhedron3dBoundaryComplex(slabCells, camera, showInvisibleEdges),
-                        });
+                    if (camera.IsFacedBy(origin, normal) || !enable4dOcclusion)
+                    {
+                        var slabPbc = new Polyhedron3dBoundaryComplex(slabCells, camera, showInvisibleEdges);
+                        foreach (var cb in slabPbc.cellBoundaries)
+                            cellsOut.Add(new CellBoundary(cb.cell, cb.pbc, i));
+                    }
                 }
             }
 
-            // 3D occlusion: shared 2-faces between slabs cancel.
-            // Remove from main pbc.d2faces AND from each CellBoundary's mini-pbc.
+            // Cross-piece deduplication: shared 2-faces between pieces cancel.
+            var claimedCells = new HashSet<IntegerCell>();
+            foreach (var cb in cellsOut)
             {
-                var claimedCells = new HashSet<IntegerCell>();
-                foreach (var slab in slabsOut)
-                {
-                    var toRemove = new List<Face2dBC>();
-                    foreach (var kvp in slab.pbc.i2p)
-                        if (!claimedCells.Add(kvp.Key))
-                            toRemove.Add(kvp.Value);
-                    foreach (var facet in toRemove)
-                    {
-                        slab.pbc.d2faces.Remove(facet);
-                        foreach (IPolyhedron edge in facet.facets)
-                            if (edge.neighbor != null) edge.neighbor.neighbor = null;
-                        if (slab.pbc.cellBoundaries != null)
-                            foreach (var cb in slab.pbc.cellBoundaries)
-                                cb.pbc.d2faces.Remove(facet);
-                    }
-                }
+                var toRemove = new List<Face2dBC>();
+                foreach (var kvp in cb.pbc.i2p)
+                    if (!claimedCells.Add(kvp.Key))
+                        toRemove.Add(kvp.Value);
+                foreach (var facet in toRemove)
+                    cb.pbc.RemoveFace(facet);
             }
         }
 
@@ -123,18 +92,12 @@ namespace D4BB.Transforms
             var viewNormal = camera.viewNormal.x;
             var cmp = new InFrontOfViewNormalComparer(viewNormal, reverse: true);
 
-            // Collect all CellBoundaries and sort far-to-near (back-to-front).
-            var allCells = new List<CellBoundary>();
-            foreach (var slab in slabs)
-                if (slab.pbc.cellBoundaries != null)
-                    allCells.AddRange(slab.pbc.cellBoundaries);
-            allCells.Sort((a, b) => cmp.Compare(b.cell, a.cell)); // descending depth = far first
+            cells.Sort((a, b) => cmp.Compare(b.cell, a.cell)); // far-to-near
 
-            // Accumulate: each cell cuts all previously seen (farther) cells.
             var back = new List<CellBoundary>();
-            maxSteps = allCells.Count;
+            maxSteps = cells.Count;
             int i = 0;
-            foreach (var nearCell in allCells)
+            foreach (var nearCell in cells)
             {
                 if (stepMode && i >= stepIndex)
                 {
@@ -150,7 +113,7 @@ namespace D4BB.Transforms
                 }
                 i++;
             }
-}
+        }
 
         public static HalfSpace[] DefiningHalfSpaces(OrientedIntegerCell cell, ICamera4d cam)
         {

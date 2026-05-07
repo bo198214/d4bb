@@ -266,6 +266,11 @@ public class Polyhedron3dBoundaryComplex {
         Debug.Assert(polyhedron.Dim()==polyhedron.SpaceDim(),"6715569833");
         CutOut(polyhedron.HalfSpaces().Values.ToArray());
     }
+    public void RemoveFace(Face2dBC facet) {
+        if (!d2faces.Remove(facet)) return;
+        foreach (IPolyhedron edge in facet.facets)
+            if (edge.neighbor != null) edge.neighbor.neighbor = null;
+    }
     public ICollection<Face2dBC> VisibleFacets() {
         if (cellBoundaries != null) {
             var result = new List<Face2dBC>();
