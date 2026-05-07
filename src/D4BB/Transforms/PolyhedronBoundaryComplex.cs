@@ -215,21 +215,37 @@ public class Polyhedron3dBoundaryComplex {
             }
         }
     }
+    static bool FaceIntersectsPolyhedron(Face2dBC facet, HalfSpace[] halfSpaces) {
+        List<Point> pts = facet.points;
+        foreach (var hs in halfSpaces) {
+            pts = ClipConvexPolygon(pts, hs);
+            if (pts.Count < 3) return false;
+        }
+        return true;
+    }
+    static List<Point> ClipConvexPolygon(List<Point> polygon, HalfSpace hs) {
+        var result = new List<Point>(polygon.Count + 1);
+        int n = polygon.Count;
+        for (int i = 0; i < n; i++) {
+            Point cur = polygon[i];
+            Point nxt = polygon[(i + 1) % n];
+            int cs = hs.side(cur);
+            int ns = hs.side(nxt);
+            if (cs <= 0) result.Add(cur);
+            if ((cs < 0 && ns > 0) || (cs > 0 && ns < 0))
+                result.Add(hs.cutPoint(cur, nxt));
+        }
+        return result;
+    }
     public void CutOut(HalfSpace[] halfSpaces) {
         List<Face2dBC> noSplit = new();
 
         List<Face2dBC> innerFacets1 = new();
         foreach (var facet in d2faces) {
-            bool outSideOneHalfSpace = false;
-            foreach (var halfSpace in halfSpaces) {
-                var side = ((IPolyhedron)facet).Side(halfSpace);
-                if (side==SplitResult.GENUINE_OUTSIDE || side==SplitResult.TOUCHING_OUTSIDE) {
-                    outSideOneHalfSpace = true;
-                    break;
-                }
-            }
-            if (!outSideOneHalfSpace) innerFacets1.Add(facet);
-            else noSplit.Add(facet);
+            if (FaceIntersectsPolyhedron(facet, halfSpaces))
+                innerFacets1.Add(facet);
+            else
+                noSplit.Add(facet);
         }
         List<Face2dBC> outerFacets = new();
         List<Face2dBC> innerFacets2 = new();
