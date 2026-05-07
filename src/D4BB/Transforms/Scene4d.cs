@@ -142,9 +142,10 @@ namespace D4BB.Transforms
                 }
                 else
                 {
+                    var halfSpaces = DefiningHalfSpaces(nearCell.cell, camera);
                     foreach (var farCell in back)
                         if (cmp.Compare(farCell.cell, nearCell.cell) != 0)
-                            farCell.pbc.CutOut(DefiningHalfSpaces(nearCell.cell, camera));
+                            farCell.pbc.CutOut(halfSpaces);
                     back.Add(nearCell);
                 }
                 i++;
