@@ -13,6 +13,18 @@ namespace D4BB.Transforms
         public int stepIndex = 0;
         public int maxSteps = 0;
         public readonly List<CellBoundary> cells = new();
+        public HashSet<Face2d>[] visibleFacets { get; private set; } = System.Array.Empty<HashSet<Face2d>>();
+        public HashSet<IPolyhedron>[] visibleEdges { get; private set; } = System.Array.Empty<HashSet<IPolyhedron>>();
+
+        // Precomputed per-piece topology: visible (c3, f2) pairs without backface culling.
+        // Stable across Translate/Rotate — only origins/spans change, not the face selection.
+        public class PieceTopology {
+            public int[][] origins;  // current tesseract origins (owned copy)
+            public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces;
+        }
+        public PieceTopology[] pieceTopologies { get; private set; } = System.Array.Empty<PieceTopology>();
+
+        private int numPieces = 0;
 
         public Scene4d(int[][][] origins, ICamera4d camera, bool showInvisibleEdges = false)
         {
@@ -21,106 +33,99 @@ namespace D4BB.Transforms
             Update(origins);
         }
 
-        public HashSet<Face2d> VisibleFacets(int pieceIndex)
-        {
-            var res = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
-            foreach (var cb in cells)
-                if (cb.pieceIndex == pieceIndex)
-                    foreach (var facet in cb.pbc.d2faces) res.Add(facet);
-            return res;
-        }
+        public HashSet<Face2d> VisibleFacets(int pieceIndex) => visibleFacets[pieceIndex];
+        public HashSet<IPolyhedron> VisibleEdges(int pieceIndex) => visibleEdges[pieceIndex];
 
-        public HashSet<IPolyhedron> VisibleEdges(int pieceIndex)
-        {
-            var res = new HashSet<IPolyhedron>();
-            foreach (var cb in cells)
-                if (cb.pieceIndex == pieceIndex)
-                    foreach (var edge in cb.pbc.VisibleEdges()) res.Add(edge);
-            return res;
-        }
+        // ── public API ────────────────────────────────────────────────────────
 
         public void Update(int[][][] pieceOrigins)
         {
-            RebuildCells(pieceOrigins, camera, enable4dOcclusion, showInvisibleEdges, cells);
+            numPieces = pieceOrigins?.Length ?? 0;
+            pieceTopologies = ComputeAllTopologies(pieceOrigins);
+            RebuildFromTopologies();
             ApplyCameraOcclusion();
+            RefreshVisibleCache();
         }
 
         public void UpdateCamera()
         {
             ApplyCameraOcclusion();
+            RefreshVisibleCache();
         }
 
-        private static void RebuildCells(int[][][] pieceOrigins, ICamera4d camera, bool enable4dOcclusion, bool showInvisibleEdges, List<CellBoundary> cellsOut)
+        public void Translate(int pieceIndex, IntegerSignedAxis axis)
         {
-            cellsOut.Clear();
-            if (pieceOrigins == null) return;
-
-            for (int pieceIndex = 0; pieceIndex < pieceOrigins.Length; pieceIndex++)
+            var topo = pieceTopologies[pieceIndex];
+            IntegerOps.Translate(topo.origins, axis);
+            foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
             {
-                var ibc = new IntegerBoundaryComplex(pieceOrigins[pieceIndex]);
+                c3.Translate(axis);
+                f2.Translate(axis);
+            }
+            RebuildFromTopologies();
+            ApplyCameraOcclusion();
+            RefreshVisibleCache();
+        }
 
-                // Step 1: For each boundary 3D cell, compute its visible 2D faces.
-                // f2 is interior iff its IBC neighbor equals its same-hyperplane neighbor.
-                var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
-                var cell2Faces = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
+        public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
+        {
+            var topo = pieceTopologies[pieceIndex];
+            IntegerOps.Rotate(topo.origins, center, v, w);
+            foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
+            {
+                c3.Rotate(center, v, w);
+                f2.Rotate(center, v, w);
+            }
+            RebuildFromTopologies();
+            ApplyCameraOcclusion();
+            RefreshVisibleCache();
+        }
 
-                foreach (OrientedIntegerCell c3 in ibc.cells)
+        // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
+
+        private static PieceTopology[] ComputeAllTopologies(int[][][] pieceOrigins)
+        {
+            if (pieceOrigins == null) return System.Array.Empty<PieceTopology>();
+            var result = new PieceTopology[pieceOrigins.Length];
+            for (int i = 0; i < pieceOrigins.Length; i++)
+                result[i] = ComputePieceTopology(pieceOrigins[i]);
+            return result;
+        }
+
+        private static PieceTopology ComputePieceTopology(int[][] origins)
+        {
+            var ibc = new IntegerBoundaryComplex(origins);
+            var coplanarBoundaryFaces = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>();
+            var seenFaces = new HashSet<IntegerCell>();
+
+            foreach (OrientedIntegerCell c3 in ibc.cells)
+            {
+                foreach (var f2 in c3.Facets())
                 {
-                    if (!camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())) && enable4dOcclusion)
-                        continue;
-
-                    var cellFacesList = new List<Face2dBC>();
-                    foreach (var f2 in c3.Facets())
-                    {
-                        if (ibc.neighborOfVia[c3].TryGetValue(f2, out var ibcNeighbor)
-                            && ibcNeighbor.Equals(c3.SameSpaceOtherParent(f2))) continue; // interior
-
-                        if (allFace2dBC.ContainsKey(f2)) continue; // already claimed
-
-                        var pf = new Face2dBC(f2, camera);
-                        allFace2dBC[f2] = pf;
-                        cellFacesList.Add(pf);
-                    }
-
-                    if (cellFacesList.Count > 0)
-                        cell2Faces[c3] = cellFacesList;
-                }
-
-                // Step 2: Set up edge neighbor links between adjacent visible faces.
-                // For edge e of face f1: if the same-hyperplane face f2 is also visible,
-                // link them as interior (invisible) neighbors; otherwise the edge is visible.
-                foreach (var pf1 in allFace2dBC.Values)
-                {
-                    var f1 = (OrientedIntegerCell)pf1.integerCell;
-                    foreach (var e in f1.Facets())
-                    {
-                        var pEdge1 = pf1.i2p[e];
-                        pEdge1.parent = pf1;
-                        var sameSpace2d = f1.SameSpaceOtherParent(e);
-                        if (allFace2dBC.TryGetValue(sameSpace2d, out var pf2))
-                        {
-                            pEdge1.neighbor = pf2.i2p[e];
-                            pEdge1.isInvisible = true;
-                        }
-                        else
-                        {
-                            pEdge1.isInvisible = false;
-                        }
-                    }
-                }
-
-                // Step 3: Build per-cell PBCs and set the pbc reference on each face.
-                foreach (var (c3, faces) in cell2Faces)
-                {
-                    var cellPbc = new Polyhedron3dBoundaryComplex(faces, showInvisibleEdges);
-                    foreach (var pf in faces) pf.pbc = cellPbc;
-                    cellsOut.Add(new CellBoundary(c3, cellPbc, pieceIndex));
+                    if (ibc.neighborOfVia[c3].TryGetValue(f2, out var ibcNeighbor)
+                        && ibcNeighbor.Equals(c3.SameSpaceOtherParent(f2))) continue; // interior
+                    if (!seenFaces.Add(f2)) continue; // already claimed by another cell
+                    coplanarBoundaryFaces.Add((c3, f2));
                 }
             }
 
+            return new PieceTopology {
+                origins = DeepCloneOrigins(origins),
+                coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray()
+            };
+        }
+
+        // ── fast rebuild from precomputed topology (skips IntegerBoundaryComplex) ─
+
+        private void RebuildFromTopologies()
+        {
+            cells.Clear();
+            for (int i = 0; i < pieceTopologies.Length; i++)
+                RebuildPieceFromTopology(pieceTopologies[i], i);
+
             // Cross-piece deduplication: shared 2-faces between pieces cancel.
             var claimedCells = new HashSet<IntegerCell>();
-            foreach (var cb in cellsOut)
+            foreach (var cb in cells)
             {
                 var toRemove = new List<Face2dBC>();
                 foreach (var kvp in cb.pbc.i2p)
@@ -130,6 +135,53 @@ namespace D4BB.Transforms
                     cb.pbc.RemoveFace(facet);
             }
         }
+
+        private void RebuildPieceFromTopology(PieceTopology topo, int pieceIndex)
+        {
+            var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
+            var cell2Faces = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
+
+            foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
+            {
+                if (!camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())) && enable4dOcclusion)
+                    continue; // backface cull
+
+                var pf = new Face2dBC(f2, camera);
+                allFace2dBC[f2] = pf;
+                if (!cell2Faces.ContainsKey(c3)) cell2Faces[c3] = new();
+                cell2Faces[c3].Add(pf);
+            }
+
+            // Set up edge neighbor links between adjacent visible faces.
+            foreach (var pf1 in allFace2dBC.Values)
+            {
+                var f1 = (OrientedIntegerCell)pf1.integerCell;
+                foreach (var e in f1.Facets())
+                {
+                    var pEdge1 = pf1.i2p[e];
+                    pEdge1.parent = pf1;
+                    var sameSpace2d = f1.SameSpaceOtherParent(e);
+                    if (allFace2dBC.TryGetValue(sameSpace2d, out var pf2))
+                    {
+                        pEdge1.neighbor = pf2.i2p[e];
+                        pEdge1.isInvisible = true;
+                    }
+                    else
+                    {
+                        pEdge1.isInvisible = false;
+                    }
+                }
+            }
+
+            foreach (var (c3, faces) in cell2Faces)
+            {
+                var cellPbc = new Polyhedron3dBoundaryComplex(faces, showInvisibleEdges);
+                foreach (var pf in faces) pf.pbc = cellPbc;
+                cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
+            }
+        }
+
+        // ── camera occlusion ──────────────────────────────────────────────────
 
         private void ApplyCameraOcclusion()
         {
@@ -161,6 +213,26 @@ namespace D4BB.Transforms
             }
         }
 
+        // ── visible cache ─────────────────────────────────────────────────────
+
+        private void RefreshVisibleCache()
+        {
+            visibleFacets = new HashSet<Face2d>[numPieces];
+            visibleEdges = new HashSet<IPolyhedron>[numPieces];
+            for (int i = 0; i < numPieces; i++)
+            {
+                visibleFacets[i] = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
+                visibleEdges[i] = new HashSet<IPolyhedron>();
+            }
+            foreach (var cb in cells)
+            {
+                foreach (var facet in cb.pbc.d2faces) visibleFacets[cb.pieceIndex].Add(facet);
+                foreach (var edge in cb.pbc.VisibleEdges()) visibleEdges[cb.pieceIndex].Add(edge);
+            }
+        }
+
+        // ── helpers ───────────────────────────────────────────────────────────
+
         public static HalfSpace[] DefiningHalfSpaces(OrientedIntegerCell cell, ICamera4d cam)
         {
             HalfSpace[] res = new HalfSpace[6];
@@ -182,6 +254,14 @@ namespace D4BB.Transforms
                 res[i++] = new HalfSpace(o, normal);
             }
             return res;
+        }
+
+        private static int[][] DeepCloneOrigins(int[][] origins)
+        {
+            var clone = new int[origins.Length][];
+            for (int i = 0; i < origins.Length; i++)
+                clone[i] = (int[])origins[i].Clone();
+            return clone;
         }
     }
 }
