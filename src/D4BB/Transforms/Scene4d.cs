@@ -99,7 +99,7 @@ namespace D4BB.Transforms
         // neighbor of c3 via f2 equals the same-space sibling of c3 — i.e. both cells sharing
         // f2 lie in the same hyperplane. Such faces are excluded from the boundary.
         // Note: the same f2 may appear with multiple c3's (from different hyperplanes). Dedup
-        // happens later in RebuildPieceFromTopology, after backface culling, so that a backface-
+        // happens later in RebuildCellsFromPieceTopology, after backface culling, so that a backface-
         // culled c3 cannot block f2 from being claimed by a front-facing c3'.
         private static PieceTopology ComputePieceTopology(int[][] origins)
         {
@@ -128,7 +128,7 @@ namespace D4BB.Transforms
         {
             cells.Clear();
             for (int i = 0; i < pieceTopologies.Length; i++)
-                RebuildPieceFromTopology(pieceTopologies[i], i);
+                RebuildCellsFromPieceTopology(pieceTopologies[i], i);
 
             // Cross-piece deduplication: shared 2-faces between pieces cancel.
             var claimedCells = new HashSet<IntegerCell>();
@@ -146,7 +146,7 @@ namespace D4BB.Transforms
         // Fresh Face2dBC objects are created on every rebuild because CutOut (called in
         // ApplyCameraOcclusion) destructively modifies them by severing neighbor links.
         // Reusing objects from a previous frame would leave stale topology.
-        private void RebuildPieceFromTopology(PieceTopology topo, int pieceIndex)
+        private void RebuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex)
         {
             var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
             var cell2Faces = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
