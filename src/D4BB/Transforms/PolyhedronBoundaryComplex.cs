@@ -145,17 +145,17 @@ public class Polyhedron3dBoundaryComplex {
     public Dictionary<IntegerCell,Face2dBC> i2p = new(); // maps 2d integer cells to their corresponding Face2dBC, for quick access when building the complex. Does not consider cut faces.
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
-    bool showInvisibleEdges;
+    bool showIntraCoplanarEdges;
 
     public List<CellBoundary> cellBoundaries;
-    internal Polyhedron3dBoundaryComplex(List<Face2dBC> prebuiltFaces, bool showInvisibleEdges) {
-        this.showInvisibleEdges = showInvisibleEdges;
+    internal Polyhedron3dBoundaryComplex(List<Face2dBC> prebuiltFaces, bool showIntraCoplanarEdges) {
+        this.showIntraCoplanarEdges = showIntraCoplanarEdges;
         d2faces = new HashSet<Face2dBC>(prebuiltFaces, ByRef.I);
         foreach (var face in d2faces)
             i2p[face.integerCell] = face;
     }
-    public Polyhedron3dBoundaryComplex(HashSet<OrientedIntegerCell> cells3, ICamera4d cam=null, bool showInvisibleEdges=false)
-            : this(new IntegerBoundaryComplex(cells3), cam, showInvisibleEdges) {
+    public Polyhedron3dBoundaryComplex(HashSet<OrientedIntegerCell> cells3, ICamera4d cam=null, bool showIntraCoplanarEdges=false)
+            : this(new IntegerBoundaryComplex(cells3), cam, showIntraCoplanarEdges) {
         cellBoundaries = new List<CellBoundary>();
         foreach (var c3 in cells3) {
             var cellFaces = new List<Face2dBC>(); //collecting the projected 2d faces from this PBC that belong to c3
@@ -163,15 +163,15 @@ public class Polyhedron3dBoundaryComplex {
                 if (i2p.TryGetValue(c2, out var face))
                     cellFaces.Add(face);
             cellBoundaries.Add(new CellBoundary(c3,
-                new Polyhedron3dBoundaryComplex(cellFaces, showInvisibleEdges)));
+                new Polyhedron3dBoundaryComplex(cellFaces, showIntraCoplanarEdges)));
         }
     }
-    public Polyhedron3dBoundaryComplex(int[] origin, ICamera4d cam=null, bool showInvisibleEdges=false)
-            : this(new IntegerBoundaryComplex(origin), cam, showInvisibleEdges) {}
-    public Polyhedron3dBoundaryComplex(int[][] origins, ICamera4d cam=null, bool showInvisibleEdges=false)
-            : this(new IntegerBoundaryComplex(origins), cam, showInvisibleEdges) {}
-    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null,bool showInvisibleEdges=false) {
-        this.showInvisibleEdges = showInvisibleEdges;
+    public Polyhedron3dBoundaryComplex(int[] origin, ICamera4d cam=null, bool showIntraCoplanarEdges=false)
+            : this(new IntegerBoundaryComplex(origin), cam, showIntraCoplanarEdges) {}
+    public Polyhedron3dBoundaryComplex(int[][] origins, ICamera4d cam=null, bool showIntraCoplanarEdges=false)
+            : this(new IntegerBoundaryComplex(origins), cam, showIntraCoplanarEdges) {}
+    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null,bool showIntraCoplanarEdges=false) {
+        this.showIntraCoplanarEdges = showIntraCoplanarEdges;
         foreach (var i2c in i3bc.cells) {
             var pc = new Face2dBC(i2c, cam) { pbc = this};
             i2p[i2c] = pc;
@@ -286,7 +286,7 @@ public class Polyhedron3dBoundaryComplex {
             : (IEnumerable<Face2dBC>)d2faces;
         foreach (var facet in faces) {
             foreach (var edge in facet.facets) {
-                if (showInvisibleEdges || !edge.isInvisible || edge.neighbor==null) {
+                if (showIntraCoplanarEdges || !edge.isInvisible || edge.neighbor==null) {
                     res.Add((EdgeBC)edge);
                 }
             }

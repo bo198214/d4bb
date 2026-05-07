@@ -7,7 +7,7 @@ namespace D4BB.Transforms
     public class Scene4d
     {
         public ICamera4d camera { get; set; }
-        public bool showInvisibleEdges;
+        public bool showIntraCoplanarEdges;
         public bool enable4dOcclusion = true;
         public bool stepMode = false;
         public int stepIndex = 0;
@@ -26,10 +26,10 @@ namespace D4BB.Transforms
 
         private int numPieces = 0;
 
-        public Scene4d(int[][][] origins, ICamera4d camera, bool showInvisibleEdges = false)
+        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false)
         {
             this.camera = camera;
-            this.showInvisibleEdges = showInvisibleEdges;
+            this.showIntraCoplanarEdges = showIntraCoplanarEdges;
             Update(origins);
         }
 
@@ -42,7 +42,7 @@ namespace D4BB.Transforms
         {
             numPieces = pieceOrigins?.Length ?? 0;
             pieceTopologies = ComputeAllTopologies(pieceOrigins);
-            RebuildFromTopologies();
+            RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
         }
@@ -62,7 +62,7 @@ namespace D4BB.Transforms
                 c3.Translate(axis);
                 f2.Translate(axis);
             }
-            RebuildFromTopologies();
+            RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
         }
@@ -76,7 +76,7 @@ namespace D4BB.Transforms
                 c3.Rotate(center, v, w);
                 f2.Rotate(center, v, w);
             }
-            RebuildFromTopologies();
+            RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
         }
@@ -117,7 +117,7 @@ namespace D4BB.Transforms
 
         // ── fast rebuild from precomputed topology (skips IntegerBoundaryComplex) ─
 
-        private void RebuildFromTopologies()
+        private void RebuildCellsFromTopologies()
         {
             cells.Clear();
             for (int i = 0; i < pieceTopologies.Length; i++)
@@ -175,7 +175,7 @@ namespace D4BB.Transforms
 
             foreach (var (c3, faces) in cell2Faces)
             {
-                var cellPbc = new Polyhedron3dBoundaryComplex(faces, showInvisibleEdges);
+                var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges);
                 foreach (var pf in faces) pf.pbc = cellPbc;
                 cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
             }

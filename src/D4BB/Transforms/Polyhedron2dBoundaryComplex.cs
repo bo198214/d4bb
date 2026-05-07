@@ -74,17 +74,17 @@ public class Polyhedron2dBoundaryComplex
     public List<Face2dIC> d2faces = new();
     public Dictionary<IntegerCell, Face2dIC> i2p = new();
     public List<CellBoundary2d> cellBoundaries;
-    bool showInvisibleEdges;
+    bool showIntraCoplanarEdges;
 
-    internal Polyhedron2dBoundaryComplex(List<Face2dIC> prebuiltFaces, bool showInvisibleEdges) {
-        this.showInvisibleEdges = showInvisibleEdges;
+    internal Polyhedron2dBoundaryComplex(List<Face2dIC> prebuiltFaces, bool showIntraCoplanarEdges) {
+        this.showIntraCoplanarEdges = showIntraCoplanarEdges;
         d2faces = prebuiltFaces;
         foreach (var face in d2faces)
             i2p[face.integerCell] = face;
     }
 
-    public Polyhedron2dBoundaryComplex(HashSet<OrientedIntegerCell> cells2, ICamera3d cam = null, bool showInvisibleEdges = false) {
-        this.showInvisibleEdges = showInvisibleEdges;
+    public Polyhedron2dBoundaryComplex(HashSet<OrientedIntegerCell> cells2, ICamera3d cam = null, bool showIntraCoplanarEdges = false) {
+        this.showIntraCoplanarEdges = showIntraCoplanarEdges;
 
         foreach (var ic2 in cells2) {
             var face = new Face2dIC(ic2, cam) { pbc = this };
@@ -124,7 +124,7 @@ public class Polyhedron2dBoundaryComplex
         cellBoundaries = new List<CellBoundary2d>();
         foreach (var ic2 in cells2)
             cellBoundaries.Add(new CellBoundary2d(ic2,
-                new Polyhedron2dBoundaryComplex(new List<Face2dIC> { i2p[ic2] }, showInvisibleEdges)));
+                new Polyhedron2dBoundaryComplex(new List<Face2dIC> { i2p[ic2] }, showIntraCoplanarEdges)));
     }
 
     public List<Face2dIC> VisibleFacets() {
@@ -143,7 +143,7 @@ public class Polyhedron2dBoundaryComplex
             : (IEnumerable<Face2dIC>)d2faces;
         foreach (var face in faces)
             foreach (var edge in face.edges)
-                if (showInvisibleEdges || !edge.isInvisible || edge.neighbor == null)
+                if (showIntraCoplanarEdges || !edge.isInvisible || edge.neighbor == null)
                     res.Add(edge);
         return res;
     }

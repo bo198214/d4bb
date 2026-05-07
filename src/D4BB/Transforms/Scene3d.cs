@@ -8,7 +8,7 @@ namespace D4BB.Transforms
 public class Scene3d
 {
     public ICamera3d camera { get; set; }
-    public bool showInvisibleEdges;
+    public bool showIntraCoplanarEdges;
     public bool enable3dOcclusion = true;
     public readonly List<Slab> slabs = new();
 
@@ -33,10 +33,10 @@ public class Scene3d
 
     // BSP for 3D occlusion (analogous to D4BSPofCells, reused directly)
 
-    public Scene3d(int[][][] origins, ICamera3d camera, bool showInvisibleEdges = false)
+    public Scene3d(int[][][] origins, ICamera3d camera, bool showIntraCoplanarEdges = false)
     {
         this.camera = camera;
-        this.showInvisibleEdges = showInvisibleEdges;
+        this.showIntraCoplanarEdges = showIntraCoplanarEdges;
         Update(origins);
     }
 
@@ -60,7 +60,7 @@ public class Scene3d
 
     public void Update(int[][][] pieceOrigins)
     {
-        RebuildSlabs(pieceOrigins, camera, enable3dOcclusion, showInvisibleEdges, slabs);
+        RebuildSlabs(pieceOrigins, camera, enable3dOcclusion, showIntraCoplanarEdges, slabs);
         ApplyCameraOcclusion();
     }
 
@@ -69,7 +69,7 @@ public class Scene3d
         ApplyCameraOcclusion();
     }
 
-    private static void RebuildSlabs(int[][][] pieceOrigins, ICamera3d camera, bool enable3dOcclusion, bool showInvisibleEdges, List<Slab> slabsOut)
+    private static void RebuildSlabs(int[][][] pieceOrigins, ICamera3d camera, bool enable3dOcclusion, bool showIntraCoplanarEdges, List<Slab> slabsOut)
     {
         slabsOut.Clear();
         if (pieceOrigins == null) return;
@@ -85,7 +85,7 @@ public class Scene3d
                     slabsOut.Add(new Slab {
                         pieceIndex = i,
                         cells = slabCells,
-                        pbc = new Polyhedron2dBoundaryComplex(slabCells, camera, showInvisibleEdges),
+                        pbc = new Polyhedron2dBoundaryComplex(slabCells, camera, showIntraCoplanarEdges),
                     });
             }
         }
