@@ -324,14 +324,8 @@ public class Face2dBCTests
         var preSplittedTop = new Face2d(new List<Point>{new(0,1,0),new(0,1,1),new(0.5,1,1),new(1,1,1),new(1,1,0),new(0.5,1,0)});
         IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
         var pbc = new Polyhedron3dBoundaryComplex(ibc);
-        var indexFront = -1;
-        for (int i=0;i<pbc.d2faces.Count;i++) if (pbc.d2faces[i].Equals(nonSplittedFront)) {indexFront=i;break;}
-        Assert.That(indexFront,Is.Not.EqualTo(-1)); //==2
-        var frontFace = pbc.d2faces[indexFront];
-        var indexBack = -1;
-        for (int i=0;i<pbc.d2faces.Count;i++) if (pbc.d2faces[i].Equals(nonSplittedBack)) {indexBack=i;break;}
-        Assert.That(indexBack,Is.Not.EqualTo(-1));  //==5
-        var backFace = pbc.d2faces[indexBack];
+        var frontFace = pbc.d2faces.First(f => f.Equals(nonSplittedFront));
+        var backFace  = pbc.d2faces.First(f => f.Equals(nonSplittedBack));
         //indexTop == 4
 
         HalfSpace halfSpace = new HalfSpace(0.5,new Point(new double[]{1,0,0}).normalize());
@@ -347,10 +341,7 @@ public class Face2dBCTests
         pbc.Replace(backFace,(Face2dBC)srBack.inner,(Face2dBC)srBack.outer);
         Assert.That(pbc.d2faces,Has.Count.EqualTo(8));
 
-        var indexTop = -1;
-        for (int i=0;i<pbc.d2faces.Count;i++) if (pbc.d2faces[i].Equals(preSplittedTop)) {indexTop=i;break;}
-        Assert.That(indexTop,Is.Not.EqualTo(-1));
-        var topFace = pbc.d2faces[indexTop];
+        var topFace = pbc.d2faces.First(f => f.Equals(preSplittedTop));
         SplitResult srTop = topFace.Split(halfSpace);
         Assert.That(srTop.inner,Is.Not.Null);
         Assert.That(srTop.outer,Is.Not.Null);

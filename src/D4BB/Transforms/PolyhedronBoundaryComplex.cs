@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using D4BB.Comb;
 using D4BB.Geometry;
 namespace D4BB.Transforms
@@ -135,7 +136,12 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
 }
 
 public class Polyhedron3dBoundaryComplex {
-    public List<Face2dBC> d2faces = new();
+    sealed class ByRef : IEqualityComparer<Face2dBC> {
+        internal static readonly ByRef I = new();
+        public bool Equals(Face2dBC x, Face2dBC y) => ReferenceEquals(x, y);
+        public int GetHashCode(Face2dBC f) => RuntimeHelpers.GetHashCode(f);
+    }
+    public HashSet<Face2dBC> d2faces = new(ByRef.I);
     public Dictionary<IntegerCell,Face2dBC> i2p = new(); // maps 2d integer cells to their corresponding Face2dBC, for quick access when building the complex. Does not consider cut faces.
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
@@ -144,7 +150,7 @@ public class Polyhedron3dBoundaryComplex {
     public List<CellBoundary> cellBoundaries;
     internal Polyhedron3dBoundaryComplex(List<Face2dBC> prebuiltFaces, bool showInvisibleEdges) {
         this.showInvisibleEdges = showInvisibleEdges;
-        d2faces = prebuiltFaces;
+        d2faces = new HashSet<Face2dBC>(prebuiltFaces, ByRef.I);
         foreach (var face in d2faces)
             i2p[face.integerCell] = face;
     }
@@ -193,7 +199,7 @@ public class Polyhedron3dBoundaryComplex {
         }
         throw new Exception();
     }
-    public static void Split(HalfSpace halfSpace,List<Face2dBC> facets, List<Face2dBC> out_inner, List<Face2dBC> out_outer) {
+    public static void Split(HalfSpace halfSpace, IEnumerable<Face2dBC> facets, List<Face2dBC> out_inner, List<Face2dBC> out_outer) {
         foreach (var facet in facets) {
             var split = facet.Split(halfSpace);
             if (split.inner!=null)
@@ -238,13 +244,13 @@ public class Polyhedron3dBoundaryComplex {
             }
         }
         outerFacets.AddRange(noSplit);
-        d2faces = outerFacets;
+        d2faces = new HashSet<Face2dBC>(outerFacets, ByRef.I);
     }
     public void CutOut(IPolyhedron polyhedron) {
         Debug.Assert(polyhedron.Dim()==polyhedron.SpaceDim(),"6715569833");
         CutOut(polyhedron.HalfSpaces().Values.ToArray());
     }
-    public List<Face2dBC> VisibleFacets() {
+    public ICollection<Face2dBC> VisibleFacets() {
         if (cellBoundaries != null) {
             var result = new List<Face2dBC>();
             foreach (var cb in cellBoundaries) result.AddRange(cb.pbc.d2faces);
@@ -266,11 +272,10 @@ public class Polyhedron3dBoundaryComplex {
         }
         return res;
     }
-    public void Replace(Face2dBC ab,Face2dBC a,Face2dBC b) {
-        int index = d2faces.IndexOf(ab);
-        if (index==-1) throw new Exception($"Replacing non-existing value {ab}");
-        d2faces[index]=b;
-        d2faces.Insert(index,a);
+    public void Replace(Face2dBC ab, Face2dBC a, Face2dBC b) {
+        if (!d2faces.Remove(ab)) throw new Exception($"Replacing non-existing value {ab}");
+        d2faces.Add(a);
+        d2faces.Add(b);
     }
 }
 }
