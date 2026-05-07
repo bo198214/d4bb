@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using D4BB.Comb;
 using D4BB.Geometry;
 
@@ -56,19 +55,66 @@ namespace D4BB.Transforms
             cellsOut.Clear();
             if (pieceOrigins == null) return;
 
-            for (int i = 0; i < pieceOrigins.Length; i++)
+            for (int pieceIndex = 0; pieceIndex < pieceOrigins.Length; pieceIndex++)
             {
-                var d4PieceIBC = new IntegerBoundaryComplex(pieceOrigins[i]);
-                foreach (var slabCells in d4PieceIBC.Slabs())
+                var ibc = new IntegerBoundaryComplex(pieceOrigins[pieceIndex]);
+
+                // Step 1: For each boundary 3D cell, compute its visible 2D faces.
+                // f2 is interior iff its IBC neighbor equals its same-hyperplane neighbor.
+                var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
+                var cell2Faces = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
+
+                foreach (OrientedIntegerCell c3 in ibc.cells)
                 {
-                    Point origin = new(slabCells.First().origin);
-                    Point normal = new(slabCells.First().Normal());
-                    if (camera.IsFacedBy(origin, normal) || !enable4dOcclusion)
+                    if (!camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())) && enable4dOcclusion)
+                        continue;
+
+                    var cellFacesList = new List<Face2dBC>();
+                    foreach (var f2 in c3.Facets())
                     {
-                        var slabPbc = new Polyhedron3dBoundaryComplex(slabCells, camera, showInvisibleEdges);
-                        foreach (var cb in slabPbc.cellBoundaries)
-                            cellsOut.Add(new CellBoundary(cb.cell, cb.pbc, i));
+                        if (ibc.neighborOfVia[c3].TryGetValue(f2, out var ibcNeighbor)
+                            && ibcNeighbor.Equals(c3.SameSpaceOtherParent(f2))) continue; // interior
+
+                        if (allFace2dBC.ContainsKey(f2)) continue; // already claimed
+
+                        var pf = new Face2dBC(f2, camera);
+                        allFace2dBC[f2] = pf;
+                        cellFacesList.Add(pf);
                     }
+
+                    if (cellFacesList.Count > 0)
+                        cell2Faces[c3] = cellFacesList;
+                }
+
+                // Step 2: Set up edge neighbor links between adjacent visible faces.
+                // For edge e of face f1: if the same-hyperplane face f2 is also visible,
+                // link them as interior (invisible) neighbors; otherwise the edge is visible.
+                foreach (var pf1 in allFace2dBC.Values)
+                {
+                    var f1 = (OrientedIntegerCell)pf1.integerCell;
+                    foreach (var e in f1.Facets())
+                    {
+                        var pEdge1 = pf1.i2p[e];
+                        pEdge1.parent = pf1;
+                        var sameSpace2d = f1.SameSpaceOtherParent(e);
+                        if (allFace2dBC.TryGetValue(sameSpace2d, out var pf2))
+                        {
+                            pEdge1.neighbor = pf2.i2p[e];
+                            pEdge1.isInvisible = true;
+                        }
+                        else
+                        {
+                            pEdge1.isInvisible = false;
+                        }
+                    }
+                }
+
+                // Step 3: Build per-cell PBCs and set the pbc reference on each face.
+                foreach (var (c3, faces) in cell2Faces)
+                {
+                    var cellPbc = new Polyhedron3dBoundaryComplex(faces, showInvisibleEdges);
+                    foreach (var pf in faces) pf.pbc = cellPbc;
+                    cellsOut.Add(new CellBoundary(c3, cellPbc, pieceIndex));
                 }
             }
 
@@ -119,8 +165,7 @@ namespace D4BB.Transforms
         {
             HalfSpace[] res = new HalfSpace[6];
             var center = new Point(3);
-            var vertices = cell.Vertices();
-            foreach (var corner in vertices)
+            foreach (var corner in cell.Vertices())
                 center.add(cam.Proj3d(new Point4d(corner)));
             center.multiply(1.0 / 8);
 
