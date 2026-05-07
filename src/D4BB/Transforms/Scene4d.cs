@@ -98,11 +98,13 @@ namespace D4BB.Transforms
         // A 2-face f2 is interior (coplanar with the same 3-cell on both sides) when the IBC
         // neighbor of c3 via f2 equals the same-space sibling of c3 — i.e. both cells sharing
         // f2 lie in the same hyperplane. Such faces are excluded from the boundary.
+        // Note: the same f2 may appear with multiple c3's (from different hyperplanes). Dedup
+        // happens later in RebuildPieceFromTopology, after backface culling, so that a backface-
+        // culled c3 cannot block f2 from being claimed by a front-facing c3'.
         private static PieceTopology ComputePieceTopology(int[][] origins)
         {
             var ibc = new IntegerBoundaryComplex(origins);
             var coplanarBoundaryFaces = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>();
-            var seenFaces = new HashSet<IntegerCell>();
 
             foreach (OrientedIntegerCell c3 in ibc.cells)
             {
@@ -110,7 +112,6 @@ namespace D4BB.Transforms
                 {
                     if (ibc.neighborOfVia[c3].TryGetValue(f2, out var ibcNeighbor)
                         && ibcNeighbor.Equals(c3.SameSpaceOtherParent(f2))) continue; // interior
-                    if (!seenFaces.Add(f2)) continue; // already claimed by another cell
                     coplanarBoundaryFaces.Add((c3, f2));
                 }
             }
@@ -154,6 +155,7 @@ namespace D4BB.Transforms
             {
                 if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
                     continue;
+                if (allFace2dBC.ContainsKey(f2)) continue; // same f2 already claimed by a front-facing c3
 
                 var pf = new Face2dBC(f2, camera);
                 allFace2dBC[f2] = pf;
