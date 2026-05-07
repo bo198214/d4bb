@@ -133,8 +133,10 @@ public class PolyhedronBoundaryComplexTests {
         var ibc = new IntegerBoundaryComplex(new int[][]{new int[]{0,0,0,0}});
         Assert.That(ibc.Dim(),Is.EqualTo(3));
         Assert.That(ibc.cells,Has.Count.EqualTo(8));
-        ibc.cells.TryGetValue(new OrientedIntegerCell(new int[]{0,0,0,0},new(){0,1,2},true,true),out var iFace3d1);
-        ibc.cells.TryGetValue(new OrientedIntegerCell(new int[]{0,0,0,0},new(){1,2,3},true,true),out var iFace3d2);
+        var iFace3d1 = ibc.cells.FirstOrDefault(c => c.Equals(new OrientedIntegerCell(new int[]{0,0,0,0},new(){0,1,2},true,true)));
+        var iFace3d2 = ibc.cells.FirstOrDefault(c => c.Equals(new OrientedIntegerCell(new int[]{0,0,0,0},new(){1,2,3},true,true)));
+        Assert.That(iFace3d1, Is.Not.Null);
+        Assert.That(iFace3d2, Is.Not.Null);
         var iCut = new IntegerCell(new int[]{0,0,0,0},new(){1,2});
         var pCut = new Face2d(new List<Point>{new(0,0,0),new(0,0,1),new(0,1,1),new(0,1,0)});
         Assert.That(ibc.neighborOfVia[iFace3d1][iCut],Is.EqualTo(iFace3d2));

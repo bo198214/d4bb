@@ -8,11 +8,7 @@ namespace D4BB.Comb
 {
 public class IntegerBoundaryComplex {
     public readonly Dictionary<OrientedIntegerCell,Dictionary<IntegerCell,OrientedIntegerCell>> neighborOfVia = new(); // dim-1
-    public HashSet<OrientedIntegerCell> cells { 
-        get {
-            return neighborOfVia.Keys.ToHashSet();
-        } 
-    }
+    public IReadOnlyCollection<OrientedIntegerCell> cells => neighborOfVia.Keys;
     public IntegerBoundaryComplex(Dictionary<OrientedIntegerCell,Dictionary<IntegerCell,OrientedIntegerCell>> neighborVia_) {
         neighborOfVia = neighborVia_;
     }
@@ -123,21 +119,19 @@ public class IntegerBoundaryComplex {
         }
         return res;
     }
-    public List<HashSet<OrientedIntegerCell>> Slabs(HashSet<OrientedIntegerCell> outAllCubes)
+    public List<HashSet<OrientedIntegerCell>> Slabs(IEnumerable<OrientedIntegerCell> cubes)
     {
+        var workingSet = new HashSet<OrientedIntegerCell>(cubes);
         List<HashSet<OrientedIntegerCell>> res = new();
-        while (outAllCubes.Count() > 0)
+        while (workingSet.Count > 0)
         {
-            OrientedIntegerCell initialCube = outAllCubes.First();
-            HashSet<OrientedIntegerCell> connectedCells = ConnectedCells(initialCube, outAllCubes);
-            res.Add(connectedCells); 
+            OrientedIntegerCell initialCube = workingSet.First();
+            HashSet<OrientedIntegerCell> connectedCells = ConnectedCells(initialCube, workingSet);
+            res.Add(connectedCells);
         }
         return res;
     }
-    public List<HashSet<OrientedIntegerCell>> Slabs()
-    {
-        return Slabs(new HashSet<OrientedIntegerCell>(neighborOfVia.Keys));
-    }
+    public List<HashSet<OrientedIntegerCell>> Slabs() => Slabs(neighborOfVia.Keys);
     public HashSet<IntegerBoundaryComplex> Skeleton()            
     {
         List<HashSet<OrientedIntegerCell>> slabs = Slabs();
