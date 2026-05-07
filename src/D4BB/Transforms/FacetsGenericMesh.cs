@@ -158,13 +158,13 @@ public class FacetsGenericMesh {
 
         foreach (var pFacet in faces2d) {
             // var insetPoints = AOP.Inset3d(((Face2d)pFacet).points,0.01);
-            // var facet = new Face2dBC(new List<Point>(insetPoints), ((Face2d)pFacet).isInvisible,((Face2dWithIntegerCellAttribute)pFacet).integerCell);
+            // var facet = new Face2dBC(new List<Point>(insetPoints), ((Face2d)pFacet).isCoplanarInterior,((Face2dWithIntegerCellAttribute)pFacet).integerCell);
 
             Face2dWithIntegerCellAttribute facet;
             if (inset>0) {
                 facet = new Face2dBC(
                     ((Face2d)pFacet).points,
-                    ((Face2d)pFacet).isInvisible,
+                    ((Face2d)pFacet).isCoplanarInterior,
                     ((Face2dWithIntegerCellAttribute)pFacet).integerCell) { camera = ((Face2dBC)pFacet).camera };
                     facet.Inset(inset);
             } else {
@@ -196,7 +196,7 @@ public class FacetsGenericMesh {
                     vertices4d.Add(v.pos4d);
                     
                     normals?.Add(normal.x);
-                    if (pt.isInvisible) {
+                    if (pt.isCoplanarInterior) {
                         uvs?.Add(new double[]{0,0});
                     }
                     else {
@@ -207,7 +207,7 @@ public class FacetsGenericMesh {
                         }
                     }
                 }
-                //if (!pt.isInvisible) {
+                //if (!pt.isCoplanarInterior) {
                     triangles.Add(vertexNumbers[v]);
                 //}
             }

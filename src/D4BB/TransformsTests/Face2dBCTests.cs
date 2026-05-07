@@ -32,7 +32,7 @@ public class Face2dBCTests
         Assert.That(res.inner.Faces(0), Has.Count.EqualTo(8));
         Assert.That(res.innerCut.Faces(0), Has.Count.EqualTo(4));
         Assert.That(res.outer.Faces(0), Has.Count.EqualTo(8));
-        Assert.That(res.innerCut.isInvisible);
+        Assert.That(res.innerCut.isCoplanarInterior);
         var ocp = res.outer.CenterPoint();
         var icp = res.inner.CenterPoint();
         Assert.That(((Face2d)res.outerCut).HalfSpaceOf().side(ocp), Is.EqualTo(D4BB.Geometry.HalfSpace.INSIDE));
@@ -50,7 +50,7 @@ public class Face2dBCTests
         Assert.That(new HashSet<IPolyhedron>{res.innerCut}, Is.SubsetOf(res.inner.facets));
         IPolyhedron facetFound;
         res.inner.facets.TryGetValue(res.innerCut,out facetFound);
-        Assert.That(facetFound.isInvisible);
+        Assert.That(facetFound.isCoplanarInterior);
 
         var facet1 = new Face2d(new List<Point>(){
             new(0.5,0,0),new(0.5,0.5,0),new(0.5,0.5,1),new(0.5,0,1)
@@ -63,7 +63,7 @@ public class Face2dBCTests
         Assert.That(res2.inner.facets,Is.SupersetOf(new HashSet<IPolyhedron>{facet1}));
         IPolyhedron polyFacet1;
         res2.inner.facets.TryGetValue(facet1,out polyFacet1);
-        Assert.That(polyFacet1.isInvisible);
+        Assert.That(polyFacet1.isCoplanarInterior);
 
         //facet contained in cut
         c1 = Face2dBC.FromIntegerCell(new int[]{0,0,0});
@@ -73,7 +73,7 @@ public class Face2dBCTests
         Assert.That(res.outerCut.Dim(), Is.EqualTo(2));
         Assert.That(res.outer.Dim(), Is.EqualTo(3));
         Assert.That(res.outer, Is.EqualTo(c1));
-        Assert.That(!res.outerCut.isInvisible);
+        Assert.That(!res.outerCut.isCoplanarInterior);
 
         //vertex (0,0,0) contained in cutPlane, otherwise empty cut
         c1 = Face2dBC.FromIntegerCell(new int[]{0,0,0});
@@ -92,7 +92,7 @@ public class Face2dBCTests
         Assert.That(res.inner.Faces(0), Has.Count.EqualTo(10));
         Assert.That(res.innerCut.Faces(0), Has.Count.EqualTo(6));
         Assert.That(res.outer.Faces(0), Has.Count.EqualTo(10));
-        Assert.That(res.innerCut.isInvisible);
+        Assert.That(res.innerCut.isCoplanarInterior);
 
         //3 vertices contained in cutPlane, non-empty cut
         c1 = Face2dBC.FromIntegerCell(new int[]{0,0,0});
@@ -101,7 +101,7 @@ public class Face2dBCTests
         Assert.That(res.inner.Faces(0), Has.Count.EqualTo(4));
         Assert.That(res.innerCut.Faces(0), Has.Count.EqualTo(3));
         Assert.That(res.outer.Faces(0), Has.Count.EqualTo(7));
-        Assert.That(res.innerCut.isInvisible);
+        Assert.That(res.innerCut.isCoplanarInterior);
 
         //edge contained in cutPlane, otherwise empty cut
         c1 = Face2dBC.FromIntegerCell(new int[]{0,0,0});
@@ -306,7 +306,7 @@ public class Face2dBCTests
         HalfSpace cutLeftRight = new HalfSpace(0.5,new Point(1,0,0));
         HalfSpace cutUpDown =    new HalfSpace(0.5,new Point(0,1,0));
         pbc.CutOut(new HalfSpace[] {cutLeftRight,cutUpDown});
-        var visibleFacets = pbc.VisibleFacets();
+        var visibleFacets = pbc.BoundaryFacets();
         Assert.That(visibleFacets, Has.Count.EqualTo(8));
         var cm = new FacetsGenericMesh(pbc.d2faces.Cast<Face2d>().ToHashSet());
     }

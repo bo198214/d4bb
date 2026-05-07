@@ -13,14 +13,14 @@ public class Face2dIC : Face2dWithIntegerCellAttribute
     public ICamera3d camera;
     public Polyhedron2dBoundaryComplex pbc;
 
-    protected Face2dIC(List<Edge> edges, bool isInvisible, IntegerCell integerCell)
-        : base(edges, isInvisible, integerCell) {}
+    protected Face2dIC(List<Edge> edges, bool isConnecting, IntegerCell integerCell)
+        : base(edges, isConnecting, integerCell) {}
 
-    protected Face2dIC(HashSet<IPolyhedron> facets, bool isInvisible, IntegerCell integerCell)
-        : base(facets, isInvisible, integerCell) {}
+    protected Face2dIC(HashSet<IPolyhedron> facets, bool isConnecting, IntegerCell integerCell)
+        : base(facets, isConnecting, integerCell) {}
 
-    protected Face2dIC(List<Point> points, bool isInvisible, IntegerCell integerCell)
-        : base(points, isInvisible, integerCell) {}
+    protected Face2dIC(List<Point> points, bool isConnecting, IntegerCell integerCell)
+        : base(points, isConnecting, integerCell) {}
 
     public Face2dIC(OrientedIntegerCell ic, ICamera3d cam)
         : base(
@@ -49,13 +49,13 @@ public class Face2dIC : Face2dWithIntegerCellAttribute
     }
 
     public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) =>
-        new Face2dIC(facets, isInvisible, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
+        new Face2dIC(facets, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
 
     public override Face2d Recreate(List<Edge> edges) =>
-        new Face2dIC(edges, isInvisible, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
+        new Face2dIC(edges, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
 
     public override Face2d Recreate(List<Point> points) =>
-        new Face2dIC(points, isInvisible, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
+        new Face2dIC(points, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
 }
 
 public class CellBoundary2d
@@ -114,9 +114,9 @@ public class Polyhedron2dBoundaryComplex
                     var myEdge    = face.i2p[ic1];
                     var theirEdge = i2p[other].i2p[ic1];
                     myEdge.neighbor    = theirEdge;
-                    myEdge.isInvisible = true;
+                    myEdge.isCoplanarInterior = true;
                 }
-                // outer boundary edges keep neighbor=null, isInvisible=false
+                // outer boundary edges keep neighbor=null, isCoplanarInterior=false
             }
         }
 
@@ -127,7 +127,7 @@ public class Polyhedron2dBoundaryComplex
                 new Polyhedron2dBoundaryComplex(new List<Face2dIC> { i2p[ic2] }, showIntraCoplanarEdges)));
     }
 
-    public List<Face2dIC> VisibleFacets() {
+    public List<Face2dIC> BoundaryFacets() {
         if (cellBoundaries != null) {
             var result = new List<Face2dIC>();
             foreach (var cb in cellBoundaries) result.AddRange(cb.pbc.d2faces);
@@ -136,14 +136,14 @@ public class Polyhedron2dBoundaryComplex
         return d2faces;
     }
 
-    public HashSet<Edge> VisibleEdges() {
+    public HashSet<Edge> BoundaryEdges() {
         var res = new HashSet<Edge>();
         var faces = cellBoundaries != null
             ? cellBoundaries.SelectMany(cb => cb.pbc.d2faces)
             : (IEnumerable<Face2dIC>)d2faces;
         foreach (var face in faces)
             foreach (var edge in face.edges)
-                if (showIntraCoplanarEdges || !edge.isInvisible || edge.neighbor == null)
+                if (showIntraCoplanarEdges || !edge.isCoplanarInterior || edge.neighbor == null)
                     res.Add(edge);
         return res;
     }

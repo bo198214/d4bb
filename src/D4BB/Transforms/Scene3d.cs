@@ -45,7 +45,7 @@ public class Scene3d
         var res = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
         foreach (var slab in slabs)
             if (slab.pieceIndex == pieceIndex)
-                foreach (var facet in slab.pbc.VisibleFacets()) res.Add(facet);
+                foreach (var facet in slab.pbc.BoundaryFacets()) res.Add(facet);
         return res;
     }
 
@@ -54,7 +54,7 @@ public class Scene3d
         var res = new HashSet<IPolyhedron>();
         foreach (var slab in slabs)
             if (slab.pieceIndex == pieceIndex)
-                foreach (var edge in slab.pbc.VisibleEdges()) res.Add(edge);
+                foreach (var edge in slab.pbc.BoundaryEdges()) res.Add(edge);
         return res;
     }
 

@@ -16,8 +16,9 @@ namespace D4BB.Transforms
         public HashSet<Face2d>[] visibleFacets { get; private set; } = System.Array.Empty<HashSet<Face2d>>();
         public HashSet<IPolyhedron>[] visibleEdges { get; private set; } = System.Array.Empty<HashSet<IPolyhedron>>();
 
-        // Precomputed per-piece topology: visible (c3, f2) pairs without backface culling.
-        // Stable across Translate/Rotate — only origins/spans change, not the face selection.
+        // Caches the (3-cell, 2-face) boundary pairs for a piece, computed once via
+        // IntegerBoundaryComplex. Translate/Rotate only mutate the origins/spans in-place,
+        // so the face selection stays valid and the expensive IBC rebuild is avoided.
         public class PieceTopology {
             public int[][] origins;  // current tesseract origins (owned copy)
             public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces;
@@ -92,6 +93,9 @@ namespace D4BB.Transforms
             return result;
         }
 
+        // A 2-face f2 is interior (coplanar with the same 3-cell on both sides) when the IBC
+        // neighbor of c3 via f2 equals the same-space sibling of c3 — i.e. both cells sharing
+        // f2 lie in the same hyperplane. Such faces are excluded from the boundary.
         private static PieceTopology ComputePieceTopology(int[][] origins)
         {
             var ibc = new IntegerBoundaryComplex(origins);
@@ -136,6 +140,9 @@ namespace D4BB.Transforms
             }
         }
 
+        // Fresh Face2dBC objects are created on every rebuild because CutOut (called in
+        // ApplyCameraOcclusion) destructively modifies them by severing neighbor links.
+        // Reusing objects from a previous frame would leave stale topology.
         private void RebuildPieceFromTopology(PieceTopology topo, int pieceIndex)
         {
             var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
@@ -164,11 +171,11 @@ namespace D4BB.Transforms
                     if (allFace2dBC.TryGetValue(sameSpace2d, out var pf2))
                     {
                         pEdge1.neighbor = pf2.i2p[e];
-                        pEdge1.isInvisible = true;
+                        pEdge1.isCoplanarInterior = true;
                     }
                     else
                     {
-                        pEdge1.isInvisible = false;
+                        pEdge1.isCoplanarInterior = false;
                     }
                 }
             }
@@ -227,7 +234,7 @@ namespace D4BB.Transforms
             foreach (var cb in cells)
             {
                 foreach (var facet in cb.pbc.d2faces) visibleFacets[cb.pieceIndex].Add(facet);
-                foreach (var edge in cb.pbc.VisibleEdges()) visibleEdges[cb.pieceIndex].Add(edge);
+                foreach (var edge in cb.pbc.BoundaryEdges()) visibleEdges[cb.pieceIndex].Add(edge);
             }
         }
 

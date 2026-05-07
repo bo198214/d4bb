@@ -17,7 +17,7 @@ public class VertexBC : Vertex
 }
 public class EdgeBC : Edge
 {
-    protected EdgeBC(Vertex a, Vertex b, bool isInvisible = false) : base(a, b, isInvisible)    {}
+    protected EdgeBC(Vertex a, Vertex b, bool isCoplanarInterior = false) : base(a, b, isCoplanarInterior)    {}
     public EdgeBC(OrientedIntegerCell ic, ICamera4d cam=null) : base(
             cam == null ? new Point(ic.EdgeA().origin) : cam.Proj3d(new Point4d(ic.EdgeA().origin)),
             cam == null ? new Point(ic.EdgeB().origin) : cam.Proj3d(new Point4d(ic.EdgeB().origin))
@@ -27,7 +27,7 @@ public class EdgeBC : Edge
         b.pos4d = ic.EdgeB().origin.Select(v => (double)v).ToArray();
     }
     public override IPolyhedron Recreate(Vertex a, Vertex b) {
-        return new EdgeBC(a,b,isInvisible) { parent = parent, neighbor=neighbor };
+        return new EdgeBC(a,b,isCoplanarInterior) { parent = parent, neighbor=neighbor };
     }
 }
 public class Face2dBC : Face2dWithIntegerCellAttribute {
@@ -37,7 +37,7 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
     public Polyhedron3dBoundaryComplex pbc;
     public Face2dBC(HashSet<IPolyhedron> facets, bool connecting_, IntegerCell _integerCell) : base(facets,connecting_,_integerCell) {}
     public Face2dBC(List<Edge> edges, bool connecting_, IntegerCell _integerCell) : base(edges,connecting_,_integerCell) {}
-    public Face2dBC(List<Point> points, bool invisible, IntegerCell integerCell) : base(points,invisible,integerCell) { this.integerCell=integerCell;}
+    public Face2dBC(List<Point> points, bool isConnecting, IntegerCell integerCell) : base(points,isConnecting,integerCell) { this.integerCell=integerCell;}
     public Face2dBC(Point a, Point b, Point c, bool connecting_, IntegerCell _integerCell) : 
             base(new List<Point>(){a,b,c}, connecting_,_integerCell) {}
     public Face2dBC(OrientedIntegerCell ic, ICamera4d cam=null) :
@@ -69,17 +69,17 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
     }
     public override IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
     {
-        var res = new Face2dBC(_facets, isInvisible, integerCell)  { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc };
+        var res = new Face2dBC(_facets, isCoplanarInterior, integerCell)  { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc };
         return res;
     }
     public override Face2d Recreate(List<Point> points)
     {
-        var res =  new Face2dBC(points,isInvisible, integerCell) { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc  };
+        var res =  new Face2dBC(points,isCoplanarInterior, integerCell) { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc  };
         return res;
     }
     public override Face2d Recreate(List<Edge> edges)
     {
-        var res =  new Face2dBC(edges,isInvisible, integerCell) { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc  };
+        var res =  new Face2dBC(edges,isCoplanarInterior, integerCell) { parent = parent, neighbor=neighbor, camera = camera, pbc=pbc  };
         return res;
     }
     public static IPolyhedron FromIntegerCell(int[] origin) {
@@ -188,8 +188,8 @@ public class Polyhedron3dBoundaryComplex {
                 pEdge1.neighbor = pEdge2;
                 pEdge1.parent = pc;
                 var visible = visibleIEdges.Contains(iEdge);
-                pEdge1.isInvisible = !visible;
-                //pEdge2.isInvisible = !visible;
+                pEdge1.isCoplanarInterior = !visible;
+                //pEdge2.isCoplanarInterior = !visible;
             }
         }
     }
@@ -237,6 +237,11 @@ public class Polyhedron3dBoundaryComplex {
         }
         return result;
     }
+    // Phase 1: skip faces whose bounding box doesn't intersect the cut region (noSplit).
+    // Phase 2: iteratively split the remaining candidates against each half-space, collecting
+    //          the outer fragments. The surviving innerFacets1 are the faces being removed.
+    // Finally, sever the neighbor links of removed faces so adjacent faces know they are now
+    // on the boundary.
     public void CutOut(HalfSpace[] halfSpaces) {
         List<Face2dBC> noSplit = new();
 
@@ -266,12 +271,15 @@ public class Polyhedron3dBoundaryComplex {
         Debug.Assert(polyhedron.Dim()==polyhedron.SpaceDim(),"6715569833");
         CutOut(polyhedron.HalfSpaces().Values.ToArray());
     }
+    // Severing neighbor links is required so the edges on the now-exposed boundary
+    // are no longer considered interior (isCoplanarInterior edges with neighbor==null
+    // are rendered as boundary edges).
     public void RemoveFace(Face2dBC facet) {
         if (!d2faces.Remove(facet)) return;
         foreach (IPolyhedron edge in facet.facets)
             if (edge.neighbor != null) edge.neighbor.neighbor = null;
     }
-    public ICollection<Face2dBC> VisibleFacets() {
+    public ICollection<Face2dBC> BoundaryFacets() {
         if (cellBoundaries != null) {
             var result = new List<Face2dBC>();
             foreach (var cb in cellBoundaries) result.AddRange(cb.pbc.d2faces);
@@ -279,14 +287,14 @@ public class Polyhedron3dBoundaryComplex {
         }
         return d2faces;
     }
-    public HashSet<EdgeBC> VisibleEdges() {
+    public HashSet<EdgeBC> BoundaryEdges() {
         HashSet<EdgeBC> res = new();
         var faces = cellBoundaries != null
             ? cellBoundaries.SelectMany(cb => cb.pbc.d2faces)
             : (IEnumerable<Face2dBC>)d2faces;
         foreach (var facet in faces) {
             foreach (var edge in facet.facets) {
-                if (showIntraCoplanarEdges || !edge.isInvisible || edge.neighbor==null) {
+                if (showIntraCoplanarEdges || !edge.isCoplanarInterior || edge.neighbor==null) {
                     res.Add((EdgeBC)edge);
                 }
             }

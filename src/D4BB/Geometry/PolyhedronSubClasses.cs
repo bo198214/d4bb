@@ -9,19 +9,19 @@ using D4BB.General;
 namespace D4BB.Geometry
 {
     public class RawVertex : IPolyhedron {
-        public bool isInvisible {get; set;}
+        public bool isCoplanarInterior {get; set;}
         public IPolyhedron parent {get;set;}
         public IPolyhedron neighbor {get;set;}
         protected readonly Point point;
 
         public HashSet<IPolyhedron> facets => new();
 
-        public RawVertex(Point point, bool isInvisible) {
+        public RawVertex(Point point, bool isCoplanarInterior) {
             this.point = point;
-            this.isInvisible = isInvisible;
+            this.isCoplanarInterior = isCoplanarInterior;
         }
 
-        public IPolyhedron OpposingClone() { 
+        public IPolyhedron OpposingClone() {
             var res = (Vertex)Recreate(point);
             res.parent = parent;
             res.neighbor = this;
@@ -43,11 +43,11 @@ namespace D4BB.Geometry
 
         public IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
         {
-            return new Vertex(point, isInvisible) { parent = parent, neighbor=neighbor };
+            return new Vertex(point, isCoplanarInterior) { parent = parent, neighbor=neighbor };
         }
-        //  public Vertex(IntegerCell ic, bool isInvisible) : this(new Point(ic.origin),isInvisible) {}
+        //  public Vertex(IntegerCell ic, bool isCoplanarInterior) : this(new Point(ic.origin),isCoplanarInterior) {}
         public virtual IPolyhedron Recreate(Point point) {
-            return new Vertex(point,isInvisible) { parent = parent, neighbor=neighbor };
+            return new Vertex(point,isCoplanarInterior) { parent = parent, neighbor=neighbor };
         }
 
         public int Side(HalfSpace halfSpace) {
@@ -75,9 +75,9 @@ namespace D4BB.Geometry
     }
     public class Vertex : RawVertex {
         public double[] pos4d;
-        public Vertex(Point point, bool isInvisible=false) : base(point,isInvisible) {
+        public Vertex(Point point, bool isCoplanarInterior=false) : base(point,isCoplanarInterior) {
         }
-        public Vertex(double x, double y, double z, bool isInvisible=false) : this(new Point(x,y,z),isInvisible) {}
+        public Vertex(double x, double y, double z, bool isCoplanarInterior=false) : this(new Point(x,y,z),isCoplanarInterior) {}
         public override bool Equals(object obj)
         {
             if (!obj.GetType().Equals(GetType())) { return false; } 
@@ -93,22 +93,22 @@ namespace D4BB.Geometry
         //1dim polyhedron
         //facets are the vertices
         //Each edge in a 3d polyhedron belongs to 2 Facets
-        public bool isInvisible {get; set;}
+        public bool isCoplanarInterior {get; set;}
         public IPolyhedron parent {get;set;}
         public IPolyhedron neighbor {get;set;}
         public HashSet<IPolyhedron> facets {
             get { return new() {a,b}; }
         }
 
-        public Edge(Vertex a, Vertex b, bool isInvisible=false) : base(a,b) {   this.isInvisible= isInvisible; }
-        public Edge(Point a, Point b, bool isInvisible=false) : base(new Vertex(a, isInvisible), new Vertex(b,isInvisible)) {   this.isInvisible= isInvisible; }
-        public Edge(HashSet<Point> points, bool isInvisible=false) : 
-                base(points.Select(p => new Vertex(p,isInvisible)).ToHashSet()) {}
-        public Edge(HashSet<Vertex> vertices, bool isInvisible) : base(vertices) {this.isInvisible=isInvisible;}
-        public Edge(HashSet<IPolyhedron> vertices, bool isInvisible) : 
-                base(vertices.Cast<Vertex>().ToHashSet()) {this.isInvisible=isInvisible;}
-        public IPolyhedron Recreate(HashSet<IPolyhedron> vertices) { return new Edge(vertices,isInvisible) { neighbor=neighbor, parent = parent }; }
-        public virtual IPolyhedron Recreate(Vertex a, Vertex b) { return new Edge(a, b, isInvisible) { neighbor=neighbor, parent = parent }; }
+        public Edge(Vertex a, Vertex b, bool isCoplanarInterior=false) : base(a,b) {   this.isCoplanarInterior= isCoplanarInterior; }
+        public Edge(Point a, Point b, bool isCoplanarInterior=false) : base(new Vertex(a, isCoplanarInterior), new Vertex(b,isCoplanarInterior)) {   this.isCoplanarInterior= isCoplanarInterior; }
+        public Edge(HashSet<Point> points, bool isCoplanarInterior=false) :
+                base(points.Select(p => new Vertex(p,isCoplanarInterior)).ToHashSet()) {}
+        public Edge(HashSet<Vertex> vertices, bool isCoplanarInterior) : base(vertices) {this.isCoplanarInterior=isCoplanarInterior;}
+        public Edge(HashSet<IPolyhedron> vertices, bool isCoplanarInterior) :
+                base(vertices.Cast<Vertex>().ToHashSet()) {this.isCoplanarInterior=isCoplanarInterior;}
+        public IPolyhedron Recreate(HashSet<IPolyhedron> vertices) { return new Edge(vertices,isCoplanarInterior) { neighbor=neighbor, parent = parent }; }
+        public virtual IPolyhedron Recreate(Vertex a, Vertex b) { return new Edge(a, b, isCoplanarInterior) { neighbor=neighbor, parent = parent }; }
         public IPolyhedron OpposingClone() { 
             var res = (Edge) Recreate((Vertex)b.OpposingClone(),(Vertex)a.OpposingClone());
             res.neighbor = this;
@@ -152,8 +152,8 @@ namespace D4BB.Geometry
             }
             if (aSide == HalfSpace.OUTSIDE && bSide == HalfSpace.INSIDE) {
                 var c = cutPlane.cutPoint(a.getPoint(),b.getPoint());
-                var ci = new Vertex(c,isInvisible);
-                var co = new Vertex(c,isInvisible);
+                var ci = new Vertex(c,isCoplanarInterior);
+                var co = new Vertex(c,isCoplanarInterior);
                 return new SplitResult {inner=Recreate(ci,b),innerCut=ci,outerCut=co,outer=Recreate(a,co)}.CrossReference(this,cutPlane);
             }
             if (aSide == HalfSpace.CONTAINED && bSide == HalfSpace.CONTAINED) {

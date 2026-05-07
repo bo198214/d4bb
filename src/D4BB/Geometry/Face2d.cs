@@ -11,7 +11,7 @@ namespace D4BB.Geometry
     }
     public class Face2d : IPolyhedron { // a more efficient implementation than the default Polyhedron
         public List<Edge> edges {get; protected set;}
-        public bool isInvisible { get; set; }
+        public bool isCoplanarInterior { get; set; }
         public IPolyhedron parent {get; set; }
         public IPolyhedron neighbor {get;set;}
         public HashSet<IPolyhedron> facets {
@@ -30,8 +30,8 @@ namespace D4BB.Geometry
             }
         }
 
-        public Face2d(List<Point> points, bool isInvisible=false) { //clockwise or anticlockwise
-            this.isInvisible = isInvisible;
+        public Face2d(List<Point> points, bool isConnecting=false) { //clockwise or anticlockwise
+            this.isCoplanarInterior = isConnecting;
             edges = Points2Edges(points);
             SetNeighbors();
         }
@@ -44,22 +44,22 @@ namespace D4BB.Geometry
                 edges[i2].a.neighbor = edges[i].b;
             }
         }
-        public Face2d(Point a, Point b, Point c, bool isInvisible) : this(new List<Point>{a,b,c},isInvisible){}
-        public Face2d(Face2d face2d) : this(face2d.edges,face2d.isInvisible) {}
-        public Face2d(List<Edge> edges, bool isInvisible=false) {
-            this.isInvisible = isInvisible;
+        public Face2d(Point a, Point b, Point c, bool isConnecting) : this(new List<Point>{a,b,c},isConnecting){}
+        public Face2d(Face2d face2d) : this(face2d.edges,face2d.isCoplanarInterior) {}
+        public Face2d(List<Edge> edges, bool isConnecting=false) {
+            this.isCoplanarInterior = isConnecting;
             this.edges = edges;
             SetNeighbors();
         }
-        public Face2d(HashSet<IPolyhedron> edges, bool isInvisible) : this(SortedEdges(edges),isInvisible) {}
+        public Face2d(HashSet<IPolyhedron> edges, bool isConnecting) : this(SortedEdges(edges),isConnecting) {}
         public virtual IPolyhedron Recreate(HashSet<IPolyhedron> facets) { 
-            return new Face2d(facets, isInvisible) { parent = parent, neighbor=neighbor };
+            return new Face2d(facets, isCoplanarInterior) { parent = parent, neighbor=neighbor };
         }
         public virtual Face2d Recreate(List<Edge> edges) {
-            return new Face2d(edges, isInvisible) { parent = parent, neighbor=neighbor };
+            return new Face2d(edges, isCoplanarInterior) { parent = parent, neighbor=neighbor };
         }
         public virtual Face2d Recreate(List<Point> points) {
-            return new Face2d(points, isInvisible) { parent = parent, neighbor=neighbor };
+            return new Face2d(points, isCoplanarInterior) { parent = parent, neighbor=neighbor };
         }
         public IPolyhedron OpposingClone() {
             List<Edge> newEdges = new();
@@ -67,7 +67,7 @@ namespace D4BB.Geometry
                 newEdges.Add((Edge)edge.OpposingClone());
             }
             newEdges.Reverse();
-            var res = new Face2d(newEdges,isInvisible) { parent = parent };
+            var res = new Face2d(newEdges,isCoplanarInterior) { parent = parent };
             res.neighbor = this;
             this.neighbor = res;
             return res;
@@ -255,7 +255,7 @@ namespace D4BB.Geometry
         /* assumes polyhedron to be 2d */
         public HashSet<Face2d> CenterTriangulation2d(Point centerPoint) {
             HashSet<Face2d> res = new();
-            var centerVertex = new Vertex(centerPoint,isInvisible:true);
+            var centerVertex = new Vertex(centerPoint,isCoplanarInterior:true);
             var n = edges.Count;
             Vertex[] oneSidedVertices = new Vertex[n];
             for (int i=0;i<n;i++) {
@@ -637,28 +637,28 @@ namespace D4BB.Geometry
     public class Face2dWithIntegerCellAttribute : Face2d, IPolyhedronWithIntegerCellAttribute
     {
         public IntegerCell integerCell { get; set; }
-        public Face2dWithIntegerCellAttribute(List<Point> points, bool isInvisible, IntegerCell ic) : base(points, isInvisible)
+        public Face2dWithIntegerCellAttribute(List<Point> points, bool isConnecting, IntegerCell ic) : base(points, isConnecting)
         {
             integerCell = ic;
         }
-        public Face2dWithIntegerCellAttribute(List<Edge> edges, bool isInvisible, IntegerCell ic) : base(edges, isInvisible)
+        public Face2dWithIntegerCellAttribute(List<Edge> edges, bool isConnecting, IntegerCell ic) : base(edges, isConnecting)
         {
             integerCell = ic;
         }
-        public Face2dWithIntegerCellAttribute(HashSet<IPolyhedron> facets, bool isInvisible, IntegerCell ic) : base(facets, isInvisible)
+        public Face2dWithIntegerCellAttribute(HashSet<IPolyhedron> facets, bool isConnecting, IntegerCell ic) : base(facets, isConnecting)
         {
             integerCell = ic;
         }
         public override Face2d Recreate(List<Edge> edges) {
-            return new Face2dWithIntegerCellAttribute(edges,isInvisible,integerCell) { parent=parent, neighbor=neighbor };
+            return new Face2dWithIntegerCellAttribute(edges,isCoplanarInterior,integerCell) { parent=parent, neighbor=neighbor };
         }
         public override Face2d Recreate(List<Point> points)
         {
-            return new Face2dWithIntegerCellAttribute(points, isInvisible,integerCell) { parent=parent, neighbor=neighbor};
+            return new Face2dWithIntegerCellAttribute(points, isCoplanarInterior,integerCell) { parent=parent, neighbor=neighbor};
         }
-        public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) { 
+        public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) {
 
-            return new Face2dWithIntegerCellAttribute(facets, isInvisible, integerCell) { parent=parent, neighbor=neighbor};
+            return new Face2dWithIntegerCellAttribute(facets, isCoplanarInterior, integerCell) { parent=parent, neighbor=neighbor};
         }
     }
     public class Face2dOrientedEquality : IEqualityComparer<Face2d>

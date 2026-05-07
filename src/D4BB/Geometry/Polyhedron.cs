@@ -34,8 +34,10 @@ namespace D4BB.Geometry
         public SplitResult CrossReference(IPolyhedron orig, HalfSpace hs) {
             if (inner!=null && outer!=null) {
                 Debug.Assert(innerCut!=null && outerCut!=null,"5333029568");
-                innerCut.isInvisible = true; //because they are in the same subspace
-                outerCut.isInvisible = true;
+                // isCoplanarInterior = true marks cut faces as interior: they become visible boundary
+                // faces only when the adjacent fragment is later removed by CutOut.
+                innerCut.isCoplanarInterior = true;
+                outerCut.isCoplanarInterior = true;
 
                 inner.parent = orig.parent;
                 outer.parent = orig.parent;
@@ -72,7 +74,7 @@ namespace D4BB.Geometry
         public SplitResult Split(HalfSpace cutPlane);
         public IPolyhedron Recreate(HashSet<IPolyhedron> _facets);
         public void Replace(IPolyhedron ab, IPolyhedron a, IPolyhedron b);
-        public bool isInvisible { get; set; }
+        public bool isCoplanarInterior { get; set; }
         /* duplicates the polyhedron with opposite orientation if applicable */
         public IPolyhedron OpposingClone();
 
@@ -288,28 +290,28 @@ namespace D4BB.Geometry
         */
         public virtual HashSet<IPolyhedron> facets {get; protected set; }
         /* connecting two parent-faces of different polyhedrons, like in the case of a split */
-        public bool isInvisible {get; set;}
+        public bool isCoplanarInterior {get; set;}
         public IPolyhedron parent {get; set;}
         public IPolyhedron neighbor {get;set;}
 
-        protected Polyhedron(bool isInvisible) {
-            this.isInvisible = isInvisible;
+        protected Polyhedron(bool isCoplanarInterior) {
+            this.isCoplanarInterior = isCoplanarInterior;
         }
-        public Polyhedron(HashSet<IPolyhedron> _facets, bool isInvisible) {
-            this.isInvisible = isInvisible;
+        public Polyhedron(HashSet<IPolyhedron> _facets, bool isCoplanarInterior) {
+            this.isCoplanarInterior = isCoplanarInterior;
             facets = _facets;
             ((IPolyhedron)this).SetNeighbors();
         }
-        public Polyhedron(IntegerCell ic, bool isInvisible) :
-                this(ic.Facets().Select(facet => new Polyhedron(facet,isInvisible)).Cast<IPolyhedron>().ToHashSet(),isInvisible) {
+        public Polyhedron(IntegerCell ic, bool isCoplanarInterior) :
+                this(ic.Facets().Select(facet => new Polyhedron(facet,isCoplanarInterior)).Cast<IPolyhedron>().ToHashSet(),isCoplanarInterior) {
         }
         public virtual IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
         {
-            return new Polyhedron(_facets,isInvisible) { parent = parent, neighbor=neighbor };
+            return new Polyhedron(_facets,isCoplanarInterior) { parent = parent, neighbor=neighbor };
         }
         public virtual IPolyhedron OpposingClone() {
             //we have no orientation, so opposingClone is just a copy
-            var res = new Polyhedron(facets,isInvisible) { parent = parent };
+            var res = new Polyhedron(facets,isCoplanarInterior) { parent = parent };
             res.neighbor = this;
             neighbor = res;
             return res;

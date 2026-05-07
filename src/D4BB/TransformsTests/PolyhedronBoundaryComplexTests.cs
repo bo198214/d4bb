@@ -9,8 +9,8 @@ namespace D4BB.Transforms {
 public class PolyhedronBoundaryComplexTests {
     [Test] public void Polyhedron3dBoundaryComplex_SingleCube_Numbers() {
         var cube = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
-        Assert.That(cube.VisibleFacets(),Has.Count.EqualTo(6));
-        Assert.That(cube.VisibleEdges(),Has.Count.EqualTo(12));
+        Assert.That(cube.BoundaryFacets(),Has.Count.EqualTo(6));
+        Assert.That(cube.BoundaryEdges(),Has.Count.EqualTo(12));
     }
     [Test] public void Polyhedron3dBoundaryComplex_Links() {
         var cube = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
@@ -36,8 +36,8 @@ public class PolyhedronBoundaryComplexTests {
     }
     [Test] public void Polyhedron3dBoundaryComplex_TwoCubes_Numbers() {
         var cubes = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0},new int[]{1,0,0}});
-        Assert.That(cubes.VisibleFacets(),Has.Count.EqualTo(10));
-        Assert.That(cubes.VisibleEdges(),Has.Count.EqualTo(16));
+        Assert.That(cubes.BoundaryFacets(),Has.Count.EqualTo(10));
+        Assert.That(cubes.BoundaryEdges(),Has.Count.EqualTo(16));
     }
     [Test] public void Polyhedron3dBoundaryComplex_TwoCubes_Links() {
         var cubes = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0},new int[]{1,0,0}});
@@ -59,15 +59,15 @@ public class PolyhedronBoundaryComplexTests {
         var pbc = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,0,0),1);
         pbc.CutOut(polyhedron1);
-        var facets = pbc.VisibleFacets();
+        var facets = pbc.BoundaryFacets();
         Assert.That(facets, Has.Count.EqualTo(5));
-        Assert.That(pbc.VisibleEdges(), Has.Count.EqualTo(12));
+        Assert.That(pbc.BoundaryEdges(), Has.Count.EqualTo(12));
     }
     [Test] public void CutOutTest_L() {
         var pbc = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,0),1);
         pbc.CutOut(polyhedron1);
-        var visibleFacets = pbc.VisibleFacets();
+        var visibleFacets = pbc.BoundaryFacets();
         Assert.That(visibleFacets, Has.Count.EqualTo(8));
 
         var edgeToFind = new Edge(new Point(0.5,0.5,0),new Point(0.5,1,0),true);
@@ -83,7 +83,7 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(edge1.neighbor,Is.SameAs(edge2));
         Assert.That(edge2.neighbor,Is.SameAs(edge1));
 
-        var edges = pbc.VisibleEdges();
+        var edges = pbc.BoundaryEdges();
         Assert.That(edges, Has.Count.EqualTo(19));
     }
     [Test] public void CutOutTest() 
@@ -95,7 +95,7 @@ public class PolyhedronBoundaryComplexTests {
                     Assert.That(edge.GetType(), Is.EqualTo(typeof(EdgeBC)));
                 }
         }
-        var edges = pbc.VisibleEdges();
+        var edges = pbc.BoundaryEdges();
         Assert.That(edges, Has.Count.EqualTo(12));
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,-0.5),1);
         pbc.CutOut(polyhedron1);
@@ -105,8 +105,8 @@ public class PolyhedronBoundaryComplexTests {
                     Assert.That(edge.GetType(), Is.EqualTo(typeof(EdgeBC)));
                 }
         }
-        //Assert.That(pbc.VisibleFacets(), Has.Count.EqualTo(8+1+8+4));
-        //Assert.That(pbc.VisibleEdges(), Has.Count.EqualTo(8+4+4+3+8));
+        //Assert.That(pbc.BoundaryFacets(), Has.Count.EqualTo(8+1+8+4));
+        //Assert.That(pbc.BoundaryEdges(), Has.Count.EqualTo(8+4+4+3+8));
         foreach (var facet in pbc.d2faces) {
             Assert.That(
                 facet.GetType(), Is.EqualTo(typeof(Face2dBC)));

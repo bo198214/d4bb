@@ -43,9 +43,9 @@ public struct EdgeClassInfo {
     public int submesh;      // 0=regular, 1=cut, 2=debug
     public double[] a;       // 3D start position
     public double[] b;       // 3D end position
-    public bool isInvisible;
+    public bool isCoplanarInterior;
     public bool neighborNull;
-    public bool neighborInvisible;
+    public bool neighborCoplanarInterior;
 }
 
 public class EdgesGenericMesh {
@@ -67,10 +67,10 @@ public class EdgesGenericMesh {
 
             List<ushort> target;
             int submesh;
-            if (edge.isInvisible && edge.neighbor==null) {
+            if (edge.isCoplanarInterior && edge.neighbor==null) {
                 target = triangles1;
                 submesh = 1;
-            } else if (edge.neighbor!=null && edge.neighbor.isInvisible) {
+            } else if (edge.neighbor!=null && edge.neighbor.isCoplanarInterior) {
                 target = triangles2;
                 submesh = 2;
             }
@@ -88,9 +88,9 @@ public class EdgesGenericMesh {
                 submesh = submesh,
                 a = new double[]{ac0[0],ac0[1],ac0[2]},
                 b = new double[]{bc0[0],bc0[1],bc0[2]},
-                isInvisible = edge.isInvisible,
+                isCoplanarInterior = edge.isCoplanarInterior,
                 neighborNull = edge.neighbor == null,
-                neighborInvisible = edge.neighbor != null && edge.neighbor.isInvisible,
+                neighborCoplanarInterior = edge.neighbor != null && edge.neighbor.isCoplanarInterior,
             });
 
             var i0 = (ushort)vertices.Count;
