@@ -410,5 +410,18 @@ public class Face2dBCTests
             Assert.That(pbc.d2faces,Has.Count.EqualTo(8));
         }
     }
+    [Test] public void HellyNoCut() {
+        // Helly-Fall: jede Halbebene schneidet die Fläche einzeln, aber ihre Schnittmenge
+        // ist auf der Fläche leer — kein Teil darf entfernt oder gespalten werden.
+        // HS1 (innen: x>0.6) und HS2 (innen: z>0.6) erzwingen x+z>1,2,
+        // was HS3 (innen: x+z<0,4) ausschließt.
+        IntegerBoundaryComplex ibc = new(new int[]{0,0,0});
+        var pbc = new Polyhedron3dBoundaryComplex(ibc);
+        HalfSpace hs1 = new HalfSpace(new Point(0.6,0,0), new Point(-1,0,0));
+        HalfSpace hs2 = new HalfSpace(new Point(0,0,0.6), new Point(0,0,-1));
+        HalfSpace hs3 = new HalfSpace(new Point(0.2,0,0.2), new Point(1,0,1).normalize());
+        pbc.CutOut(new HalfSpace[]{hs1, hs2, hs3});
+        Assert.That(pbc.d2faces, Has.Count.EqualTo(6));
+    }
 }
 }
