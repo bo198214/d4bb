@@ -9,6 +9,7 @@ namespace D4BB.Transforms
         public ICamera4d camera { get; set; }
         public bool showIntraCoplanarEdges;
         public bool enable4dOcclusion = true;
+        public bool cullBackFaces = true;
         public bool stepMode = false;
         public int stepIndex = 0;
         public int maxSteps = 0;
@@ -27,10 +28,11 @@ namespace D4BB.Transforms
 
         private int numPieces = 0;
 
-        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false)
+        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true)
         {
             this.camera = camera;
             this.showIntraCoplanarEdges = showIntraCoplanarEdges;
+            this.cullBackFaces = cullBackFaces;
             Update(origins);
         }
 
@@ -150,8 +152,8 @@ namespace D4BB.Transforms
 
             foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
             {
-                if (!camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())) && enable4dOcclusion)
-                    continue; // backface cull
+                if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
+                    continue;
 
                 var pf = new Face2dBC(f2, camera);
                 allFace2dBC[f2] = pf;
