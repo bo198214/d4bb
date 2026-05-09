@@ -5,8 +5,14 @@ using System.Linq;
 using D4BB.Comb;
 
 public class OrientedIntegerCell : IntegerCell {
-    // inverted=true means that the outside normal with respect to the parent points opposite to a main direction 
-    public readonly bool inverted; 
+    /// <summary>
+    /// Direction of the cell's outward normal relative to its parent (one dimension higher).
+    /// false: normal points in the +axis direction of the missing span dimension.
+    /// true:  normal points in the −axis direction.
+    /// Reflected in <see cref="ToString"/> as "+" (false) or "−" (true), e.g.
+    /// <c>[1,1,1,0]+[0,1,3]</c> vs <c>[1,1,1,0]-[0,1,2]</c>.
+    /// </summary>
+    public readonly bool inverted;
     public readonly bool parity;
 
     /* Normal is always along a single axis in the positive direction, except if inverted */
@@ -129,6 +135,13 @@ public class OrientedIntegerCell : IntegerCell {
     // {
     //     return base.GetHashCode() + inverted.GetHashCode();
     // }
+    /// <summary>
+    /// Format: <c>[origin]±[span]</c> where the sign encodes <see cref="inverted"/>:
+    /// <c>+</c> = normal points in +axis direction, <c>-</c> = inverted (−axis).
+    /// Example: <c>[1,1,1,0]+[0,1,3]</c> is a 3-cell at origin (1,1,1,0) with span (x,y,w),
+    /// outward normal = +z. <c>[2,2,1,0]-[0,1,2]</c> is a 3-cell at (2,2,1,0) with span
+    /// (x,y,z), outward normal = −w (the wi=0 boundary of a hypercube extending into +w).
+    /// </summary>
     public override string ToString()
     {
         int[] spanArray = span.ToArray();

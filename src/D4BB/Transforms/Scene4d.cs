@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using D4BB.Comb;
 using D4BB.Geometry;
 
@@ -149,35 +150,50 @@ namespace D4BB.Transforms
             // }
         }
 
+        // Each front-facing 3-cell c3 plays TWO independent roles in the scene:
+        //   (a) Owner of visible 2-faces: each f2 is rendered exactly once, owned by some c3.
+        //   (b) Occluder: c3's halfspaces cut other cells' faces in ApplyCameraOcclusion.
+        //
+        // These roles must NOT be conflated. A c3 may legitimately own zero f2's — when all
+        // its f2's are 2-corners shared with other-hyperplane c3's that won the dedup race —
+        // and still be required as an occluder. Coupling the roles (only adding c3 to `cells`
+        // if it owns at least one f2) caused Box3D_NoDuplicateFaceFragmentsInSameCell: the
+        // diagonal-corner cell of the 3DBox hole had no owned f2's, so its halfspaces were
+        // missing from occlusion, and the diagonal-corner quadrant of the inner-hole wall
+        // survived the cut.
+        //
         // Fresh Face2dBC objects are created on every rebuild because CutOut (called in
         // ApplyCameraOcclusion) destructively modifies them by severing neighbor links.
         // Reusing objects from a previous frame would leave stale topology.
         private void RebuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex)
         {
-            var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
-            var cell2Faces = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
-            // Collect every front-facing c3, even those whose f2's are all claimed by other
-            // c3's (different-hyperplane siblings). Such "ownerless" c3's have no visible
-            // faces but still contribute halfspaces during ApplyCameraOcclusion — without
-            // them the diagonal corners that lie strictly inside the c3's 3D volume survive
-            // (see Box3D_NoDuplicateFaceFragmentsInSameCell).
-            var frontFacingCells = new HashSet<OrientedIntegerCell>();
+            // Role (b): every front-facing c3 must contribute halfspaces, regardless of f2 ownership.
+            var occluderCells = new HashSet<OrientedIntegerCell>();
+            // Role (a): each f2 → one Face2dBC, owned by exactly one c3.
+            var faceOf = new Dictionary<IntegerCell, Face2dBC>();
+            var ownedFacesOf = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
 
-            foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
+            // Iterate in a deterministic order so f2-dedup ownership is reproducible across
+            // runs (HashSet iteration in coplanarBoundaryFaces' source is not stable).
+            // Tiebreaker: lexicographic by (c3.origin, c3.span, f2.origin, f2.span).
+            var orderedPairs = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>(topo.coplanarBoundaryFaces);
+            orderedPairs.Sort(ComparePairsForDedup);
+
+            foreach (var (c3, f2) in orderedPairs)
             {
                 if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
                     continue;
-                frontFacingCells.Add(c3);
-                if (allFace2dBC.ContainsKey(f2)) continue; // same f2 already claimed by a front-facing c3
+                occluderCells.Add(c3);
+                if (faceOf.ContainsKey(f2)) continue; // already claimed by an earlier c3 in dedup order
 
                 var pf = new Face2dBC(f2, camera);
-                allFace2dBC[f2] = pf;
-                if (!cell2Faces.ContainsKey(c3)) cell2Faces[c3] = new();
-                cell2Faces[c3].Add(pf);
+                faceOf[f2] = pf;
+                if (!ownedFacesOf.ContainsKey(c3)) ownedFacesOf[c3] = new();
+                ownedFacesOf[c3].Add(pf);
             }
 
             // Set up edge neighbor links between adjacent visible faces.
-            foreach (var pf1 in allFace2dBC.Values)
+            foreach (var pf1 in faceOf.Values)
             {
                 var f1 = (OrientedIntegerCell)pf1.integerCell;
                 foreach (var e in f1.Facets())
@@ -185,7 +201,7 @@ namespace D4BB.Transforms
                     var pEdge1 = pf1.i2p[e];
                     pEdge1.parent = pf1;
                     var sameSpace2d = f1.SameSpaceOtherParent(e);
-                    if (allFace2dBC.TryGetValue(sameSpace2d, out var pf2))
+                    if (faceOf.TryGetValue(sameSpace2d, out var pf2))
                     {
                         pEdge1.neighbor = pf2.i2p[e];
                         pEdge1.isCoplanarInterior = true;
@@ -197,13 +213,46 @@ namespace D4BB.Transforms
                 }
             }
 
-            foreach (var c3 in frontFacingCells)
+            int addedHere = 0;
+            foreach (var c3 in occluderCells)
             {
-                var faces = cell2Faces.TryGetValue(c3, out var fs) ? fs : new List<Face2dBC>();
+                var faces = ownedFacesOf.TryGetValue(c3, out var fs) ? fs : new List<Face2dBC>();
                 var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges);
                 foreach (var pf in faces) pf.pbc = cellPbc;
                 cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
+                addedHere++;
             }
+            // Invariant: every front-facing c3 contributes an occluder, even ownerless ones.
+            Debug.Assert(addedHere == occluderCells.Count,
+                "RebuildCellsFromPieceTopology: every front-facing c3 must contribute an occluder.");
+        }
+
+        // Lexicographic tiebreaker over the (c3, f2) iteration so f2-dedup is deterministic.
+        private static int ComparePairsForDedup(
+            (OrientedIntegerCell c3, OrientedIntegerCell f2) a,
+            (OrientedIntegerCell c3, OrientedIntegerCell f2) b)
+        {
+            int c = CompareCells(a.c3, b.c3);
+            if (c != 0) return c;
+            return CompareCells(a.f2, b.f2);
+        }
+        private static int CompareCells(OrientedIntegerCell x, OrientedIntegerCell y)
+        {
+            for (int i = 0; i < x.origin.Length; i++)
+            {
+                int c = x.origin[i].CompareTo(y.origin[i]);
+                if (c != 0) return c;
+            }
+            int xs = x.span.Count, ys = y.span.Count;
+            if (xs != ys) return xs.CompareTo(ys);
+            var xa = new int[xs]; x.span.CopyTo(xa); System.Array.Sort(xa);
+            var ya = new int[ys]; y.span.CopyTo(ya); System.Array.Sort(ya);
+            for (int i = 0; i < xs; i++)
+            {
+                int c = xa[i].CompareTo(ya[i]);
+                if (c != 0) return c;
+            }
+            return x.inverted.CompareTo(y.inverted);
         }
 
         // ── camera occlusion ──────────────────────────────────────────────────
@@ -213,9 +262,7 @@ namespace D4BB.Transforms
             if (!enable4dOcclusion) return;
 
             var viewNormal = camera.viewNormal.x;
-            var cmp = new InFrontOfViewNormalComparer(viewNormal, reverse: true);
-
-            cells.Sort((a, b) => cmp.Compare(b.cell, a.cell)); // far-to-near
+            SortCellsFarToNear(viewNormal);
 
             var back = new List<CellBoundary>();
             maxSteps = cells.Count;
@@ -228,14 +275,31 @@ namespace D4BB.Transforms
                 }
                 else
                 {
+                    var nearDepth = Depth(nearCell.cell, viewNormal);
                     var halfSpaces = DefiningHalfSpaces(nearCell.cell, camera);
                     foreach (var farCell in back)
-                        if (cmp.Compare(farCell.cell, nearCell.cell) != 0)
+                        if (Depth(farCell.cell, viewNormal) != nearDepth)
                             farCell.pbc.CutOut(halfSpaces);
                     back.Add(nearCell);
                 }
                 i++;
             }
+        }
+
+        // Painter's-algorithm depth ordering: cells with larger depth (deeper into the
+        // viewNormal direction, i.e. farther from the camera) come first; smaller-depth
+        // (nearer) cells come last so each near cell can cut all already-processed far cells
+        // in `back`. Equal-depth cells coexist (skipped from cutting each other below).
+        private void SortCellsFarToNear(double[] viewNormal)
+        {
+            cells.Sort((a, b) => Depth(b.cell, viewNormal).CompareTo(Depth(a.cell, viewNormal)));
+        }
+        private static double Depth(IntegerCell cell, double[] viewNormal)
+        {
+            var c = cell.Center();
+            double sum = 0;
+            for (int i = 0; i < viewNormal.Length; i++) sum += viewNormal[i] * c[i];
+            return sum;
         }
 
         // ── visible cache ─────────────────────────────────────────────────────

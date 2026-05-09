@@ -635,11 +635,20 @@ public class Scene4dHashTests {
     // ── 3DBox: self-occlusion of a 3x3x3-minus-center piece ─────────────────────
     // After CutOut, the inner-hole region in 3D should show the 3 inner walls (front-
     // facing; the 3 back walls are correctly back-face-culled). One specific face — the
-    // w=1 face of the -z-facing inner-hole cell — is supposed to be fully cut by the 4
+    // w=1 face of the -z-facing inner-hole cell — is supposed to be fully cut by the
     // surrounding w=0 face cells (they form a frame around it in 3D), leaving only the
-    // inner-corner quadrant visible. But due to a bug in Face2d.Split for vertex
-    // configurations like INSIDE-CONTAINED-OUTSIDE, the diagonally-opposite corner
-    // quadrant survives too — visible artifact in the hole.
+    // inner-corner quadrant visible.
+    //
+    // Symptom (the test enforces): no cell may contain two fragments of the same
+    // integerCell. Pre-fix the diagonally-opposite corner quadrant survives as a second
+    // fragment of the same integerCell, visible as an artifact in the hole.
+    //
+    // Root cause (current understanding — see Scene4dHashTests.NOTES.md):
+    // RebuildCellsFromPieceTopology used to add a 3-cell c3 to `cells` only if c3 owned at
+    // least one 2-face after dedup. The diagonal-corner cell (e.g. wi=0 face of (2,2,1,0))
+    // owned no 2-faces — its f2's were claimed by sibling c3's in other hyperplanes — so
+    // its halfspaces were missing from ApplyCameraOcclusion and the diagonal quadrant
+    // (which lies strictly inside that cell's 3D volume) was not cut.
     [Test] public void Box3D_NoDuplicateFaceFragmentsInSameCell() {
         var camera = new Camera4dParallel();
         var origins = new int[][][] { Build3DBoxPiece0(), new int[][] { new int[] {4,1,1,0} } };

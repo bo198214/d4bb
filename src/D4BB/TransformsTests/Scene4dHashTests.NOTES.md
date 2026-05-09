@@ -100,6 +100,49 @@ Wichtigste Regression-Tests in `Scene4dHashTests.cs`:
 | `Cavalier_SingleHypercube_pbc_d2faces_Match_i2p` | `d2faces` und `i2p` haben dieselben Schlüssel (1:1). |
 | `Polyhedron3dBoundaryComplex_InputOrder_DoesNotAffectFaces` | Permutationen der Eingabeliste ändern den Output nicht. |
 | `TwoTesseracts_NoFaceFragmentInsideUnionOfCloserOtherPieceCells` | Gegenrichtungs-Test: bei wirklich überlappenden Pieces (TwoTesseracts.json) dürfen keine Fragmente einer hinteren Piece innerhalb der Union der vorderen Piece-Cells bleiben. Ohne Dynamic-Mode (statisches PreserveAll): 2 Fragmente fälschlich erhalten. Mit Dynamic-Mode: 0. |
+| `Box3D_NoDuplicateFaceFragmentsInSameCell` | 3×3×3-minus-Center: die mittlere Innenwand wurde nur teilweise gecuttet, weil ein Eck-Occluder ((2,2,1,0)'s wi=0-Face) in `RebuildCellsFromPieceTopology` keine eigenen 2-Faces besaß und daher fehlte. Fix: ownerless c3 trotzdem als Occluder einfügen (s.u.). |
+
+## Bug "diagonal-eck überlebt im 3DBox-Loch" (Box3D_NoDuplicateFaceFragmentsInSameCell)
+
+### Symptom
+
+In einem 3×3×3-Piece mit fehlender Mitte überlebt das diagonale Eckstück der Innenwand des Lochs den Cut, obwohl es geometrisch im Inneren der Eck-Occluder-Cells (z.B. wi=0-Face von (2,2,1,0)) liegt. Resultat: 2 Fragmente derselben integerCell in der `pbc.d2faces`.
+
+### Wurzelursache
+
+`RebuildCellsFromPieceTopology` ([Scene4d.cs:155+](Packages/d4bb/src/D4BB/Transforms/Scene4d.cs#L155)) iteriert die Liste `(c3, f2)`-Paare aus `coplanarBoundaryFaces` und ordnet jede 2-Face f2 dem **erst-iterierten** front-facing c3 zu, der sie beansprucht. Eine f2, die zwischen zwei c3's verschiedener Hyperebenen geteilt wird (z.B. wi=0-Face und xi=3-Face desselben Hypercubes teilen die 2-Face an der xi=3∧wi=0-Ecke), wird nur einem von beiden zugeordnet.
+
+Effekt: Manche 3-Cells (wie (2,2,1,0)'s wi=0-Face) verlieren *alle* ihre f2's an Geschwister-c3's. Sie waren danach gar nicht mehr in `cells` enthalten — und somit fehlten ihre Halfspaces in `ApplyCameraOcclusion`, sodass sie ihre Volumen nicht aus dahinterliegenden Faces ausschneiden konnten.
+
+Konkret beim 3DBox-Test: die diagonal-eck (2,2,1.447)–(2.447,2.447,1.447) liegt strikt im 3D-Volumen der Cube-Projektion von (2,2,1,0)+[0,1,2] (= (2,2,1)–(3,3,2)), würde von dessen Halfspaces komplett gecuttet — aber dieser Cell war nicht in `cells`.
+
+### Fix
+
+In `RebuildCellsFromPieceTopology`: alle front-facing c3's einsammeln (auch ohne eigene f2's) und für jeden eine `CellBoundary` mit (möglicherweise leerer) pbc anlegen. Solche "ownerless" cells haben keine sichtbaren d2faces, tragen aber ihre Halfspaces zur Occlusion bei.
+
+```csharp
+var frontFacingCells = new HashSet<OrientedIntegerCell>();
+foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
+{
+    if (cullBackFaces && !camera.IsFacedBy(...)) continue;
+    frontFacingCells.Add(c3);   // ← einsammeln
+    if (allFace2dBC.ContainsKey(f2)) continue;
+    ... // f2 → c3 zuordnen wie zuvor
+}
+foreach (var c3 in frontFacingCells)   // ← alle, nicht nur die mit f2
+{
+    var faces = cell2Faces.TryGetValue(c3, out var fs) ? fs : new List<Face2dBC>();
+    var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges);
+    foreach (var pf in faces) pf.pbc = cellPbc;
+    cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
+}
+```
+
+### Begleitend: Sutherland-Hodgman in `Face2d.Split`
+
+Die ursprüngliche Diagnose vermutete den Bug in den fehlerhaften Early-Return-Pfaden in `Face2d.Split` (Zeilen 477–489 für `IN-CON-CON`/`CON-CON-IN`/`CON-CON-OUT`-Triple). Eine Trace der tatsächlichen Vertex-Konfigurationen ergab: solche Patterns treten im Box3D-Test **gar nicht** auf — der eigentliche Bug ist eine Schicht höher.
+
+`Face2d.Split` wurde trotzdem auf einen sauberen Sutherland-Hodgman-Algorithmus umgestellt ([Face2d.cs:380+](Packages/d4bb/src/D4BB/Geometry/Face2d.cs#L380)) — die alten Early-Returns waren tatsächlich fragile bei subtilen CON-Konfigurationen, auch wenn sie diesen konkreten Test nicht selbst auslösen. Begleitende Unit-Tests in `GeometryTests.cs` (`SH_Split_*`) prüfen die Korrektheit für IN-CON-OUT-CON-Kites, transition-CON-Vertices, tangentiale CON-CON-Edges und alle 4 Rotationen einer Polygon-Liste.
 
 ## Beobachtungen am Design (unabhängig vom Fix)
 
