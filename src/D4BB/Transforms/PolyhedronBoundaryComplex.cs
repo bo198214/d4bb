@@ -199,11 +199,21 @@ public class Polyhedron3dBoundaryComplex {
         }
         throw new Exception();
     }
-    // interiorOnly=true: faces lying *exactly on* a halfspace's plane are treated as
-    // outside the polyhedron (occlusion semantics — the cell's own boundary stays visible).
-    // interiorOnly=false: legacy boolean-difference semantics — boundary-coincident faces
-    // are treated as removed by the cut.
-    public static void Split(HalfSpace halfSpace, IEnumerable<Face2dBC> facets, List<Face2dBC> out_inner, List<Face2dBC> out_outer, bool interiorOnly = true) {
+    // How boundary-coincident faces (split.isContained) are routed:
+    //   Dynamic     — compare face's outward normal with the cutting halfspace's outward
+    //                 normal. Same direction ⇒ face is co-oriented with the cutter's
+    //                 visible-front surface (drawn by the cutter itself, occluded here)
+    //                 ⇒ inner. Opposite ⇒ face's visible side faces away from the cutter
+    //                 (cutter sits behind it from the camera POV) ⇒ outer.
+    //   PreserveAll — always to outer. Used by callers that *only* want strictly-interior
+    //                 fragments cut (a stricter occlusion variant; leaves both co- and
+    //                 counter-oriented boundary faces visible, e.g. for Z-fight-tolerant
+    //                 modes).
+    //   CutAll      — always to inner. Legacy boolean-difference semantics ("subtract
+    //                 polyhedron B from A — touching wall is part of the cut").
+    public enum BoundaryFaceMode { Dynamic, PreserveAll, CutAll }
+
+    public static void Split(HalfSpace halfSpace, IEnumerable<Face2dBC> facets, List<Face2dBC> out_inner, List<Face2dBC> out_outer, BoundaryFaceMode boundaryMode = BoundaryFaceMode.Dynamic) {
         foreach (var facet in facets) {
             var split = facet.Split(halfSpace);
             if (split.inner!=null)
@@ -211,10 +221,19 @@ public class Polyhedron3dBoundaryComplex {
             if (split.outer!=null)
                 out_outer.Add((Face2dBC)split.outer);
             if (split.isContained) {
-                if (interiorOnly)
-                    out_outer.Add(facet);
-                else
-                    out_inner.Add(facet);
+                switch (boundaryMode) {
+                    case BoundaryFaceMode.PreserveAll:
+                        out_outer.Add(facet); break;
+                    case BoundaryFaceMode.CutAll:
+                        out_inner.Add(facet); break;
+                    case BoundaryFaceMode.Dynamic:
+                    default:
+                        if (AOP.gt(facet.Normal().sc(halfSpace.normal), 0))
+                            out_inner.Add(facet);   // co-oriented with cutter ⇒ occluded
+                        else
+                            out_outer.Add(facet);   // counter-oriented ⇒ this is the visible boundary
+                        break;
+                }
             }
         }
     }
@@ -245,16 +264,12 @@ public class Polyhedron3dBoundaryComplex {
     //          the outer fragments. The surviving innerFacets1 are the faces being removed.
     // Finally, sever the neighbor links of removed faces so adjacent faces know they are now
     // on the boundary.
-    // interiorOnly=true (occlusion semantics, default): a face that lies exactly on
-    // one of the cutting halfspaces' planes is preserved — it's the visible front
-    // surface of the cutter, not occluded by it. This is what ApplyCameraOcclusion
-    // wants: when one cell's halfspaces are used to cut another cell at different
-    // depth, a 2-face shared between them must not be lost.
-    //
-    // interiorOnly=false (legacy boolean-difference): boundary-coincident faces are
-    // treated as part of the cut volume and removed. This is the convention used
-    // by the older CutOutTest_* tests, which test "subtract polyhedron B from A".
-    public void CutOut(HalfSpace[] halfSpaces, bool interiorOnly = true) {
+    // boundaryMode controls how faces lying exactly on a cutter's halfspace plane are
+    // routed (see BoundaryFaceMode docs above). The default Dynamic mode is what
+    // ApplyCameraOcclusion needs: faces co-oriented with the cutter's visible front
+    // surface are cut (occluded), counter-oriented ones are preserved (the visible
+    // boundary surface of the *cut-out* cell that happens to coincide with the cutter).
+    public void CutOut(HalfSpace[] halfSpaces, BoundaryFaceMode boundaryMode = BoundaryFaceMode.Dynamic) {
         List<Face2dBC> noSplit = new();
 
         List<Face2dBC> innerFacets1 = new();
@@ -267,7 +282,7 @@ public class Polyhedron3dBoundaryComplex {
         List<Face2dBC> outerFacets = new();
         List<Face2dBC> innerFacets2 = new();
         foreach (var halfSpace in halfSpaces) {
-            Split(halfSpace,innerFacets1,innerFacets2,outerFacets,interiorOnly);
+            Split(halfSpace,innerFacets1,innerFacets2,outerFacets,boundaryMode);
             innerFacets1=innerFacets2;
             innerFacets2 = new();
         }
@@ -279,9 +294,9 @@ public class Polyhedron3dBoundaryComplex {
         outerFacets.AddRange(noSplit);
         d2faces = new HashSet<Face2dBC>(outerFacets, ByRef.I);
     }
-    public void CutOut(IPolyhedron polyhedron, bool interiorOnly = true) {
+    public void CutOut(IPolyhedron polyhedron, BoundaryFaceMode boundaryMode = BoundaryFaceMode.Dynamic) {
         Debug.Assert(polyhedron.Dim()==polyhedron.SpaceDim(),"6715569833");
-        CutOut(polyhedron.HalfSpaces().Values.ToArray(), interiorOnly);
+        CutOut(polyhedron.HalfSpaces().Values.ToArray(), boundaryMode);
     }
     // Severing neighbor links is required so the edges on the now-exposed boundary
     // are no longer considered interior (isCoplanarInterior edges with neighbor==null

@@ -61,7 +61,7 @@ public class PolyhedronBoundaryComplexTests {
         // Legacy boolean-difference semantics: boundary-coincident faces are treated as
         // part of the cut (the cube's left wall at x=0 coincides with the cutter's right
         // wall and is removed). The default occlusion semantics would keep that face.
-        pbc.CutOut(polyhedron1, interiorOnly: false);
+        pbc.CutOut(polyhedron1, Polyhedron3dBoundaryComplex.BoundaryFaceMode.CutAll);
         var facets = pbc.BoundaryFacets();
         Assert.That(facets, Has.Count.EqualTo(5));
         Assert.That(pbc.BoundaryEdges(), Has.Count.EqualTo(12));
@@ -69,7 +69,7 @@ public class PolyhedronBoundaryComplexTests {
     [Test] public void CutOutTest_L() {
         var pbc = new Polyhedron3dBoundaryComplex(new int[]{0,0,0});
         var polyhedron1 = PolyhedronCreate.Cube3dAt(new Point(-0.5,-0.5,0),1);
-        pbc.CutOut(polyhedron1, interiorOnly: false);
+        pbc.CutOut(polyhedron1, Polyhedron3dBoundaryComplex.BoundaryFaceMode.CutAll);
         var visibleFacets = pbc.BoundaryFacets();
         Assert.That(visibleFacets, Has.Count.EqualTo(8));
 
@@ -162,7 +162,7 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(pbc2.d2faces,Has.Count.EqualTo(6));
         Assert.That(pbc2.d2faces.Contains(pCut2));
         var toCutOut = PolyhedronCreate.Cube3dAt(new Point(0,-0.5,0),1);
-        pbc1.CutOut(toCutOut, interiorOnly: false);
+        pbc1.CutOut(toCutOut, Polyhedron3dBoundaryComplex.BoundaryFaceMode.CutAll);
         Assert.That(pbc1.d2faces,Has.Count.EqualTo(5));
         Assert.That(pbc1.d2faces.Contains(pCut1),Is.False);
         Assert.That(pbc2.d2faces,Has.Count.EqualTo(7));

@@ -554,6 +554,69 @@ public class Scene4dHashTests {
             "This proves the bug is fundamental to CutOut's boundary semantics, not a float-precision issue.");
     }
 
+    // ── TwoTesseracts: occluding pieces overlap in 3D projection ─────────────────
+    // Two single-hypercube pieces at non-overlapping 4D positions whose 3D-cavalier
+    // projections overlap. Piece 0 (w=0..1) is closer; piece 1 (w=2..3) is farther.
+    // The originally-reported bug: parts of piece 1's faces remained visible inside
+    // piece 0's projected volume (occlusion failed). Verified via the union-of-closer-
+    // cells halfspace test below.
+    [Test] public void TwoTesseracts_NoFaceFragmentInsideUnionOfCloserOtherPieceCells() {
+        var camera = new Camera4dParallel();
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0} },
+            new int[][] { new int[] {-1,-1,0,2} },
+        };
+        var scene = new Scene4d(origins, camera);
+
+        double DepthOf(IntegerCell c) {
+            var ctr = c.Center();
+            double d = 0;
+            for (int i = 0; i < camera.viewNormal.x.Length; i++) d += camera.viewNormal.x[i] * ctr[i];
+            return d;
+        }
+
+        bool VertexInsideOrOnBoundary(Point pt, HalfSpace[] halfSpaces) {
+            foreach (var hs in halfSpaces)
+                if (hs.side(pt) > 0) return false;
+            return true;
+        }
+
+        // For every visible face, if every vertex lies inside the union of *other-piece*
+        // closer cells, the face fragment is hidden — should have been cut by occlusion.
+        var problems = new List<string>();
+        for (int p = 0; p < scene.cells.Count; p++) {
+            var cellP = scene.cells[p];
+            var depthP = DepthOf(cellP.cell);
+            var closerHs = new List<HalfSpace[]>();
+            for (int q = 0; q < scene.cells.Count; q++) {
+                if (q == p) continue;
+                // Only other-piece cells count as occluders here. Same-piece sibling
+                // cells legitimately share boundaries with this face.
+                if (scene.cells[q].pieceIndex == cellP.pieceIndex) continue;
+                if (DepthOf(scene.cells[q].cell) >= depthP) continue;
+                closerHs.Add(Scene4d.DefiningHalfSpaces((OrientedIntegerCell)scene.cells[q].cell, camera));
+            }
+            if (closerHs.Count == 0) continue;
+
+            foreach (var face in cellP.pbc.d2faces) {
+                bool hidden = true;
+                foreach (var pt in face.points) {
+                    bool insideAny = false;
+                    foreach (var hs in closerHs)
+                        if (VertexInsideOrOnBoundary(pt, hs)) { insideAny = true; break; }
+                    if (!insideAny) { hidden = false; break; }
+                }
+                if (hidden) {
+                    var pts = string.Join(" ", face.points.Select(pt => $"({pt.x[0]:F2},{pt.x[1]:F2},{pt.x[2]:F2})"));
+                    problems.Add($"{face.integerCell} (piece {cellP.pieceIndex}) hidden by closer other-piece cells; pts: {pts}");
+                }
+            }
+        }
+        Assert.That(problems, Is.Empty,
+            "Some visible face fragment is hidden by a closer occluding piece — should have been cut. " +
+            string.Join("; ", problems));
+    }
+
     [Test] public void IntegerCell_Hash_Equals_AreConsistent_Across_SpanOrders() {
         var rnd = new System.Random(12345);
         // For each 2-face, build it with HashSet<int> spans inserted in different orders
