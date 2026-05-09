@@ -377,164 +377,196 @@ namespace D4BB.Geometry
             edges[index]= edge2;
             edges.Insert(index,edge1);
         }
+        // Sutherland-Hodgman based polygon split. The polygon is assumed convex.
+        // Each polygon vertex is classified as INSIDE / OUTSIDE / CONTAINED relative to cutPlane.
+        // - All CONTAINED (and not all colinear): isContained.
+        // - No OUTSIDE vertex: polygon entirely on inner side. innerCut may be a CONT-CONT edge.
+        // - No INSIDE vertex: polygon entirely on outer side.
+        // - Otherwise: walk edges once, routing each edge (or its split halves) into
+        //   innerEdges / outerEdges, and recording the up to 2 cut-vertex pairs. The
+        //   inner/outer arc start/end are recovered from the edge lists by point-set
+        //   difference, then the cut edges are added with the orientation that closes
+        //   the cycle CCW. SortedEdges (via Recreate(HashSet)) takes care of ordering.
         public SplitResult Split(HalfSpace cutPlane) {
-            List<Edge> inner = new();
-            List<Edge> outer = new();
-            List<Vertex> innerCut = new();
-            List<Vertex> outerCut = new();
-            Edge innerCutEdge = null;
-            Edge outerCutEdge = null;
-            Edge edge1 = edges[^1];
-            Vertex a = edge1.a;
-            int sideA = cutPlane.side(a.getPoint());
-            Vertex b = edge1.b;
-            int sideB = cutPlane.side(b.getPoint());
-            
-            for (int i=0;i<edges.Count;i++) {
-                var edge2 = edges[i];
-                Vertex c = edge2.b;
-                int sideC = cutPlane.side(c.getPoint());
-
-                if (sideB == HalfSpace.INSIDE && sideC == HalfSpace.OUTSIDE) {
-                    // Point cutBC = cutPlane.cutPoint(b.getPoint(),c.getPoint());
-                    // Edge cut1 = (Edge)edge2.Recreate(b,(Vertex)c.Recreate(cutBC));
-                    // Edge cut2 = (Edge)edge2.Recreate((Vertex)b.Recreate(cutBC),c);
-                    var cr = edge2.Split(cutPlane);
-                    var cut1 = (Edge)cr.inner;
-                    var cut2 = (Edge)cr.outer;
-                    outerCut.Add((Vertex)cr.outerCut);
-                    innerCut.Add((Vertex)cr.innerCut);
-                    inner.Add(cut1);
-                    if (innerCut.Count==2) {
-                        Debug.Assert(outerCut.Count==2,"5601857415");
-                        innerCutEdge = (Edge)edge2.Recreate((Vertex)innerCut[1].OpposingClone(),(Vertex)innerCut[0].OpposingClone());
-                        inner.Add(innerCutEdge); //inner cycle closed
-                        Debug.Assert(innerCut[0].getPoint().Equals(inner.First().a.getPoint()),"8976978753");
-
-                        //outer cycle to continue
-                        outerCutEdge = (Edge)edge2.Recreate((Vertex)outerCut[0].OpposingClone(),(Vertex)outerCut[1].OpposingClone());
-                        outer.Add(outerCutEdge);
-                    }
-                    sideB = HalfSpace.CONTAINED;
-                    edge2 = cut2;
-                } 
-                else if (sideB == HalfSpace.OUTSIDE && sideC == HalfSpace.INSIDE) {
-                    var cr = edge2.Split(cutPlane);
-                    //Point cutBC = cutPlane.cutPoint(b.getPoint(),c.getPoint());
-                    //Edge cut1 = (Edge)edge2.Recreate(b,(Vertex)c.Recreate(cutBC));
-                    //Edge cut2 = (Edge)edge2.Recreate((Vertex)b.Recreate(cutBC),c);
-                    var cut1 = (Edge)cr.outer;
-                    var cut2 = (Edge)cr.inner;
-                    innerCut.Add((Vertex)cr.innerCut);
-                    outerCut.Add((Vertex)cr.outerCut);
-                    outer.Add(cut1);
-                    if (innerCut.Count==2) {
-                        Debug.Assert(outerCut.Count==2,"2312108382");
-                        outerCutEdge = (Edge)edge2.Recreate((Vertex)outerCut[1].OpposingClone(),(Vertex)outerCut[0].OpposingClone());
-                        outer.Add(outerCutEdge); //outer cycle closed
-                        Debug.Assert(outerCut[0].getPoint().Equals(outer.First().a.getPoint()),"1002646478");
-                        outerCut[0].neighbor = outer.First().a;
-                        outer.First().a.neighbor = outerCut[0];
-                        
-                        //inner cycle to continue
-                        innerCutEdge = (Edge)edge2.Recreate((Vertex)innerCut[0].OpposingClone(),(Vertex)innerCut[1].OpposingClone());
-                        inner.Add(innerCutEdge);
-                    }
-                    sideB = HalfSpace.CONTAINED;
-                    edge2 = cut2;
-                }
-                else if (sideA == HalfSpace.INSIDE && sideB==HalfSpace.CONTAINED && sideC == HalfSpace.OUTSIDE) {
-                    outerCut.Add(edge2.a);
-                    innerCut.Add(edge1.b);
-                    inner.Add(edge1);
-                    if (innerCut.Count==2) {
-                        Debug.Assert(outerCut.Count==2,"9521366133");
-                        innerCutEdge = (Edge)edge2.Recreate((Vertex)innerCut[1].OpposingClone(),(Vertex)innerCut[0].OpposingClone());
-                        inner.Add(innerCutEdge); //inner cycle closed
-                        Debug.Assert(innerCut[0].getPoint().Equals(inner.First().a.getPoint()),"2307260588");
-
-                        //outer cycle to continue
-                        outerCutEdge = (Edge)edge2.Recreate((Vertex)outerCut[0].OpposingClone(),(Vertex)outerCut[1].OpposingClone());
-                        outer.Add(outerCutEdge);
-                    }
-                }
-                else if (sideA == HalfSpace.OUTSIDE && sideB==HalfSpace.CONTAINED && sideC == HalfSpace.INSIDE) {
-                    innerCut.Add(edge2.a);
-                    outerCut.Add(edge1.b);
-                    outer.Add(edge1);
-                    if (innerCut.Count==2) {
-                        outerCutEdge = (Edge)edge2.Recreate((Vertex)outerCut[1].OpposingClone(),(Vertex)outerCut[0].OpposingClone());
-                        outer.Add(outerCutEdge); //outer cycle closed
-                        Debug.Assert(outerCut[0].getPoint().Equals(outer.First().a.getPoint()),"8097379053");
-
-                        //inner cycle to continue
-                        innerCutEdge = (Edge)edge2.Recreate((Vertex)innerCut[0].OpposingClone(),(Vertex)innerCut[1].OpposingClone());
-                        inner.Add(innerCutEdge);
-                    }
-                }
-                else if (sideB == HalfSpace.OUTSIDE && sideC == HalfSpace.OUTSIDE) {/* edge1 already added */}
-                else if (sideB == HalfSpace.INSIDE  && sideC == HalfSpace.INSIDE ) {/* edge1 already added */}
-                else if (sideA==HalfSpace.INSIDE && sideB==HalfSpace.CONTAINED && sideC==HalfSpace.CONTAINED) {
-                    var ic = edge2;
-                    return new SplitResult() {inner=this,innerCut=ic,outer=null};
-                } else if (sideC==HalfSpace.OUTSIDE && sideB==HalfSpace.CONTAINED && sideC==HalfSpace.CONTAINED) {
-                    var oc = edge2;
-                    return new SplitResult {inner=null,outerCut=oc,outer=this};
-                } else if (sideA==HalfSpace.CONTAINED && sideB==HalfSpace.CONTAINED && sideC==HalfSpace.INSIDE) {
-                    var ic = edge1;
-                    return new SplitResult {inner=this,innerCut=ic,outer=null};
-                } else if (sideA==HalfSpace.CONTAINED && sideB==HalfSpace.CONTAINED && sideC==HalfSpace.OUTSIDE) {
-                    var oc = edge1;
-                    return new SplitResult {inner=null,outerCut=oc,outer=this};
-                }
-                else if (sideA == HalfSpace.OUTSIDE  && sideB==HalfSpace.CONTAINED && sideC==HalfSpace.OUTSIDE) {
-                    outer.Add(edge1);
-                }
-                else if (sideA == HalfSpace.INSIDE  && sideB==HalfSpace.CONTAINED && sideC==HalfSpace.INSIDE) {
-                    inner.Add(edge1);
-                }
-                else if (sideA == HalfSpace.CONTAINED && sideB==HalfSpace.CONTAINED && sideC == HalfSpace.CONTAINED) {
-                  	if (! AOP.Colinear1d(a.PointRef(), b.PointRef(), c.PointRef())) return new SplitResult {isContained=true};
-                }
-                else if (sideC == HalfSpace.CONTAINED) {/* will be handled in the next step */}
-                else {
-                    throw new Exception();
-                }
-                
-                if (sideC==HalfSpace.INSIDE) {
-                    inner.Add(edge2);
-                } else if (sideC == HalfSpace.OUTSIDE) {
-                    outer.Add(edge2);
-                } else if (sideC == HalfSpace.CONTAINED) {
-                    //wait for the next edge
-                } else {
-                    throw new Exception();
-                }
-
-                sideA = sideB;
-                b = c;
-                sideB = sideC;
-                edge1 = edge2;
+            int n = edges.Count;
+            int[] sides = new int[n];
+            Vertex[] verts = new Vertex[n];
+            for (int i = 0; i < n; i++) {
+                verts[i] = edges[i].a;
+                sides[i] = cutPlane.side(verts[i].getPoint());
             }
-            IPolyhedron resInner = null;
-            IPolyhedron resOuter = null;
-            if (inner.Count>0 && outer.Count>0) {
-                resInner = Recreate(inner);
-                resOuter = Recreate(outer);
-            } else if (inner.Count>0 && outer.Count==0) {
-                resInner = this;
-                resOuter = null;
-            } else if (inner.Count==0 && outer.Count>0) {
-                resInner = null;
-                resOuter = this;
+
+            int nIn = 0, nOut = 0, nCon = 0;
+            for (int i = 0; i < n; i++) {
+                if (sides[i] == HalfSpace.INSIDE) nIn++;
+                else if (sides[i] == HalfSpace.OUTSIDE) nOut++;
+                else nCon++;
             }
-            Debug.Assert(innerCut.Count==2 && outerCut.Count==2 || innerCut.Count==0 && outerCut.Count==0,"3805925512");
-            if (innerCut.Count==2) {
-                Debug.Assert(innerCutEdge!=null,"5505643563");
-                Debug.Assert(outerCutEdge!=null,"7220313878");
+
+            if (nCon == n) {
+                bool allColinear = true;
+                for (int i = 0; i < n; i++) {
+                    if (!AOP.Colinear1d(verts[i].PointRef(), verts[(i+1)%n].PointRef(), verts[(i+2)%n].PointRef())) {
+                        allColinear = false; break;
+                    }
+                }
+                if (!allColinear) return new SplitResult { isContained = true };
             }
-            var res = new SplitResult {inner=resInner,innerCut=innerCutEdge,outerCut=outerCutEdge, outer=resOuter}.CrossReference(this,cutPlane);
-            return res;
+
+            if (nOut == 0) {
+                Edge tangentEdge = null;
+                for (int i = 0; i < n; i++) {
+                    if (sides[i] == HalfSpace.CONTAINED && sides[(i+1)%n] == HalfSpace.CONTAINED) {
+                        tangentEdge = edges[i]; break;
+                    }
+                }
+                return new SplitResult { inner = this, innerCut = tangentEdge, outer = null };
+            }
+            if (nIn == 0) {
+                Edge tangentEdge = null;
+                for (int i = 0; i < n; i++) {
+                    if (sides[i] == HalfSpace.CONTAINED && sides[(i+1)%n] == HalfSpace.CONTAINED) {
+                        tangentEdge = edges[i]; break;
+                    }
+                }
+                return new SplitResult { outer = this, outerCut = tangentEdge, inner = null };
+            }
+
+            var innerEdges = new List<Edge>();
+            var outerEdges = new List<Edge>();
+            var innerCutVerts = new List<Vertex>();
+            var outerCutVerts = new List<Vertex>();
+
+            for (int i = 0; i < n; i++) {
+                var edge = edges[i];
+                int sa = sides[i];
+                int sb = sides[(i+1) % n];
+
+                if (sa == HalfSpace.INSIDE && sb == HalfSpace.INSIDE) {
+                    innerEdges.Add(edge);
+                }
+                else if (sa == HalfSpace.OUTSIDE && sb == HalfSpace.OUTSIDE) {
+                    outerEdges.Add(edge);
+                }
+                else if ((sa == HalfSpace.INSIDE && sb == HalfSpace.OUTSIDE)
+                      || (sa == HalfSpace.OUTSIDE && sb == HalfSpace.INSIDE)) {
+                    var sr = edge.Split(cutPlane);
+                    innerEdges.Add((Edge)sr.inner);
+                    outerEdges.Add((Edge)sr.outer);
+                    innerCutVerts.Add((Vertex)sr.innerCut);
+                    outerCutVerts.Add((Vertex)sr.outerCut);
+                }
+                else if (sa == HalfSpace.CONTAINED && sb == HalfSpace.INSIDE) {
+                    innerEdges.Add(edge);
+                    int iPrev = (i - 1 + n) % n;
+                    if (sides[iPrev] == HalfSpace.OUTSIDE) {
+                        // transition through CONTAINED vertex
+                        innerCutVerts.Add(edge.a);
+                        outerCutVerts.Add(edges[iPrev].b);
+                    }
+                }
+                else if (sa == HalfSpace.CONTAINED && sb == HalfSpace.OUTSIDE) {
+                    outerEdges.Add(edge);
+                    int iPrev = (i - 1 + n) % n;
+                    if (sides[iPrev] == HalfSpace.INSIDE) {
+                        outerCutVerts.Add(edge.a);
+                        innerCutVerts.Add(edges[iPrev].b);
+                    }
+                }
+                else if (sa == HalfSpace.INSIDE && sb == HalfSpace.CONTAINED) {
+                    innerEdges.Add(edge);
+                    // transition recorded by next iteration's CONTAINED-OUTSIDE / CONTAINED-INSIDE
+                }
+                else if (sa == HalfSpace.OUTSIDE && sb == HalfSpace.CONTAINED) {
+                    outerEdges.Add(edge);
+                }
+                // sa==CONTAINED && sb==CONTAINED: cannot occur in a genuine cut of a convex polygon — skip defensively
+            }
+
+            Debug.Assert(innerCutVerts.Count == 2 && outerCutVerts.Count == 2,
+                $"SH split expected 2 cut-vertex pairs but got inner={innerCutVerts.Count} outer={outerCutVerts.Count}");
+
+            Vertex innerArcStart = FindArcStart(innerEdges);
+            Vertex innerArcEnd = FindArcEnd(innerEdges);
+
+            Vertex innerCutFromV, innerCutToV, outerCutFromV, outerCutToV;
+            if (innerCutVerts[0].PointRef().Equals(innerArcEnd.PointRef())) {
+                innerCutFromV = (Vertex)innerCutVerts[0].OpposingClone();
+                innerCutToV = (Vertex)innerCutVerts[1].OpposingClone();
+                outerCutFromV = (Vertex)outerCutVerts[1].OpposingClone();
+                outerCutToV = (Vertex)outerCutVerts[0].OpposingClone();
+            } else {
+                innerCutFromV = (Vertex)innerCutVerts[1].OpposingClone();
+                innerCutToV = (Vertex)innerCutVerts[0].OpposingClone();
+                outerCutFromV = (Vertex)outerCutVerts[0].OpposingClone();
+                outerCutToV = (Vertex)outerCutVerts[1].OpposingClone();
+            }
+
+            Edge proto = edges[0];
+            Edge innerCutEdge = (Edge)proto.Recreate(innerCutFromV, innerCutToV);
+            Edge outerCutEdge = (Edge)proto.Recreate(outerCutFromV, outerCutToV);
+
+            // Build chained lists in CCW cycle order. SortedEdges (used by Recreate(HashSet))
+            // relies on Vertex.Equals which is type-strict — it fails when a face mixes
+            // original VertexBC vertices with plain Vertex cut-points produced by Edge.Split,
+            // so we chain by point-equality directly here.
+            var innerOrdered = ChainByPoint(innerEdges, innerCutEdge);
+            var outerOrdered = ChainByPoint(outerEdges, outerCutEdge);
+
+            IPolyhedron resInner = Recreate(innerOrdered);
+            IPolyhedron resOuter = Recreate(outerOrdered);
+
+            return new SplitResult {
+                inner = resInner,
+                outer = resOuter,
+                innerCut = innerCutEdge,
+                outerCut = outerCutEdge
+            }.CrossReference(this, cutPlane);
+        }
+        static Vertex FindArcStart(List<Edge> arc) {
+            // vertex that appears as .a but not as .b (by point-equality) — open start of arc
+            foreach (var e in arc) {
+                bool isStart = true;
+                foreach (var e2 in arc) {
+                    if (ReferenceEquals(e, e2)) continue;
+                    if (e2.b.PointRef().Equals(e.a.PointRef())) { isStart = false; break; }
+                }
+                if (isStart) return e.a;
+            }
+            return null;
+        }
+        static Vertex FindArcEnd(List<Edge> arc) {
+            foreach (var e in arc) {
+                bool isEnd = true;
+                foreach (var e2 in arc) {
+                    if (ReferenceEquals(e, e2)) continue;
+                    if (e2.a.PointRef().Equals(e.b.PointRef())) { isEnd = false; break; }
+                }
+                if (isEnd) return e.b;
+            }
+            return null;
+        }
+        static List<Edge> ChainByPoint(List<Edge> arcEdges, Edge cutEdge) {
+            // Combine arc edges and cut edge, then chain them into a directed cycle by
+            // matching .b -> .a using Point equality (type-agnostic).
+            var pool = new List<Edge>(arcEdges) { cutEdge };
+            var result = new List<Edge>(pool.Count);
+            var current = pool[0];
+            pool.RemoveAt(0);
+            result.Add(current);
+            while (pool.Count > 0) {
+                int found = -1;
+                for (int i = 0; i < pool.Count; i++) {
+                    if (current.b.PointRef().Equals(pool[i].a.PointRef())) { found = i; break; }
+                }
+                Debug.Assert(found >= 0, "SH split: arc cannot be chained into a cycle");
+                current = pool[found];
+                pool.RemoveAt(found);
+                result.Add(current);
+            }
+            Debug.Assert(result[result.Count - 1].b.PointRef().Equals(result[0].a.PointRef()),
+                "SH split: chained arc is not closed");
+            return result;
         }
         public void Inset(double delta) {
             var n = edges.Count;
