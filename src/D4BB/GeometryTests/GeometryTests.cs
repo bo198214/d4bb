@@ -493,5 +493,162 @@ public class Geom3dTests
         Assert.That(sr.inner,Is.Not.Null);
         Assert.That(sr.outer,Is.Not.Null);
     }
+
+    // Helper: collect points of a Face2d in CCW order.
+    static List<Point> Pts(IPolyhedron p) => ((Face2d)p).points;
+
+    static bool ContainsPoint(List<Point> pts, double x, double y, double z) {
+        var target = new Point(x, y, z);
+        foreach (var p in pts) if (p.Equals(target)) return true;
+        return false;
+    }
+
+    // Sutherland-Hodgman regression: vertex configuration INSIDE-CONTAINED-OUTSIDE-CONTAINED.
+    // Cut line passes through two non-adjacent polygon vertices (V1 and V3 of the kite).
+    // Pre-fix this returned inner=this on a buggy early-return path.
+    [Test] public void SH_Split_InCnOutCn_KiteShape() {
+        // Kite-shaped convex quad in z=0 plane:
+        //   V0(0,-1,0) INSIDE,  V1(1,0,0) CONTAINED,  V2(0,1,0) OUTSIDE,  V3(-1,0,0) CONTAINED
+        // CCW order from -y axis. Cut plane y=0 (normal +y).
+        var poly = new Face2d(new List<Point>{ new(0,-1,0), new(1,0,0), new(0,1,0), new(-1,0,0) });
+        var hs = new HalfSpace(0, new Point(0,1,0));
+
+        var sr = poly.Split(hs);
+
+        Assert.That(sr.isContained, Is.False);
+        Assert.That(sr.inner, Is.Not.Null);
+        Assert.That(sr.outer, Is.Not.Null);
+        Assert.That(sr.innerCut, Is.Not.Null);
+        Assert.That(sr.outerCut, Is.Not.Null);
+
+        var innerPts = Pts(sr.inner);
+        var outerPts = Pts(sr.outer);
+        // inner triangle: V0, V1, V3 (V2 was OUTSIDE)
+        Assert.That(innerPts.Count, Is.EqualTo(3));
+        Assert.That(ContainsPoint(innerPts, 0,-1,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, 1,0,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, -1,0,0), Is.True);
+        // outer triangle: V2, V1, V3 (V0 was INSIDE)
+        Assert.That(outerPts.Count, Is.EqualTo(3));
+        Assert.That(ContainsPoint(outerPts, 0,1,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, 1,0,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, -1,0,0), Is.True);
+    }
+
+    // Cut crosses one edge in the middle and passes through one polygon vertex (CONTAINED).
+    [Test] public void SH_Split_VertexCutPlusEdgeCut() {
+        // Triangle V0(0,-1,0) IN, V1(1,0,0) CON, V2(-1,1,0) OUT. Cut y=0 normal +y.
+        var poly = new Face2d(new List<Point>{ new(0,-1,0), new(1,0,0), new(-1,1,0) });
+        var hs = new HalfSpace(0, new Point(0,1,0));
+
+        var sr = poly.Split(hs);
+        Assert.That(sr.inner, Is.Not.Null);
+        Assert.That(sr.outer, Is.Not.Null);
+
+        var innerPts = Pts(sr.inner);
+        var outerPts = Pts(sr.outer);
+        // inner: V0, V1, mid(V2,V0). V2V0 line from (-1,1) to (0,-1). At y=0: x = -0.5.
+        Assert.That(innerPts.Count, Is.EqualTo(3));
+        Assert.That(ContainsPoint(innerPts, 0,-1,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, 1,0,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, -0.5,0,0), Is.True);
+        // outer: V1, V2, mid(V2,V0)
+        Assert.That(outerPts.Count, Is.EqualTo(3));
+        Assert.That(ContainsPoint(outerPts, 1,0,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, -1,1,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, -0.5,0,0), Is.True);
+    }
+
+    // Polygon entirely on the inner side, touching the cut plane at a single vertex.
+    // Should return inner=this with no actual cut.
+    [Test] public void SH_Split_TouchInnerVertexOnly() {
+        var poly = new Face2d(new List<Point>{ new(0,0,0), new(1,0,0), new(0.5,-1,0) });
+        var hs = new HalfSpace(0, new Point(0,1,0));
+
+        var sr = poly.Split(hs);
+        Assert.That(sr.inner, Is.SameAs(poly));
+        Assert.That(sr.outer, Is.Null);
+        Assert.That(sr.isContained, Is.False);
+    }
+
+    // Polygon with two consecutive vertices on the cut plane (CON-CON edge), but the
+    // entire polygon is on the inner side. innerCut should be that tangent edge.
+    [Test] public void SH_Split_TangentInnerEdge() {
+        var poly = new Face2d(new List<Point>{ new(0,0,0), new(1,0,0), new(0.5,-1,0) });
+        var hs = new HalfSpace(0, new Point(0,1,0));
+
+        var sr = poly.Split(hs);
+        Assert.That(sr.inner, Is.SameAs(poly));
+        Assert.That(sr.outer, Is.Null);
+        Assert.That(sr.innerCut, Is.Not.Null);
+        // innerCut should be the edge between (0,0,0) and (1,0,0)
+        var ic = (Edge)sr.innerCut;
+        Assert.That(ic.Equals(new Edge(new Point(0,0,0), new Point(1,0,0))));
+    }
+
+    // Polygon entirely on outer side with tangent edge.
+    [Test] public void SH_Split_TangentOuterEdge() {
+        var poly = new Face2d(new List<Point>{ new(0,0,0), new(0.5,1,0), new(1,0,0) });
+        var hs = new HalfSpace(0, new Point(0,1,0));
+
+        var sr = poly.Split(hs);
+        Assert.That(sr.outer, Is.SameAs(poly));
+        Assert.That(sr.inner, Is.Null);
+        Assert.That(sr.outerCut, Is.Not.Null);
+    }
+
+    // All vertices on the cut plane: isContained.
+    [Test] public void SH_Split_AllContained() {
+        var poly = new Face2d(new List<Point>{ new(0,0,0), new(1,0,0), new(1,1,0) });
+        var hs = new HalfSpace(0, new Point(0,0,1));
+
+        var sr = poly.Split(hs);
+        Assert.That(sr.isContained, Is.True);
+        Assert.That(sr.inner, Is.Null);
+        Assert.That(sr.outer, Is.Null);
+    }
+
+    // Standard square cut by a plane that doesn't pass through any vertex.
+    // Both fragments are quads.
+    [Test] public void SH_Split_SquareInOut() {
+        var poly = new Face2d(new List<Point>{ new(0,0,0), new(2,0,0), new(2,2,0), new(0,2,0) });
+        var hs = new HalfSpace(1, new Point(1,0,0));
+
+        var sr = poly.Split(hs);
+        Assert.That(sr.inner, Is.Not.Null);
+        Assert.That(sr.outer, Is.Not.Null);
+
+        var innerPts = Pts(sr.inner);
+        var outerPts = Pts(sr.outer);
+        Assert.That(innerPts.Count, Is.EqualTo(4));
+        Assert.That(outerPts.Count, Is.EqualTo(4));
+        Assert.That(ContainsPoint(innerPts, 0,0,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, 1,0,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, 1,2,0), Is.True);
+        Assert.That(ContainsPoint(innerPts, 0,2,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, 1,0,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, 2,0,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, 2,2,0), Is.True);
+        Assert.That(ContainsPoint(outerPts, 1,2,0), Is.True);
+    }
+
+    // Cut crosses two polygon vertices (both CONTAINED) — kite shape with cut along the
+    // opposite-vertex diagonal. This exercises both transitions occurring at vertices,
+    // a situation where the original code was sensitive to the polygon's starting edge.
+    [Test] public void SH_Split_BothCutsAtVertices_DifferentRotations() {
+        // Same kite as SH_Split_InCnOutCn_KiteShape but starting from each different vertex.
+        Point[] verts = { new(0,-1,0), new(1,0,0), new(0,1,0), new(-1,0,0) };
+        var hs = new HalfSpace(0, new Point(0,1,0));
+        for (int rot = 0; rot < 4; rot++) {
+            var pts = new List<Point>();
+            for (int i = 0; i < 4; i++) pts.Add(verts[(i + rot) % 4]);
+            var poly = new Face2d(pts);
+            var sr = poly.Split(hs);
+            Assert.That(sr.inner, Is.Not.Null, $"rotation {rot}: inner null");
+            Assert.That(sr.outer, Is.Not.Null, $"rotation {rot}: outer null");
+            Assert.That(Pts(sr.inner).Count, Is.EqualTo(3), $"rotation {rot}: inner not triangle");
+            Assert.That(Pts(sr.outer).Count, Is.EqualTo(3), $"rotation {rot}: outer not triangle");
+        }
+    }
 }
 }
