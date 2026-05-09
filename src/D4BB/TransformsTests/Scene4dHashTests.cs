@@ -504,31 +504,54 @@ public class Scene4dHashTests {
         public UnityEngine_Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
     }
 
-    // Smoking gun #2: even on a SINGLE Scene4d build (no UpdateCamera, no cumulative
-    // cutting), an asymmetric camera causes shared 4D-going faces to vanish. The reason
-    // is that ClipConvexPolygon treats boundary points (cs == 0) as "inside" — so a face
-    // lying *exactly on* one of the neighbor cell's defining halfspaces gets fully
-    // classified as "inside" the cut polyhedron and removed.
+    // Regression: across many asymmetric wDir magnitudes (covering the formerly-fragile
+    // Goldilocks zone), all 9 4D-going faces remain visible. With CutOut's interiorOnly
+    // semantics (default), shared boundary faces between cells are not lost regardless
+    // of the camera-induced depth ordering.
     [TestCase(1e-7)]
     [TestCase(1e-6)]
     [TestCase(1e-5)]
     [TestCase(1e-4)]
     [TestCase(1e-3)]
     [TestCase(1e-2)]
-    public void Cavalier_SingleHypercube_AsymmetricWDir_AlreadyLosesSharedFaces(double eps) {
+    public void Cavalier_SingleHypercube_AsymmetricWDir_Keeps4dFaces(double eps) {
         var camera = new Camera4dParallel();
-        // Real asymmetric wDir (consistent across viewNormal AND projection basis)
         camera.wDir = new Point3d(camera.wDir.x[0] + eps, camera.wDir.x[1], camera.wDir.x[2]);
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
         var fourD = scene.VisibleFacets(0)
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
+            .Count();
+        Assert.That(fourD, Is.EqualTo(9), $"eps={eps:G2}: lost shared 4D-going faces");
+    }
+
+    // Demonstrates that the bug is NOT an epsilon problem. With a non-symmetric wDir
+    // (e.g. user rotated the camera by some non-trivial angle), c3_a/b/c are at
+    // genuinely different depths, the comparator correctly orders them, and the back
+    // cell's shared 4D-going face is still cut even though both cells are part of the
+    // same single hypercube and the face is on the surface of the projected hypercube.
+    [TestCase(0.1, 0.0, 0.0)]   // skew x by 10%
+    [TestCase(0.5, 0.0, 0.0)]   // bigger skew
+    [TestCase(0.0, 0.3, 0.7)]   // y/z asymmetric
+    [TestCase(2.0, 1.5, 1.0)]   // arbitrary non-symmetric camera
+    public void Cavalier_SingleHypercube_NonSymmetricCamera_ShouldKeepAll4dFaces(double dx, double dy, double dz) {
+        var camera = new Camera4dParallel();
+        var w = camera.wDir;
+        camera.wDir = new Point3d(w.x[0] + dx, w.x[1] + dy, w.x[2] + dz);
+        var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
+        var scene = new Scene4d(origins, camera);
+        var fourD = scene.VisibleFacets(0)
+            .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
-        TestContext.Progress.WriteLine($"eps={eps:G2}: {fourD.Count} 4D-going faces visible");
-        foreach (var k in fourD.OrderBy(s => s)) TestContext.Progress.WriteLine($"  4D: {k}");
+        TestContext.Progress.WriteLine($"wDir+={dx},{dy},{dz}: {fourD.Count} 4D-going visible");
+        foreach (var k in fourD.OrderBy(s => s)) TestContext.Progress.WriteLine($"  {k}");
+        // For a non-symmetric camera the depths of c3_a/b/c are genuinely different —
+        // no comparator-tolerance fix can paper over this. The shared 4D-going face
+        // F between c3_a and c3_b lies *on* the boundary of one of them and gets cut
+        // by ClipConvexPolygon's `cs <= 0` (boundary-as-inside) rule.
         Assert.That(fourD.Count, Is.EqualTo(9),
-            $"eps={eps:G2}: shared 4D-going boundary faces vanished. ClipConvexPolygon's `cs <= 0` " +
-            "includes boundary points as 'inside', so faces lying exactly on a neighbor cell's halfspace get cut.");
+            $"With non-symmetric wDir+={dx},{dy},{dz}, shared 4D-going faces are cut. " +
+            "This proves the bug is fundamental to CutOut's boundary semantics, not a float-precision issue.");
     }
 
     [Test] public void IntegerCell_Hash_Equals_AreConsistent_Across_SpanOrders() {

@@ -52,6 +52,12 @@ namespace D4BB.Transforms
 
         public void UpdateCamera()
         {
+            // Must rebuild before re-occluding: ApplyCameraOcclusion mutates pbc.d2faces
+            // destructively, so calling it twice on the same cells erodes d2faces. The
+            // rebuild is cheap because pieceTopologies is cached (no IBC recomputation).
+            // Also keeps Face2dBC.points in sync with the current camera so HalfSpace.side
+            // checks against DefiningHalfSpaces use a consistent projection.
+            RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
         }
