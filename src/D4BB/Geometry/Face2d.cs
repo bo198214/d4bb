@@ -597,18 +597,20 @@ namespace D4BB.Geometry
             Point n = Normal();
             var a = edges[0].a.PointRef();
             if (!AOP.eq(p.clone().subtract(a).sc(n),0)) throw new NotInPlaneException();
+            bool onBoundary = false;
             foreach (var edge in edges) {
                 a = edge.a.PointRef();
-                var ab = edge.b.getPoint().subtract(a).normalize();
+                var ab = edge.b.getPoint().subtract(a);
                 var hs = new HalfSpace(edge.a.getPoint(),AOP.cross(ab,n).normalize());
                 var side = hs.side(p);
                 if (side==HalfSpace.OUTSIDE) return side;
                 if (side==HalfSpace.CONTAINED) {
-                    var t = ab.sc(p.clone().subtract(a));
-                    if (t<0 || t>1) return 1;
+                    var t = ab.sc(p.clone().subtract(a)) / ab.sc(ab);
+                    if (t<0 || t>1) return HalfSpace.OUTSIDE;
+                    onBoundary = true;
                 }
             }
-            return -1;
+            return onBoundary ? HalfSpace.CONTAINED : HalfSpace.INSIDE;
         }
         public bool Contains(Face2d facet) {
             foreach (var edge in facet.edges) {
