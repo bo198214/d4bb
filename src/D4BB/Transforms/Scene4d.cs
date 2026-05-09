@@ -156,11 +156,18 @@ namespace D4BB.Transforms
         {
             var allFace2dBC = new Dictionary<IntegerCell, Face2dBC>();
             var cell2Faces = new Dictionary<OrientedIntegerCell, List<Face2dBC>>();
+            // Collect every front-facing c3, even those whose f2's are all claimed by other
+            // c3's (different-hyperplane siblings). Such "ownerless" c3's have no visible
+            // faces but still contribute halfspaces during ApplyCameraOcclusion — without
+            // them the diagonal corners that lie strictly inside the c3's 3D volume survive
+            // (see Box3D_NoDuplicateFaceFragmentsInSameCell).
+            var frontFacingCells = new HashSet<OrientedIntegerCell>();
 
             foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
             {
                 if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
                     continue;
+                frontFacingCells.Add(c3);
                 if (allFace2dBC.ContainsKey(f2)) continue; // same f2 already claimed by a front-facing c3
 
                 var pf = new Face2dBC(f2, camera);
@@ -190,8 +197,9 @@ namespace D4BB.Transforms
                 }
             }
 
-            foreach (var (c3, faces) in cell2Faces)
+            foreach (var c3 in frontFacingCells)
             {
+                var faces = cell2Faces.TryGetValue(c3, out var fs) ? fs : new List<Face2dBC>();
                 var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges);
                 foreach (var pf in faces) pf.pbc = cellPbc;
                 cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
