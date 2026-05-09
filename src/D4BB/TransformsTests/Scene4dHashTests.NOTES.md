@@ -18,47 +18,32 @@ Verstärkend: `Scene4d.UpdateCamera()` rief `ApplyCameraOcclusion()` ohne vorher
 
 ## Fix (umgesetzt)
 
-### 1. `CutOut` bekommt `BoundaryFaceMode`-Parameter (Default `Dynamic`)
+### 1. `CutOut` routet `isContained`-Faces orientierungs-basiert
 
-`Polyhedron3dBoundaryComplex.CutOut` und `Polyhedron3dBoundaryComplex.Split` haben einen `BoundaryFaceMode boundaryMode = BoundaryFaceMode.Dynamic` Parameter. Drei Werte:
+`Polyhedron3dBoundaryComplex.CutOut` und `.Split` behandeln boundary-koinzidente Faces (`split.isContained=true`) anhand der Normalenrichtung:
 
-- **`Dynamic`** (Default): Bei `isContained`-Faces wird anhand der Normalenrichtung entschieden:
-  - F.normal · H.normal > 0 (gleichgerichtet): F ist co-orientiert mit der sichtbaren Vorderseite des Cutters → Face wird gecuttet (vom Cutter selbst gezeichnet, hier verdeckt).
-  - F.normal · H.normal < 0 (entgegengesetzt): F's sichtbare Seite zeigt vom Cutter weg → Face bleibt erhalten (Vorderseite einer Cell, die zufällig auf der Cut-Ebene liegt).
-- **`PreserveAll`**: Boundary-Faces immer bewahren. Stricter Occlusion-Variant.
-- **`CutAll`**: Boundary-Faces immer entfernen. Legacy-Boolean-Difference-Semantik.
-
-Die alten Tests `CutOutTest_Half`, `CutOutTest_L`, `NeighborCut` benutzen `BoundaryFaceMode.CutAll`, um die alte Subtraktions-Semantik weiter zu testen.
+- F.normal · H.normal > 0 (gleichgerichtet): F ist co-orientiert mit der sichtbaren Vorderseite des Cutters → Face wird gecuttet (vom Cutter selbst gezeichnet, hier verdeckt).
+- F.normal · H.normal < 0 (entgegengesetzt): F's sichtbare Seite zeigt vom Cutter weg → Face bleibt erhalten (Vorderseite einer Cell, die zufällig auf der Cut-Ebene liegt).
 
 ```csharp
 // PolyhedronBoundaryComplex.cs
-public enum BoundaryFaceMode { Dynamic, PreserveAll, CutAll }
-
-public void CutOut(HalfSpace[] halfSpaces, BoundaryFaceMode boundaryMode = BoundaryFaceMode.Dynamic) { ... }
-
 public static void Split(HalfSpace halfSpace, IEnumerable<Face2dBC> facets,
-                          List<Face2dBC> out_inner, List<Face2dBC> out_outer,
-                          BoundaryFaceMode boundaryMode = BoundaryFaceMode.Dynamic) {
+                          List<Face2dBC> out_inner, List<Face2dBC> out_outer) {
     foreach (var facet in facets) {
         var split = facet.Split(halfSpace);
         if (split.inner != null) out_inner.Add((Face2dBC)split.inner);
         if (split.outer != null) out_outer.Add((Face2dBC)split.outer);
         if (split.isContained) {
-            switch (boundaryMode) {
-                case BoundaryFaceMode.PreserveAll: out_outer.Add(facet); break;
-                case BoundaryFaceMode.CutAll:      out_inner.Add(facet); break;
-                case BoundaryFaceMode.Dynamic:
-                default:
-                    if (AOP.gt(facet.Normal().sc(halfSpace.normal), 0))
-                        out_inner.Add(facet);   // co-oriented → occluded
-                    else
-                        out_outer.Add(facet);   // counter-oriented → visible boundary
-                    break;
-            }
+            if (AOP.gt(facet.Normal().sc(halfSpace.normal), 0))
+                out_inner.Add(facet);   // co-oriented → occluded
+            else
+                out_outer.Add(facet);   // counter-oriented → visible boundary
         }
     }
 }
 ```
+
+> **Historische Notiz:** Eine ältere Iteration hatte einen `BoundaryFaceMode { Dynamic, PreserveAll, CutAll }`-Parameter mit drei semantischen Modi. `Dynamic` (das aktuelle Verhalten) war der Default für Camera-Occlusion. `CutAll` (Legacy-Boolean-Difference: Touching-Wand wird entfernt) wurde nur von 3 Tests in `PolyhedronBoundaryComplexTests.cs` verwendet. `PreserveAll` hatte gar keine Aufrufer. Beim Refactoring stellte sich heraus, dass die 3 `CutAll`-Tests (`CutOutTest_Half`, `CutOutTest_L`, `NeighborCut`) auch unter `Dynamic` mit denselben Assertions durchlaufen — die Test-Geometrien lösen die CutAll/Dynamic-Divergenz gar nicht aus (alle isContained-Faces sind co-orientiert, also in beiden Modi entfernt). Enum und Parameter wurden entfernt; `CutOut` und `Split` haben nur noch das Dynamic-Verhalten.
 
 ### 1a. Warum *Dynamic* statt einer statischen "Occlusion-Variante"
 
@@ -161,7 +146,7 @@ Diese Punkte fielen mir beim Lesen auf — Kandidaten für nachgelagerte Aufräu
 
 2. **`ApplyCameraOcclusion` mutiert `pbc.d2faces` destruktiv**. Heißt: jeder `Polyhedron3dBoundaryComplex` ist nach Konstruktion in einem zwei-Phasen-Zustand ("vor / nach Occlusion"). Empfehlung: Occlusion in eine separate Read-Only-Sicht schreiben (z. B. `pbc.visibleAfterOcclusion`), oder `ApplyCameraOcclusion` in `RebuildCellsFromTopologies` integrieren, damit nur ein Eingangspunkt existiert.
 
-3. **`CutOut` hat drei Semantiken hinter einem Namen.** Mit `BoundaryFaceMode` sind sie explizit (`Dynamic` / `PreserveAll` / `CutAll`). Wenn der Boolean-Difference-Use-Case in der Codebasis nirgends sonst verwendet wird (in `Scene4d` jedenfalls nicht — der einzige Call kommt aus `ApplyCameraOcclusion`), könnte man `CutAll` perspektivisch herausziehen und in einen separaten Boolean-Difference-Methodenname trennen.
+3. ~~**`CutOut` hat drei Semantiken hinter einem Namen.**~~ ~~Mit `BoundaryFaceMode` sind sie explizit (`Dynamic` / `PreserveAll` / `CutAll`).~~ — *Erledigt:* `BoundaryFaceMode` entfernt; `CutOut` hat nur noch das Dynamic-Verhalten. Die 3 ehemaligen `CutAll`-Tests funktionieren auch mit Dynamic (Test-Geometrie löst die Divergenz nicht aus); `PreserveAll` hatte keine Aufrufer.
 
 4. **`Face2dBC.points` aus dem Build-Zeitpunkt vs. `DefiningHalfSpaces` aus der aktuellen Kamera.** Wenn die Kamera sich zwischen den Phasen ändert, geraten Punkte und Halbebenen in eine sub-AOP.ERR-Inkonsistenz, die `HalfSpace.side` *gerade* in den 0-Bereich pusht. Mit `Dynamic` Mode ist das jetzt unkritisch, aber als Code-Hygiene-Punkt: `DefiningHalfSpaces` könnte aus den schon gespeicherten Face-Punkten ableiten statt erneut zu projizieren.
 
