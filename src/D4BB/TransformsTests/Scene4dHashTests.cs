@@ -617,6 +617,48 @@ public class Scene4dHashTests {
             string.Join("; ", problems));
     }
 
+    // ── 3DBox level: 3x3x3-minus-center self-occlusion ─────────────────────────
+    // Piece 0 is a 3x3x3 cube of unit hypercubes (all at w=0) with the center cube at
+    // (1,1,1,0) removed → 26 hypercubes. The boundary contains 6 inward-facing 3-cells
+    // around the hole. The user reports artifacts in the hole region.
+    static int[][] Build3DBoxPiece0() {
+        var pieces = new List<int[]>();
+        for (int x = 0; x < 3; x++)
+        for (int y = 0; y < 3; y++)
+        for (int z = 0; z < 3; z++) {
+            if (x == 1 && y == 1 && z == 1) continue; // hole
+            pieces.Add(new int[] {x, y, z, 0});
+        }
+        return pieces.ToArray();
+    }
+
+    // ── 3DBox: self-occlusion of a 3x3x3-minus-center piece ─────────────────────
+    // After CutOut, the inner-hole region in 3D should show the 3 inner walls (front-
+    // facing; the 3 back walls are correctly back-face-culled). One specific face — the
+    // w=1 face of the -z-facing inner-hole cell — is supposed to be fully cut by the 4
+    // surrounding w=0 face cells (they form a frame around it in 3D), leaving only the
+    // inner-corner quadrant visible. But due to a bug in Face2d.Split for vertex
+    // configurations like INSIDE-CONTAINED-OUTSIDE, the diagonally-opposite corner
+    // quadrant survives too — visible artifact in the hole.
+    [Test] public void Box3D_NoDuplicateFaceFragmentsInSameCell() {
+        var camera = new Camera4dParallel();
+        var origins = new int[][][] { Build3DBoxPiece0(), new int[][] { new int[] {4,1,1,0} } };
+        var scene = new Scene4d(origins, camera);
+
+        var problems = new List<string>();
+        foreach (var cb in scene.cells) {
+            var dups = cb.pbc.d2faces.GroupBy(f => f.integerCell.ToString()).Where(g => g.Count() > 1);
+            foreach (var g in dups) {
+                problems.Add($"cell {cb.cell}: {g.Count()} fragments share integerCell {g.Key}");
+                foreach (var f in g) {
+                    var pts = string.Join(" ", f.points.Select(p => $"({p.x[0]:F3},{p.x[1]:F3},{p.x[2]:F3})"));
+                    problems.Add($"    pts: {pts}");
+                }
+            }
+        }
+        Assert.That(problems, Is.Empty, string.Join("\n  ", problems));
+    }
+
     [Test] public void IntegerCell_Hash_Equals_AreConsistent_Across_SpanOrders() {
         var rnd = new System.Random(12345);
         // For each 2-face, build it with HashSet<int> spans inserted in different orders
