@@ -136,17 +136,17 @@ namespace D4BB.Transforms
             for (int i = 0; i < pieceTopologies.Length; i++)
                 RebuildCellsFromPieceTopology(pieceTopologies[i], i);
 
-            // Cross-piece deduplication: shared 2-faces between pieces cancel.
-            var claimedCells = new HashSet<IntegerCell>();
-            foreach (var cb in cells)
-            {
-                var toRemove = new List<Face2dBC>();
-                foreach (var kvp in cb.pbc.i2p)
-                    if (!claimedCells.Add(kvp.Key))
-                        toRemove.Add(kvp.Value);
-                foreach (var facet in toRemove)
-                    cb.pbc.RemoveFace(facet);
-            }
+            // // Cross-piece deduplication: shared 2-faces between pieces cancel.
+            // var claimedCells = new HashSet<IntegerCell>();
+            // foreach (var cb in cells)
+            // {
+            //     var toRemove = new List<Face2dBC>();
+            //     foreach (var kvp in cb.pbc.i2p)
+            //         if (!claimedCells.Add(kvp.Key))
+            //             toRemove.Add(kvp.Value);
+            //     foreach (var facet in toRemove)
+            //         cb.pbc.RemoveFace(facet);
+            // }
         }
 
         // Fresh Face2dBC objects are created on every rebuild because CutOut (called in
