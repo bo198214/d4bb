@@ -68,8 +68,8 @@ public class PrecisionTests
             Assert.That(a.Equals(a,10));
         }
         {
-            Point a = new(new double[]{2.14});
-            Point b = new(new double[]{2.16});
+            Point a = new(new double[]{2.4});
+            Point b = new(new double[]{2.6});
             Assert.That(a.Equals(b,0));
             Assert.That(!a.Equals(b,1));
         }
@@ -119,7 +119,7 @@ public class PrecisionTests
         }
         {
             var square1 = new Face2d(new List<Point>{new(-1,-1,1),new(-1,0,1),new(0,0,1),new(0,-1,1)});
-            var square2 = new Face2d(new List<Point>{new(-1,-1.001,1),new(0,-1,1),new(0,0,1),new(-1,0,1)});
+            var square2 = new Face2d(new List<Point>{new(-1,-1.2,1),new(0,-1,1),new(0,0,1),new(-1,0,1)});
             HashSet<Face2d> face2ds = new(new Face2dUnOrientedEquality(2));
             face2ds.Add(square1);
             face2ds.Add(square2);
@@ -127,7 +127,7 @@ public class PrecisionTests
         }
         {
             var square1 = new Face2d(new List<Point>{new(-1,-1,1),new(-1,0,1),new(0,0,1),new(0,-1,1)});
-            var square2 = new Face2d(new List<Point>{new(-1,-1.001,1),new(0,-1,1),new(0,0,1),new(-1,0,1)});
+            var square2 = new Face2d(new List<Point>{new(-1,-1.2,1),new(0,-1,1),new(0,0,1),new(-1,0,1)});
             HashSet<Face2d> face2ds = new(new Face2dUnOrientedEquality(3));
             face2ds.Add(square1);
             face2ds.Add(square2);
