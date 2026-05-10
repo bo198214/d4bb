@@ -185,14 +185,23 @@ namespace D4BB.Geometry2 {
             return hs1.side(hs0.origin()) == 0;
         }
 
-        /// An edge is coplanar-embedded iff it has at least 2 incident 2-faces AND all of
-        /// them share the same supporting affine 2-plane in 4D.
+        /// An edge is coplanar-embedded iff, AFTER discarding coplanar-embedded incident
+        /// 2-faces (which the renderer hides), the remaining incident 2-faces all share
+        /// the same supporting affine 2-plane in 4D. With fewer than 2 such non-hidden
+        /// incident faces the edge is treated as visible (silhouette / free-floating).
+        ///
+        /// This two-stage rule matches what's visible at render time: faces filtered by
+        /// IsCoplanarFace don't reach the screen, so they shouldn't influence whether
+        /// an edge looks like a "ridge" or a flat continuation.
         public bool IsCoplanarEdge(int edgeId) {
             var owners = FacesPerEdge(edgeId);
-            if (owners.Count < 2) return false;
-            var plane0 = FacePlane(owners[0]);
-            for (int i = 1; i < owners.Count; i++)
-                if (!plane0.SameSubspace(FacePlane(owners[i]))) return false;
+            var visible = new List<int>(owners.Count);
+            foreach (var fId in owners)
+                if (!IsCoplanarFace(fId)) visible.Add(fId);
+            if (visible.Count < 2) return false;
+            var plane0 = FacePlane(visible[0]);
+            for (int i = 1; i < visible.Count; i++)
+                if (!plane0.SameSubspace(FacePlane(visible[i]))) return false;
             return true;
         }
 

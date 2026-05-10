@@ -13,32 +13,38 @@ namespace D4BB.Geometry2 {
         public static (CellFragment pos, CellFragment neg) Split(CellFragment f, HalfSpace splitter) {
             var posFaces = new List<List<Point>>();
             var negFaces = new List<List<Point>>();
+            var posFaceIds = new List<int>();
+            var negFaceIds = new List<int>();
             var capPointsRaw = new List<Point>();
 
-            foreach (var face in f.faces) {
+            for (int i = 0; i < f.faces.Count; i++) {
+                var face = f.faces[i];
+                int srcId = f.faceIds != null ? f.faceIds[i] : -1;
                 var posPoly = new List<Point>();
                 var negPoly = new List<Point>();
                 SplitPolygon(face, splitter, posPoly, negPoly, capPointsRaw);
-                if (posPoly.Count >= 3) posFaces.Add(posPoly);
-                if (negPoly.Count >= 3) negFaces.Add(negPoly);
+                if (posPoly.Count >= 3) { posFaces.Add(posPoly); posFaceIds.Add(srcId); }
+                if (negPoly.Count >= 3) { negFaces.Add(negPoly); negFaceIds.Add(srcId); }
             }
 
             var cap = OrderCapPolygon(capPointsRaw);
             if (cap != null && cap.Count >= 3) {
-                posFaces.Add(cap);
-                negFaces.Add(new List<Point>(cap));  // shared geometry; orientation does not matter for BSP/culling
+                posFaces.Add(cap); posFaceIds.Add(-1);  // synthetic cap face
+                negFaces.Add(new List<Point>(cap)); negFaceIds.Add(-1);
             }
 
             CellFragment posFrag = posFaces.Count >= 4 ? new CellFragment {
                 sourceCellId = f.sourceCellId,
                 normal = f.normal,
                 faces = posFaces,
+                faceIds = posFaceIds,
                 supportingHyperplane = f.supportingHyperplane
             } : null;
             CellFragment negFrag = negFaces.Count >= 4 ? new CellFragment {
                 sourceCellId = f.sourceCellId,
                 normal = f.normal,
                 faces = negFaces,
+                faceIds = negFaceIds,
                 supportingHyperplane = f.supportingHyperplane
             } : null;
             return (posFrag, negFrag);

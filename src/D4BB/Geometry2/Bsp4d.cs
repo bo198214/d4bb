@@ -17,6 +17,8 @@ namespace D4BB.Geometry2 {
         public int sourceCellId;
         public Point normal;                 // optional 4D outward normal, copied from source Cell
         public List<List<Point>> faces;      // each face: cyclically ordered 4D points
+        public List<int> faceIds;            // parallel to `faces`; the source PolyhedralComplex4d.faces
+                                             // index, or -1 for synthetic faces (BSP-split caps).
         public HalfSpace supportingHyperplane;  // 3-hyperplane in 4D containing this fragment
 
         public Point AnyVertex() => faces[0][0];
@@ -32,11 +34,13 @@ namespace D4BB.Geometry2 {
                 sourceCellId = cellId,
                 normal = cell.normal,
                 faces = new List<List<Point>>(),
+                faceIds = new List<int>(cell.faceIds.Length),
                 supportingHyperplane = complex.CellHyperplane(cellId)
             };
             foreach (var fId in cell.faceIds) {
                 var verts = complex.FaceVertices(fId).Select(v => v.clone()).ToList();
                 fragment.faces.Add(verts);
+                fragment.faceIds.Add(fId);
             }
             return fragment;
         }

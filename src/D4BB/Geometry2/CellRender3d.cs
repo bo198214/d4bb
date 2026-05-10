@@ -12,6 +12,10 @@ namespace D4BB.Geometry2 {
         public int sourceCellId;
         /// 2-faces of the cell as cyclically ordered 3D points (Point with x.Length == 3).
         public List<List<Point>> faces;
+        /// Parallel to <see cref="faces"/>: source PolyhedralComplex4d.faces index, or -1
+        /// for synthetic faces (BSP-split caps). Allows the renderer to filter polygons
+        /// by their original face's coplanarity status.
+        public List<int> faceIds;
 
         Point _centroidCache;
 
@@ -19,11 +23,14 @@ namespace D4BB.Geometry2 {
             var cell = new CellRender3d {
                 sourceCellId = fragment.sourceCellId,
                 faces = new List<List<Point>>(fragment.faces.Count),
+                faceIds = new List<int>(fragment.faces.Count),
             };
-            foreach (var poly4d in fragment.faces) {
+            for (int i = 0; i < fragment.faces.Count; i++) {
+                var poly4d = fragment.faces[i];
                 var poly3d = new List<Point>(poly4d.Count);
                 foreach (var v in poly4d) poly3d.Add(camera.Proj3d(v));
                 cell.faces.Add(poly3d);
+                cell.faceIds.Add(fragment.faceIds != null ? fragment.faceIds[i] : -1);
             }
             return cell;
         }
@@ -88,30 +95,39 @@ namespace D4BB.Geometry2 {
             if (halfSpaces == null || halfSpaces.Length == 0) return;
             var cellCentroid = Centroid3d();
             var outerKeep = new List<List<Point>>();
-            var current = new List<List<Point>>(faces);  // may still be (partially) occluded
+            var outerKeepIds = new List<int>();
+            var current = new List<List<Point>>(faces);
+            var currentIds = faceIds != null ? new List<int>(faceIds) : Enumerable.Repeat(-1, faces.Count).ToList();
             foreach (var hs in halfSpaces) {
                 if (current.Count == 0) break;
                 var nextCurrent = new List<List<Point>>(current.Count);
-                foreach (var face in current) {
+                var nextIds = new List<int>(current.Count);
+                for (int idx = 0; idx < current.Count; idx++) {
+                    var face = current[idx];
+                    int srcId = currentIds[idx];
                     if (FaceLiesEntirelyOnPlane(face, hs)) {
                         // Coincident: route by orientation. The face lives on this plane —
                         // further halfspaces can't occlude it, so we never re-add it to current.
                         // co-oriented (face outward · hs.normal > 0) ⇒ face is on the cutter's
                         // far side ⇒ occluded ⇒ drop. Counter-oriented ⇒ visible boundary ⇒ keep.
-                        if (!FaceOutwardCoOrientedWith(face, cellCentroid, hs.normal))
+                        if (!FaceOutwardCoOrientedWith(face, cellCentroid, hs.normal)) {
                             outerKeep.Add(face);
+                            outerKeepIds.Add(srcId);
+                        }
                         continue;
                     }
                     var inner = new List<Point>();
                     var outer = new List<Point>();
                     SplitPolygon3d(face, hs, inner, outer);
-                    if (inner.Count >= 3) nextCurrent.Add(inner);
-                    if (outer.Count >= 3) outerKeep.Add(outer);
+                    if (inner.Count >= 3) { nextCurrent.Add(inner); nextIds.Add(srcId); }
+                    if (outer.Count >= 3) { outerKeep.Add(outer); outerKeepIds.Add(srcId); }
                 }
                 current = nextCurrent;
+                currentIds = nextIds;
             }
             // `current` are face fragments inside ALL halfspaces ⇒ entirely occluded ⇒ discard
             faces = outerKeep;
+            faceIds = outerKeepIds;
             _centroidCache = null;
         }
 
