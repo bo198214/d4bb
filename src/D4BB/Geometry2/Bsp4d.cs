@@ -133,11 +133,11 @@ namespace D4BB.Geometry2 {
 
         // ── traversal ─────────────────────────────────────────────────────────
 
-        public IEnumerable<CellFragment> BackToFront(ICamera4d camera) {
-            return Traverse(root, camera);
+        public IEnumerable<CellFragment> BackToFront(ICamera4d camera, bool cullBackfaces = true) {
+            return Traverse(root, camera, cullBackfaces);
         }
 
-        static IEnumerable<CellFragment> Traverse(BspNode node, ICamera4d camera) {
+        static IEnumerable<CellFragment> Traverse(BspNode node, ICamera4d camera, bool cullBackfaces) {
             if (node == null) yield break;
             // ICamera4d.IsFacedBy(origin, normal) is true iff the camera looks at the
             // surface from its positive-normal side, i.e. the camera sits in the splitter's
@@ -145,10 +145,10 @@ namespace D4BB.Geometry2 {
             bool cameraOnPositiveSide = camera.IsFacedBy(node.splitter.origin(), node.splitter.normal);
             var far = cameraOnPositiveSide ? node.negative : node.positive;
             var near = cameraOnPositiveSide ? node.positive : node.negative;
-            foreach (var f in Traverse(far, camera)) yield return f;
+            foreach (var f in Traverse(far, camera, cullBackfaces)) yield return f;
             foreach (var f in node.coincident)
-                if (PassesBackfaceCulling(f, camera)) yield return f;
-            foreach (var f in Traverse(near, camera)) yield return f;
+                if (!cullBackfaces || PassesBackfaceCulling(f, camera)) yield return f;
+            foreach (var f in Traverse(near, camera, cullBackfaces)) yield return f;
         }
 
         static bool PassesBackfaceCulling(CellFragment f, ICamera4d camera) {
