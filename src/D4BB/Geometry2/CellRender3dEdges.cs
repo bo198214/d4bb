@@ -29,25 +29,15 @@ namespace D4BB.Geometry2 {
         }
     }
 
-    /// Strategies for producing the edge mesh in the rendering pipeline.
-    public enum EdgeClippingMode {
-        /// No clipping at all — edges drawn from original (rotated) vertex positions, full length.
-        /// Edges that should be occluded by nearer cells punch through visually. Debug-only.
-        Unclipped,
-        /// Extract every polygon's boundary as edges, after BSP+CutOut. The polygons are
-        /// already HSR-correct (clipped); their boundary edges naturally trace the visible
-        /// surface. Some boundary edges are cuts introduced by clipping (no original-edge ID).
-        /// Correctness piggy-backs on the face pipeline — no independent depth ordering needed.
-        FromPolygonBoundaries,
-    }
-
     /// Helpers used by the rendering pipeline to derive edges from already-clipped face
-    /// polygons (variant 1) or by clipping original edges directly (variant 2).
+    /// polygons. The only edge-extraction strategy: pull boundaries out of the BSP+CutOut
+    /// processed polygons. Correctness piggy-backs on the face pipeline — the polygons are
+    /// already HSR-correct, so their boundaries naturally trace the visible surface.
     public static class CellRender3dEdges {
 
-        /// Variant 1: extract every polygon's boundary edges from `processedCells`. Each
-        /// polygon's boundary is decomposed into segments; segments are classified into the
-        /// four (isOriginal, isCoplanar) categories.
+        /// Extract every polygon's boundary edges from `processedCells`. Each polygon's
+        /// boundary is decomposed into segments; segments are classified into the four
+        /// (isOriginal, isCoplanar) categories.
         ///
         /// Source faces with `IsCoplanarFace` are skipped (their boundaries are internal-seam
         /// artifacts in the original geometry).
