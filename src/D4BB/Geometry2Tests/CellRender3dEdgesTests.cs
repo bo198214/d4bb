@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using D4BB.Geometry;
@@ -115,6 +116,46 @@ namespace D4BB.Geometry2Tests {
             int origNonCoplanar = edges.Count(e => e.isOriginal && !e.isCoplanar);
             Assert.That(origCoplanar,    Is.GreaterThan(0));
             Assert.That(origNonCoplanar, Is.GreaterThan(0));
+        }
+
+        [Test] public void FromPolygonBoundaries_KleinBottle_AllEdgesViaFastPath() {
+            // klein-bottle.json is a pure 2-complex (1152 faces, 1728 edges, 0 cells).
+            // Free-floating face polygons go straight through the edge pipeline; every
+            // polygon-boundary segment must be matched against a complex edge via the
+            // O(1) vertex-hash fast path (no CutOut means no sub-segments). Validates
+            // both correctness and that the fast path is actually exercised — if the
+            // Quantize hash drifts vs. ProjectComplexEdges, this test will produce cuts
+            // and fail the Count assertion.
+            var assemblyDir = Path.GetDirectoryName(typeof(CellRender3dEdgesTests).Assembly.Location);
+            var d = new System.IO.DirectoryInfo(assemblyDir);
+            string jsonPath = null;
+            while (d != null) {
+                var p = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", "klein-bottle.json");
+                if (File.Exists(p)) { jsonPath = p; break; }
+                d = d.Parent;
+            }
+            if (jsonPath == null) { Assert.Ignore("klein-bottle.json not found in containing repo"); return; }
+
+            var c = PolyhedralComplex4dJson.FromJson(File.ReadAllText(jsonPath));
+            Assert.That(c.cells.Count, Is.EqualTo(0), "klein-bottle is a pure 2-complex");
+            var cam = new Camera4dParallel();
+            // Mirror ComplexFrame's free-floating-face path: wrap each face as a single-face CellRender3d.
+            var processed = new List<CellRender3d>();
+            for (int fId = 0; fId < c.faces.Count; fId++) {
+                var poly3d = new List<Point>();
+                foreach (var v in c.FaceVertices(fId)) poly3d.Add(cam.Proj3d(v));
+                processed.Add(new CellRender3d {
+                    sourceCellId = -1,
+                    faces = new List<List<Point>> { poly3d },
+                    faceIds = new List<int> { fId },
+                });
+            }
+            var edges = CellRender3dEdges.ExtractFromPolygonBoundaries(processed, c, cam);
+            int original = edges.Count(e => e.isOriginal);
+            int cut      = edges.Count(e => !e.isOriginal);
+            Assert.That(cut, Is.EqualTo(0), "no clipping happened ⇒ no cut edges expected");
+            Assert.That(original, Is.EqualTo(c.edges.Count),
+                $"every complex edge should produce one merged segment (got {original} originals for {c.edges.Count} edges)");
         }
     }
 }

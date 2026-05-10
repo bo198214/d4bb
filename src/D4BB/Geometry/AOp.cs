@@ -242,6 +242,27 @@ public class AOP {
 				a3d.x[2]*b3d.x[0]-a3d.x[0]*b3d.x[2],
 				a3d.x[0]*b3d.x[1]-a3d.x[1]*b3d.x[0]);
 	}
+
+	/// Squared distance between a and b. No sqrt, no allocation — use for threshold
+	/// comparisons against err*err instead of `a.clone().subtract(b).len() > err`.
+	public static double LenSquaredDiff(Point a, Point b) {
+		double sum = 0;
+		for (int i = 0; i < a.x.Length; i++) {
+			double d = a.x[i] - b.x[i];
+			sum += d * d;
+		}
+		return sum;
+	}
+
+	/// Cross product of (b-a) and (c-a), written into the 3D destination point. No
+	/// allocation — replaces `AOP.cross(b.clone().subtract(a), c.clone().subtract(a))`.
+	public static void CrossDiff(Point a, Point b, Point c, Point dst) {
+		double bx = b.x[0]-a.x[0], by = b.x[1]-a.x[1], bz = b.x[2]-a.x[2];
+		double cx = c.x[0]-a.x[0], cy = c.x[1]-a.x[1], cz = c.x[2]-a.x[2];
+		dst.x[0] = by*cz - bz*cy;
+		dst.x[1] = bz*cx - bx*cz;
+		dst.x[2] = bx*cy - by*cx;
+	}
 	
 	public static double[] Cross(double[][] vs) {
 		var n = vs.Length+1;

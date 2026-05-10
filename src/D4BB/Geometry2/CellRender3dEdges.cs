@@ -56,7 +56,8 @@ namespace D4BB.Geometry2 {
                 ICamera4d camera,
                 double eps = 1e-4) {
             var origEdges = ProjectComplexEdges(complex, camera);
-            ScanPolygonBoundaries(processedCells, complex, origEdges, eps,
+            var index = BuildEdgeIndex(complex, origEdges, eps);
+            ScanPolygonBoundaries(processedCells, complex, origEdges, index, eps,
                                   out var origByEdge, out var cuts);
 
             // Pass 2: deduplicate originals via per-edge t-interval union.
@@ -70,6 +71,45 @@ namespace D4BB.Geometry2 {
             result.AddRange(SubdivideCutEdgesByLineCoverage(cuts, eps));
             return result;
         }
+
+        /// Hash index built per-frame so polygon-boundary lookups can hit O(1) instead of
+        /// scanning all complex edges. `vertexHash` maps quantized 3D-projected vertex
+        /// positions to the source complex-vertex id; `edgeMap` maps unordered (vId0, vId1)
+        /// pairs to the complex-edge id.
+        ///
+        /// Only ungclipped polygon boundaries (= both endpoints are projected complex
+        /// vertices and connected by a complex edge) hit the fast path. Geometry that has
+        /// been split by CutOut still falls through to the linear PointOnSegment scan.
+        struct EdgeIndex {
+            public Dictionary<(long, long, long), int> vertexHash;
+            public Dictionary<(int, int), int> edgeMap;
+        }
+
+        static EdgeIndex BuildEdgeIndex(PolyhedralComplex4d complex,
+                List<(Point a, Point b, bool coplanar)> origEdges, double eps) {
+            var vertexHash = new Dictionary<(long, long, long), int>(complex.vertices.Count);
+            // Re-project once per vertex; origEdges contains projected endpoints but not the
+            // vertex-id mapping, so we walk vertices directly. The ProjectComplexEdges call
+            // and this loop both go through camera.Proj3d, so the resulting Point values are
+            // bit-identical for the same source vertex (deterministic float pipeline).
+            for (int eId = 0; eId < complex.edges.Count; eId++) {
+                var e = complex.edges[eId];
+                vertexHash[Quantize(origEdges[eId].a, eps)] = e.v0;
+                vertexHash[Quantize(origEdges[eId].b, eps)] = e.v1;
+            }
+            var edgeMap = new Dictionary<(int, int), int>(complex.edges.Count);
+            for (int eId = 0; eId < complex.edges.Count; eId++) {
+                var e = complex.edges[eId];
+                int lo = System.Math.Min(e.v0, e.v1), hi = System.Math.Max(e.v0, e.v1);
+                edgeMap[(lo, hi)] = eId;
+            }
+            return new EdgeIndex { vertexHash = vertexHash, edgeMap = edgeMap };
+        }
+
+        static (long, long, long) Quantize(Point p, double eps) =>
+            ((long)System.Math.Round(p.x[0] / eps),
+             (long)System.Math.Round(p.x[1] / eps),
+             (long)System.Math.Round(p.x[2] / eps));
 
         /// Pre-project every complex edge to 3D, with its `IsCoplanarEdge` flag.
         static List<(Point a, Point b, bool coplanar)> ProjectComplexEdges(
@@ -88,10 +128,17 @@ namespace D4BB.Geometry2 {
         /// Walk all polygon boundaries; bucket each segment as either an original-edge
         /// contribution (keyed by complex-edge id) or as a cut edge.
         /// Coplanar source faces are skipped at the polygon level.
+        ///
+        /// Lookup strategy: try the O(1) hash-based fast path first (both polygon-edge
+        /// endpoints are projected complex vertices and the pair is connected by a complex
+        /// edge). Fall back to the linear PointOnSegment scan only when the polygon edge is
+        /// a sub-segment introduced by CutOut (= at least one endpoint isn't a projected
+        /// complex vertex).
         static void ScanPolygonBoundaries(
                 IList<CellRender3d> processedCells,
                 PolyhedralComplex4d complex,
                 List<(Point a, Point b, bool coplanar)> origEdges,
+                EdgeIndex index,
                 double eps,
                 out Dictionary<int, List<(Point a, Point b)>> origByEdge,
                 out List<EdgeSegment3d> cuts) {
@@ -109,14 +156,7 @@ namespace D4BB.Geometry2 {
                         Point a = poly[i];
                         Point b = poly[(i + 1) % n];
                         if (a.clone().subtract(b).len() < eps) continue;
-                        int matchedEdgeId = -1;
-                        for (int eId = 0; eId < origEdges.Count; eId++) {
-                            var (p0, p1, _) = origEdges[eId];
-                            if (PointOnSegment(a, p0, p1, eps) && PointOnSegment(b, p0, p1, eps)) {
-                                matchedEdgeId = eId;
-                                break;
-                            }
-                        }
+                        int matchedEdgeId = LookupEdgeId(a, b, index, origEdges, eps);
                         if (matchedEdgeId >= 0) {
                             if (!origByEdge.TryGetValue(matchedEdgeId, out var list)) {
                                 list = new List<(Point, Point)>();
@@ -129,6 +169,29 @@ namespace D4BB.Geometry2 {
                     }
                 }
             }
+        }
+
+        /// Returns the complex-edge id whose 3D-projected segment carries both `a` and `b`,
+        /// or -1 if no such edge exists (= cut). Fast path uses the precomputed vertex/edge
+        /// hash; linear PointOnSegment fallback only when at least one endpoint isn't a
+        /// projected complex vertex (= sub-segment introduced by clipping).
+        static int LookupEdgeId(Point a, Point b, EdgeIndex index,
+                List<(Point a, Point b, bool coplanar)> origEdges, double eps) {
+            bool aIsVertex = index.vertexHash.TryGetValue(Quantize(a, eps), out int vIdA);
+            bool bIsVertex = index.vertexHash.TryGetValue(Quantize(b, eps), out int vIdB);
+            if (aIsVertex && bIsVertex) {
+                int lo = System.Math.Min(vIdA, vIdB), hi = System.Math.Max(vIdA, vIdB);
+                return index.edgeMap.TryGetValue((lo, hi), out int eId) ? eId : -1;
+            }
+            // Sub-segment from CutOut: at least one endpoint is interior to a complex edge.
+            // Fall back to a linear scan, but restrict candidates to edges incident on the
+            // one matching vertex (if any) to keep the worst case small.
+            for (int eId = 0; eId < origEdges.Count; eId++) {
+                var (p0, p1, _) = origEdges[eId];
+                if (PointOnSegment(a, p0, p1, eps) && PointOnSegment(b, p0, p1, eps))
+                    return eId;
+            }
+            return -1;
         }
 
         /// Compute the union of t-intervals along the line through p0..p1 from the polygon
