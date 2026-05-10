@@ -96,8 +96,23 @@ namespace D4BB.Geometry2 {
             var cellCentroid = Centroid3d();
             var outerKeep = new List<List<Point>>();
             var outerKeepIds = new List<int>();
-            var current = new List<List<Point>>(faces);
-            var currentIds = faceIds != null ? new List<int>(faceIds) : Enumerable.Repeat(-1, faces.Count).ToList();
+            // Pre-pass: faces that don't intersect the cutter polyhedron at all are kept
+            // unmodified. Without this, every face is iteratively split against every halfspace,
+            // producing spurious fragments along halfspace planes even when the face doesn't
+            // actually overlap the cutter (e.g. a face entirely beyond cutter's y=+0.5
+            // gets split at cutter's x=±0.5 anyway). Mirrors Polyhedron3dBoundaryComplex.CutOut.
+            var current = new List<List<Point>>();
+            var currentIds = new List<int>();
+            var origIds = faceIds != null ? faceIds : Enumerable.Repeat(-1, faces.Count).ToList();
+            for (int i = 0; i < faces.Count; i++) {
+                if (FaceIntersectsPolyhedron(faces[i], halfSpaces)) {
+                    current.Add(faces[i]);
+                    currentIds.Add(origIds[i]);
+                } else {
+                    outerKeep.Add(faces[i]);
+                    outerKeepIds.Add(origIds[i]);
+                }
+            }
             foreach (var hs in halfSpaces) {
                 if (current.Count == 0) break;
                 var nextCurrent = new List<List<Point>>(current.Count);
@@ -106,13 +121,21 @@ namespace D4BB.Geometry2 {
                     var face = current[idx];
                     int srcId = currentIds[idx];
                     if (FaceLiesEntirelyOnPlane(face, hs)) {
-                        // Coincident: route by orientation. The face lives on this plane —
-                        // further halfspaces can't occlude it, so we never re-add it to current.
-                        // co-oriented (face outward · hs.normal > 0) ⇒ face is on the cutter's
-                        // far side ⇒ occluded ⇒ drop. Counter-oriented ⇒ visible boundary ⇒ keep.
+                        // Coincident: route by orientation. Mirrors Polyhedron3dBoundaryComplex.Split.
+                        //   counter-oriented (face outward opposes hs.normal) ⇒ this is the
+                        //     visible boundary on this halfspace's outside ⇒ permanently kept.
+                        //   co-oriented ⇒ this face is "behind" this halfspace from the cutter's
+                        //     POV, so it's inside w.r.t. THIS halfspace. It still needs to clear
+                        //     the OTHER halfspaces to actually be inside the whole cutter, so we
+                        //     route it to nextCurrent for further evaluation. If it ends up
+                        //     inside ALL halfspaces, it gets discarded at the very end. If at
+                        //     some later halfspace it goes outer, that fragment is preserved.
                         if (!FaceOutwardCoOrientedWith(face, cellCentroid, hs.normal)) {
                             outerKeep.Add(face);
                             outerKeepIds.Add(srcId);
+                        } else {
+                            nextCurrent.Add(face);
+                            nextIds.Add(srcId);
                         }
                         continue;
                     }
@@ -129,6 +152,33 @@ namespace D4BB.Geometry2 {
             faces = outerKeep;
             faceIds = outerKeepIds;
             _centroidCache = null;
+        }
+
+        /// True iff the face polygon, clipped against every cutter halfspace in turn,
+        /// retains at least 3 vertices — i.e. has a non-trivial intersection with the
+        /// cutter's interior region. Used by CutOut as a pre-filter.
+        static bool FaceIntersectsPolyhedron(List<Point> face, HalfSpace[] halfSpaces) {
+            var pts = face;
+            foreach (var hs in halfSpaces) {
+                pts = ClipConvexPolygonInside(pts, hs);
+                if (pts.Count < 3) return false;
+            }
+            return true;
+        }
+
+        static List<Point> ClipConvexPolygonInside(List<Point> poly, HalfSpace hs) {
+            var result = new List<Point>(poly.Count + 1);
+            int n = poly.Count;
+            for (int i = 0; i < n; i++) {
+                var cur = poly[i];
+                var nxt = poly[(i + 1) % n];
+                int cs = hs.side(cur);
+                int ns = hs.side(nxt);
+                if (cs <= 0) result.Add(cur);
+                if ((cs < 0 && ns > 0) || (cs > 0 && ns < 0))
+                    result.Add(hs.cutPoint(cur, nxt));
+            }
+            return result;
         }
 
         static bool FaceLiesEntirelyOnPlane(List<Point> face, HalfSpace hs) {
