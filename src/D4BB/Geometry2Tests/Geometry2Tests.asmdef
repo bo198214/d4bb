@@ -1,0 +1,14 @@
+{
+    "name": "Geometry2Tests",
+    "references": [ "General", "Comb", "Geometry", "Geometry2" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}

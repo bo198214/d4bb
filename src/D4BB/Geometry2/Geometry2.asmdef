@@ -1,0 +1,9 @@
+{
+    "name": "Geometry2",
+    "rootNamespace": "D4BB.Geometry2",
+    "references": [
+        "Geometry",
+        "General",
+        "Comb"
+    ]
+}
