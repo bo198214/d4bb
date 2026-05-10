@@ -3,28 +3,23 @@ using System.Linq;
 using NUnit.Framework;
 using D4BB.Geometry;
 using D4BB.Geometry2;
-using Edge = D4BB.Geometry2.Edge;
 
 namespace D4BB.Geometry2Tests {
 
-    /// Tests for the two edge-extraction strategies introduced for handling clipped edges.
+    /// Tests for the FromPolygonBoundaries edge-extraction strategy.
     public class CellRender3dEdgesTests {
 
-        // ── variant 1 (FromPolygonBoundaries) ─────────────────────────────────
-
         [Test] public void FromPolygonBoundaries_UnitCubeUnclipped_AllOriginal() {
-            // A single uncut cube: every polygon-boundary edge coincides with an original
-            // complex edge (= classified as original, isOriginal=true).
+            // A single uncut cube: 12 unique edges. Each cube edge is shared between 2 faces,
+            // so the per-face boundary scan emits each edge twice; MergeOriginalSegments
+            // dedupes via per-edge interval union.
             var cube = Cube4dBuilder.UnitCubeAtW(0, cellNormal: new Point(0, 0, 0, 1));
             var cell3d = CellRender3d.FromFragment(CellFragment.FromCell(cube, 0), new Camera4dParallel());
             var processed = new List<CellRender3d> { cell3d };
             var edges = CellRender3dEdges.ExtractFromPolygonBoundaries(processed, cube, new Camera4dParallel());
-            Assert.That(edges, Is.Not.Empty);
-            Assert.That(edges.All(e => e.isOriginal), Is.True,
-                "every cube-boundary edge should be classified as original");
-            // 6 faces × 4 edges = 24 polygon-boundary edges (one per face per side; shared edges
-            // are listed twice, once per face). That's the natural output of a per-face boundary scan.
-            Assert.That(edges.Count, Is.EqualTo(24));
+            Assert.That(edges.All(e => e.isOriginal), Is.True);
+            Assert.That(edges.Count, Is.EqualTo(12),
+                "12 unique cube edges expected after dedup (would be 24 without)");
         }
 
         [Test] public void FromPolygonBoundaries_AfterClip_HasCutEdges() {
@@ -41,62 +36,6 @@ namespace D4BB.Geometry2Tests {
             int cut = edges.Count(e => !e.isOriginal);
             Assert.That(cut, Is.GreaterThan(0), "expected some cut edges along the clip plane");
             Assert.That(original, Is.GreaterThan(0), "expected the cube's surviving original edges to be classified original");
-        }
-
-        // ── variant 2 (DirectEdgeClipping) ────────────────────────────────────
-
-        [Test] public void ClipEdgesAgainstCells_FreeFloatingEdges_AllEmitted() {
-            // Complex with edges but no 3-cells: every non-coplanar edge is emitted intact
-            // (no cell halfspaces to clip against, and the visibility filter keeps free-
-            // floating edges).
-            var c = new PolyhedralComplex4d();
-            c.vertices.Add(new Point(0, 0, 0, 0));
-            c.vertices.Add(new Point(1, 0, 0, 0));
-            c.vertices.Add(new Point(0, 1, 0, 0));
-            c.edges.Add(new Edge(0, 1));
-            c.edges.Add(new Edge(1, 2));
-            c.edges.Add(new Edge(2, 0));
-            var visible = new List<CellRender3d>();
-            var edges = CellRender3dEdges.ClipEdgesAgainstCells(c, visible, new Camera4dParallel());
-            Assert.That(edges.Count, Is.EqualTo(3));
-            Assert.That(edges.All(e => e.isOriginal), Is.True);
-        }
-
-        [Test] public void ClipEdgesAgainstCells_OwnerCellDoesNotClipOwnEdges() {
-            // A single cube as both source and visible. None of the cube's own edges should be
-            // clipped (they're on the cube's boundary, not interior). All 12 edges survive.
-            var cube = Cube4dBuilder.UnitCubeAtW(0, cellNormal: new Point(0, 0, 0, 1));
-            var cell3d = CellRender3d.FromFragment(CellFragment.FromCell(cube, 0), new Camera4dParallel());
-            var visible = new List<CellRender3d> { cell3d };
-            var edges = CellRender3dEdges.ClipEdgesAgainstCells(cube, visible, new Camera4dParallel());
-            Assert.That(edges.Count, Is.EqualTo(12),
-                "owner-cell halfspaces are skipped ⇒ all 12 cube edges survive intact");
-            Assert.That(edges.All(e => e.isOriginal), Is.True);
-        }
-
-        // ── coplanar classification ───────────────────────────────────────────
-
-        /// Two adjacent cubes at w=0 (sharing an x=1 boundary face) form a slab. The shared
-        /// 2-face is coplanar-embedded (both cells in same w=0 hyperplane). Edges on that
-        /// shared face are coplanar-embedded too.
-        ///
-        /// IntegerComplex4dBuilder.Boundary gives us a real such complex. We verify that
-        /// ClipEdgesAgainstCells flags coplanar edges via isCoplanar.
-        [Test] public void ClipEdgesAgainstCells_FlagsCoplanarSourceEdges() {
-            var c = IntegerComplex4dBuilder.Boundary(new[] {
-                new D4BB.Comb.IntegerCell(new[] { 0, 0, 0, 0 }),
-                new D4BB.Comb.IntegerCell(new[] { 1, 0, 0, 0 }),
-            });
-            // Run all cells visible.
-            var cam = new Camera4dParallel();
-            var visible = new List<CellRender3d>();
-            for (int i = 0; i < c.cells.Count; i++)
-                visible.Add(CellRender3d.FromFragment(CellFragment.FromCell(c, i), cam));
-            var edges = CellRender3dEdges.ClipEdgesAgainstCells(c, visible, cam);
-            int coplanar = edges.Count(e => e.isCoplanar);
-            int nonCoplanar = edges.Count(e => !e.isCoplanar);
-            Assert.That(coplanar,    Is.GreaterThan(0), "two-cube slab has internal coplanar edges that should be flagged");
-            Assert.That(nonCoplanar, Is.GreaterThan(0), "two-cube slab also has silhouette/ridge edges that aren't coplanar");
         }
 
         // ── cut-edge sharing under partial overlap ────────────────────────────

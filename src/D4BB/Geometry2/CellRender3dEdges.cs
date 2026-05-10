@@ -29,19 +29,16 @@ namespace D4BB.Geometry2 {
         }
     }
 
-    /// Two strategies for producing the edge mesh in the rendering pipeline.
+    /// Strategies for producing the edge mesh in the rendering pipeline.
     public enum EdgeClippingMode {
         /// No clipping at all — edges drawn from original (rotated) vertex positions, full length.
-        /// Edges that should be occluded by nearer cells punch through visually.
+        /// Edges that should be occluded by nearer cells punch through visually. Debug-only.
         Unclipped,
-        /// Variant 1 — extract every polygon's boundary as edges, after CutOut. The polygons
-        /// are already HSR-correct (clipped); their boundary edges naturally trace the visible
+        /// Extract every polygon's boundary as edges, after BSP+CutOut. The polygons are
+        /// already HSR-correct (clipped); their boundary edges naturally trace the visible
         /// surface. Some boundary edges are cuts introduced by clipping (no original-edge ID).
+        /// Correctness piggy-backs on the face pipeline — no independent depth ordering needed.
         FromPolygonBoundaries,
-        /// Variant 2 — clip each original complex edge directly against the visible cells'
-        /// halfspaces (excluding cells that own the edge). Produces 0..N sub-segments per
-        /// original edge; all sub-segments are "original" in the classification sense.
-        DirectEdgeClipping,
     }
 
     /// Helpers used by the rendering pipeline to derive edges from already-clipped face
@@ -68,19 +65,48 @@ namespace D4BB.Geometry2 {
                 PolyhedralComplex4d complex,
                 ICamera4d camera,
                 double eps = 1e-4) {
-            // Pre-project every complex edge to 3D, with coplanar flag.
-            var origEdges = new List<(Point a, Point b, bool coplanar)>();
+            var origEdges = ProjectComplexEdges(complex, camera);
+            ScanPolygonBoundaries(processedCells, complex, origEdges, eps,
+                                  out var origByEdge, out var cuts);
+
+            // Pass 2: deduplicate originals via per-edge t-interval union.
+            var result = new List<EdgeSegment3d>();
+            foreach (var kv in origByEdge) {
+                int eId = kv.Key;
+                var (p0, p1, coplanar) = origEdges[eId];
+                MergeOriginalSegments(p0, p1, kv.Value, coplanar, eps, result);
+            }
+            // Pass 3: subdivide cut edges by line coverage.
+            result.AddRange(SubdivideCutEdgesByLineCoverage(cuts, eps));
+            return result;
+        }
+
+        /// Pre-project every complex edge to 3D, with its `IsCoplanarEdge` flag.
+        static List<(Point a, Point b, bool coplanar)> ProjectComplexEdges(
+                PolyhedralComplex4d complex, ICamera4d camera) {
+            var result = new List<(Point a, Point b, bool coplanar)>(complex.edges.Count);
             for (int eId = 0; eId < complex.edges.Count; eId++) {
                 var e = complex.edges[eId];
-                origEdges.Add((
+                result.Add((
                     camera.Proj3d(complex.vertices[e.v0]),
                     camera.Proj3d(complex.vertices[e.v1]),
                     complex.IsCoplanarEdge(eId)));
             }
+            return result;
+        }
 
-            // Pass 1: extract all polygon-boundary edges, classify originals (with isCoplanar
-            // from IsCoplanarEdge); leave cuts with isCoplanar=false provisionally.
-            var result = new List<EdgeSegment3d>();
+        /// Walk all polygon boundaries; bucket each segment as either an original-edge
+        /// contribution (keyed by complex-edge id) or as a cut edge.
+        /// Coplanar source faces are skipped at the polygon level.
+        static void ScanPolygonBoundaries(
+                IList<CellRender3d> processedCells,
+                PolyhedralComplex4d complex,
+                List<(Point a, Point b, bool coplanar)> origEdges,
+                double eps,
+                out Dictionary<int, List<(Point a, Point b)>> origByEdge,
+                out List<EdgeSegment3d> cuts) {
+            origByEdge = new Dictionary<int, List<(Point, Point)>>();
+            cuts = new List<EdgeSegment3d>();
             foreach (var cell in processedCells) {
                 for (int p = 0; p < cell.faces.Count; p++) {
                     var poly = cell.faces[p];
@@ -93,31 +119,61 @@ namespace D4BB.Geometry2 {
                         Point a = poly[i];
                         Point b = poly[(i + 1) % n];
                         if (a.clone().subtract(b).len() < eps) continue;
-                        bool isOriginal = false;
-                        bool isCoplanar = false;
-                        foreach (var (p0, p1, coplanar) in origEdges) {
+                        int matchedEdgeId = -1;
+                        for (int eId = 0; eId < origEdges.Count; eId++) {
+                            var (p0, p1, _) = origEdges[eId];
                             if (PointOnSegment(a, p0, p1, eps) && PointOnSegment(b, p0, p1, eps)) {
-                                isOriginal = true;
-                                isCoplanar = coplanar;
+                                matchedEdgeId = eId;
                                 break;
                             }
                         }
-                        result.Add(new EdgeSegment3d(a, b, isOriginal, isCoplanar));
+                        if (matchedEdgeId >= 0) {
+                            if (!origByEdge.TryGetValue(matchedEdgeId, out var list)) {
+                                list = new List<(Point, Point)>();
+                                origByEdge[matchedEdgeId] = list;
+                            }
+                            list.Add((a, b));
+                        } else {
+                            cuts.Add(new EdgeSegment3d(a, b, isOriginal: false, isCoplanar: false));
+                        }
                     }
                 }
             }
+        }
 
-            // Pass 2: cut edges that appear (even partially) on the same line as another
-            // surviving polygon's boundary are coplanar-embedded over their overlap. Group
-            // cuts by line; within each group, subdivide along sweep-line t parameters and
-            // mark sub-intervals with coverage ≥ 2 as coplanar.
-            var origs   = result.Where(e =>  e.isOriginal).ToList();
-            var cuts    = result.Where(e => !e.isOriginal).ToList();
-            var refined = SubdivideCutEdgesByLineCoverage(cuts, eps);
-            result.Clear();
-            result.AddRange(origs);
-            result.AddRange(refined);
-            return result;
+        /// Compute the union of t-intervals along the line through p0..p1 from the polygon
+        /// contributions, output merged segments inheriting `coplanar`.
+        static void MergeOriginalSegments(Point p0, Point p1,
+                List<(Point a, Point b)> segments, bool coplanar, double eps,
+                List<EdgeSegment3d> output) {
+            var dir = p1.clone().subtract(p0);
+            double len = dir.len();
+            if (len < eps) return;
+            dir.multiply(1.0 / len);
+            var intervals = new List<(double lo, double hi)>(segments.Count);
+            foreach (var (a, b) in segments) {
+                double ta = dir.sc(a.clone().subtract(p0));
+                double tb = dir.sc(b.clone().subtract(p0));
+                if (ta > tb) (ta, tb) = (tb, ta);
+                intervals.Add((ta, tb));
+            }
+            intervals.Sort((x, y) => x.lo.CompareTo(y.lo));
+            // Merge overlapping/touching intervals.
+            var merged = new List<(double lo, double hi)>();
+            foreach (var iv in intervals) {
+                if (merged.Count > 0 && iv.lo <= merged[merged.Count - 1].hi + eps) {
+                    var last = merged[merged.Count - 1];
+                    merged[merged.Count - 1] = (last.lo, System.Math.Max(last.hi, iv.hi));
+                } else {
+                    merged.Add(iv);
+                }
+            }
+            foreach (var (lo, hi) in merged) {
+                if (hi - lo < eps) continue;
+                var a = p0.clone().add(dir.clone().multiply(lo));
+                var b = p0.clone().add(dir.clone().multiply(hi));
+                output.Add(new EdgeSegment3d(a, b, isOriginal: true, isCoplanar: coplanar));
+            }
         }
 
         /// Sweep-line subdivision of cut edges along their shared lines. For every group of
@@ -215,105 +271,6 @@ namespace D4BB.Geometry2 {
             key = new LineKey(Q(refPt.x[0]), Q(refPt.x[1]), Q(refPt.x[2]),
                               Q(dir.x[0]),    Q(dir.x[1]),    Q(dir.x[2]));
             return true;
-        }
-
-        /// Variant 2: each visible edge is clipped against the halfspaces of every visible
-        /// cell (except cells that own the edge). Produces 0..N sub-segments per source edge,
-        /// all `isOriginal=true`; `isCoplanar` is inherited from the source edge's
-        /// `IsCoplanarEdge` flag.
-        public static List<EdgeSegment3d> ClipEdgesAgainstCells(
-                PolyhedralComplex4d complex,
-                IList<CellRender3d> visibleCells,
-                ICamera4d camera) {
-            var visibleCellIds = new HashSet<int>();
-            var halfspacesByCell = new Dictionary<int, HalfSpace[]>();
-            foreach (var cell in visibleCells) {
-                if (cell.sourceCellId < 0) continue;
-                if (halfspacesByCell.ContainsKey(cell.sourceCellId)) continue;
-                visibleCellIds.Add(cell.sourceCellId);
-                halfspacesByCell[cell.sourceCellId] = cell.DefiningHalfSpaces();
-            }
-
-            var result = new List<EdgeSegment3d>();
-            // Iterate ALL edges (including coplanar) so the renderer can apply its own toggle.
-            for (int eId = 0; eId < complex.edges.Count; eId++) {
-                if (!IsEdgeVisible(complex, eId, visibleCellIds)) continue;
-                var edge = complex.edges[eId];
-                bool coplanar = complex.IsCoplanarEdge(eId);
-                Point a = camera.Proj3d(complex.vertices[edge.v0]);
-                Point b = camera.Proj3d(complex.vertices[edge.v1]);
-
-                var owners = new HashSet<int>();
-                foreach (int fId in complex.FacesPerEdge(eId))
-                    foreach (int cId in complex.CellsPerFace(fId)) owners.Add(cId);
-
-                var intervals = new List<(double lo, double hi)> { (0.0, 1.0) };
-                foreach (var kv in halfspacesByCell) {
-                    if (owners.Contains(kv.Key)) continue;
-                    intervals = ClipIntervalsAgainstCell(intervals, a, b, kv.Value);
-                    if (intervals.Count == 0) break;
-                }
-                foreach (var (lo, hi) in intervals) {
-                    if (hi - lo < 1e-9) continue;
-                    var segA = a.clone().multiply(1 - lo).add(b.clone().multiply(lo));
-                    var segB = a.clone().multiply(1 - hi).add(b.clone().multiply(hi));
-                    result.Add(new EdgeSegment3d(segA, segB, isOriginal: true, isCoplanar: coplanar));
-                }
-            }
-            return result;
-        }
-
-        /// Edge is visible iff it has no incident 3-cell (free-floating) OR at least one
-        /// incident cell is in `visibleCellIds`. Same predicate as
-        /// PolyhedralComplex4d.VisibleNonCoplanarEdgeIds, but here we ignore the coplanar
-        /// flag — the renderer decides whether to display coplanar edges.
-        static bool IsEdgeVisible(PolyhedralComplex4d complex, int eId, HashSet<int> visibleCellIds) {
-            bool hasIncidentCell = false;
-            foreach (int fId in complex.FacesPerEdge(eId)) {
-                foreach (int cId in complex.CellsPerFace(fId)) {
-                    hasIncidentCell = true;
-                    if (visibleCellIds.Contains(cId)) return true;
-                }
-            }
-            return !hasIncidentCell;
-        }
-
-        /// For each interval [lo, hi] on the segment a→b, find the sub-range of t inside the
-        /// cell defined by `cellHs` (= side ≤ 0 for ALL halfspaces) and return the COMPLEMENT
-        /// (= the parts of the interval that survive the clip).
-        static List<(double lo, double hi)> ClipIntervalsAgainstCell(
-                List<(double lo, double hi)> intervals, Point a, Point b, HalfSpace[] cellHs) {
-            var result = new List<(double, double)>();
-            // Compute the cell-interior t-range once (it depends only on a, b, cellHs).
-            double tInLo = 0.0, tInHi = 1.0;
-            bool empty = false;
-            foreach (var h in cellHs) {
-                double sa = h.normal.sc(a.clone().subtract(h.origin()));
-                double diff = h.normal.sc(b.clone().subtract(a));
-                if (System.Math.Abs(diff) < AOP.ERR) {
-                    if (sa > AOP.ERR) { empty = true; break; }
-                    // else: no constraint
-                } else {
-                    double tCut = -sa / diff;
-                    if (diff > 0) tInHi = System.Math.Min(tInHi, tCut);
-                    else          tInLo = System.Math.Max(tInLo, tCut);
-                }
-            }
-            if (empty || tInLo >= tInHi) {
-                // Segment doesn't enter the cell → keep all intervals unchanged.
-                return new List<(double, double)>(intervals);
-            }
-            foreach (var (lo, hi) in intervals) {
-                double subLo = System.Math.Max(lo, tInLo);
-                double subHi = System.Math.Min(hi, tInHi);
-                if (subLo >= subHi) {
-                    result.Add((lo, hi));  // no overlap with cell interior
-                } else {
-                    if (lo < subLo) result.Add((lo, subLo));
-                    if (subHi < hi) result.Add((subHi, hi));
-                }
-            }
-            return result;
         }
 
         /// True iff `p` lies on the segment between `a` and `b` within `eps`.

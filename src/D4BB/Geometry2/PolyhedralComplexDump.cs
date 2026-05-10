@@ -13,7 +13,9 @@ namespace D4BB.Geometry2 {
     /// three additional top-level keys:
     ///   "camera": { "type": "Camera4dParallel", "eye": [x,y,z,w], "wDir": [x,y,z] }
     ///   "angles": [angle1, angle2]    — XY/ZW rotation angles for documentation only
-    ///   "flags":  { "useBsp": bool, "applyCutOut": bool, "backfaceCulling": bool, "edgesVisible": bool }
+    ///   "flags":  { "useBsp": bool, "applyCutOut": bool, "backfaceCulling": bool,
+    ///               "edgesVisible": bool, "edgeMode": string,
+    ///               "showCoplanarOriginalEdges": bool, "debugShowCoplanarCutEdges": bool }
     public class PolyhedralComplexDump {
         public PolyhedralComplex4d complex;
         public Camera4dParallel camera;
@@ -23,6 +25,9 @@ namespace D4BB.Geometry2 {
         public bool applyCutOut;
         public bool backfaceCulling;
         public bool edgesVisible;
+        public EdgeClippingMode edgeMode;
+        public bool showCoplanarOriginalEdges;
+        public bool debugShowCoplanarCutEdges;
     }
 
     public static class PolyhedralComplexDumpJson {
@@ -46,10 +51,13 @@ namespace D4BB.Geometry2 {
             }
 
             if (json.TryGetValue("flags", out var flagsObj) && flagsObj is Dictionary<string, object> flags) {
-                dump.useBsp          = ReadBool(flags, "useBsp");
-                dump.applyCutOut     = ReadBool(flags, "applyCutOut");
-                dump.backfaceCulling = ReadBool(flags, "backfaceCulling", defaultValue: true);
-                dump.edgesVisible    = ReadBool(flags, "edgesVisible",    defaultValue: true);
+                dump.useBsp                     = ReadBool(flags, "useBsp");
+                dump.applyCutOut                = ReadBool(flags, "applyCutOut");
+                dump.backfaceCulling            = ReadBool(flags, "backfaceCulling", defaultValue: true);
+                dump.edgesVisible               = ReadBool(flags, "edgesVisible",    defaultValue: true);
+                dump.edgeMode                   = ReadEdgeMode(flags, "edgeMode");
+                dump.showCoplanarOriginalEdges  = ReadBool(flags, "showCoplanarOriginalEdges");
+                dump.debugShowCoplanarCutEdges  = ReadBool(flags, "debugShowCoplanarCutEdges");
             }
 
             return dump;
@@ -64,6 +72,12 @@ namespace D4BB.Geometry2 {
         static Point3d ReadPoint3(Dictionary<string, object> obj, string key) {
             if (!obj.TryGetValue(key, out var v) || !(v is List<object> arr) || arr.Count != 3) return null;
             return new Point3d(ToDouble(arr[0]), ToDouble(arr[1]), ToDouble(arr[2]));
+        }
+
+        static EdgeClippingMode ReadEdgeMode(Dictionary<string, object> obj, string key) {
+            if (!obj.TryGetValue(key, out var v) || !(v is string s)) return EdgeClippingMode.Unclipped;
+            if (System.Enum.TryParse<EdgeClippingMode>(s, ignoreCase: true, out var mode)) return mode;
+            return EdgeClippingMode.Unclipped;
         }
 
         static bool ReadBool(Dictionary<string, object> obj, string key, bool defaultValue = false) {
