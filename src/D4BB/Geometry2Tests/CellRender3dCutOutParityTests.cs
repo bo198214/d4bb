@@ -71,6 +71,78 @@ namespace D4BB.Geometry2Tests {
         /// specific count (the original test uses a Does.Not.Contains check with specific
         /// polygons). We verify the cube isn't entirely emptied and at least the far-corner
         /// face (x=1) survives unchanged.
+        // ── parity with PreSplittedCut3d (Face2dBCTests) ──────────────────────
+        // Cube cut by single halfspace at x=0.5: PBC says 5 facets after CutOut.
+        [Test] public void PreSplittedCut3d_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            // The x=0.5 plane with normal (1,0,0): "inside" = x < 0.5 half (per HalfSpace ctor).
+            var hs = new HalfSpace(0.5, new Point(1, 0, 0).normalize());
+            src.CutOut(new[] { hs });
+            Assert.That(src.faces.Count, Is.EqualTo(5));
+        }
+
+        // ── parity with DiagSplittedCube (Face2dBCTests) ──────────────────────
+        // Cube cut by oblique halfspaces. Same geometry, same CutOut, same face counts.
+        [Test] public void DiagSplittedCube_Hs1Alone_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs1 = new HalfSpace(new Point(0.6, 0.5, 0), new Point(1, 1, 0).normalize());
+            src.CutOut(new[] { hs1 });
+            Assert.That(src.faces.Count, Is.EqualTo(4));
+        }
+
+        [Test] public void DiagSplittedCube_Hs2Alone_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs2 = new HalfSpace(new Point(0.5, 0.5, 0), new Point(-1, 1, 0).normalize());
+            src.CutOut(new[] { hs2 });
+            Assert.That(src.faces.Count, Is.EqualTo(4));
+        }
+
+        [Test] public void DiagSplittedCube_BothHs_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs1 = new HalfSpace(new Point(0.6, 0.5, 0), new Point(1, 1, 0).normalize());
+            var hs2 = new HalfSpace(new Point(0.5, 0.5, 0), new Point(-1, 1, 0).normalize());
+            src.CutOut(new[] { hs1, hs2 });
+            Assert.That(src.faces.Count, Is.EqualTo(7));
+        }
+
+        // ── parity with CutOutGroove (Face2dBCTests) ──────────────────────────
+        // Groove-shape cuts produced by V-pair of oblique halfspaces; offset variants change count.
+        [Test] public void CutOutGroove_Centered_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs1 = new HalfSpace(new Point(0.5, 0.5, 0), new Point(1, 1, 0).normalize());
+            var hs2 = new HalfSpace(new Point(0.5, 0.5, 0), new Point(-1, 1, 0).normalize());
+            src.CutOut(new[] { hs1, hs2 });
+            Assert.That(src.faces.Count, Is.EqualTo(7));
+        }
+
+        [Test] public void CutOutGroove_OffsetPositive_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs1 = new HalfSpace(new Point(0.6, 0.5, 0), new Point(1, 1, 0).normalize());
+            var hs2 = new HalfSpace(new Point(0.5, 0.5, 0), new Point(-1, 1, 0).normalize());
+            src.CutOut(new[] { hs1, hs2 });
+            Assert.That(src.faces.Count, Is.EqualTo(7));
+        }
+
+        [Test] public void CutOutGroove_OffsetNegative_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs1 = new HalfSpace(new Point(0.4, 0.5, 0), new Point(1, 1, 0).normalize());
+            var hs2 = new HalfSpace(new Point(0.5, 0.5, 0), new Point(-1, 1, 0).normalize());
+            src.CutOut(new[] { hs1, hs2 });
+            Assert.That(src.faces.Count, Is.EqualTo(8));
+        }
+
+        // ── parity with HellyNoCut (Face2dBCTests) ────────────────────────────
+        // Helly case: every halfspace individually intersects the cube, but the intersection
+        // of all three is empty inside the cube — so nothing should be removed (6 facets).
+        [Test] public void HellyNoCut_Parity() {
+            var src = UnitCube(new Point(0, 0, 0), 1.0);
+            var hs1 = new HalfSpace(new Point(0.6, 0, 0), new Point(-1, 0, 0));
+            var hs2 = new HalfSpace(new Point(0, 0, 0.6), new Point(0, 0, -1));
+            var hs3 = new HalfSpace(new Point(0.2, 0, 0.2), new Point(1, 0, 1).normalize());
+            src.CutOut(new[] { hs1, hs2, hs3 });
+            Assert.That(src.faces.Count, Is.EqualTo(6));
+        }
+
         [Test] public void CutOutTest_Corner_Parity() {
             var src = UnitCube(new Point(0, 0, 0), 1.0);
             var cutter = UnitCube(new Point(-0.5, -0.5, -0.5), 1.0);
