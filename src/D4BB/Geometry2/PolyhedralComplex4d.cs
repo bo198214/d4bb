@@ -52,6 +52,10 @@ namespace D4BB.Geometry2 {
         public readonly List<Edge> edges;
         public readonly List<Face> faces;
         public readonly List<Cell> cells;
+        /// 2-face indices the user wants visually marked. Renderer pulls these out as a
+        /// separate always-on-top pass with a distinct material — useful to verify whether
+        /// a face that the BSP/CutOut pipeline removes was a genuine occlusion or a bug.
+        public readonly HashSet<int> markedFaces = new HashSet<int>();
 
         // Lazy caches
         Plane2in4[] _facePlanes;

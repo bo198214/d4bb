@@ -20,6 +20,7 @@ namespace D4BB.Geometry2 {
     ///     "cells":       [[v0,v1,...], ...]              vertex indices per cell (sorted, redundant — derived from cell_faces)
     ///     "cell_faces":  [[f0,f1,...], ...]              face indices per cell
     ///     "normals":     [[nx,ny,nz,nw] | null, ...]     outward 4D normal per cell, or null (optional whole field)
+    ///     "marked_faces":[i, j, ...]                     2-face indices to highlight (optional)
     ///   }
     public static class PolyhedralComplex4dJson {
 
@@ -75,6 +76,11 @@ namespace D4BB.Geometry2 {
                     else WritePoint(sb, n);
                 }
                 sb.Append("\n  ]");
+            }
+
+            if (complex.markedFaces.Count > 0) {
+                sb.Append(",\n  \"marked_faces\": ");
+                WriteIntArray(sb, complex.markedFaces.OrderBy(i => i).ToArray());
             }
 
             sb.Append("\n}\n");
@@ -150,7 +156,11 @@ namespace D4BB.Geometry2 {
                 cells.Add(new Cell(fIds, normal));
             }
 
-            return new PolyhedralComplex4d(vertices, edges, faces, cells);
+            var complex = new PolyhedralComplex4d(vertices, edges, faces, cells);
+            if (json.TryGetValue("marked_faces", out var mfObj) && mfObj is List<object> mf) {
+                foreach (var x in mf) complex.markedFaces.Add(ToInt(x));
+            }
+            return complex;
         }
 
         // ── face cycle reconstruction (reader) ─────────────────────────────────

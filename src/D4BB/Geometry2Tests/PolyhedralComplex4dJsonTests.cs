@@ -137,5 +137,24 @@ namespace D4BB.Geometry2Tests {
             Assert.That(visible.Count, Is.GreaterThan(0));
             Assert.That(visible.Count, Is.LessThanOrEqualTo(5));
         }
+
+        [Test] public void MarkedFaces_RoundTrip() {
+            var c = Cube4dBuilder.UnitCubeAtW(0, cellNormal: new Point(0, 0, 0, 1));
+            c.markedFaces.Add(2);
+            c.markedFaces.Add(5);
+            var json = PolyhedralComplex4dJson.ToJson(c, name: "cube");
+            Assert.That(json, Does.Contain("\"marked_faces\""));
+            var c2 = PolyhedralComplex4dJson.FromJson(json);
+            Assert.That(c2.markedFaces, Is.EquivalentTo(new[] { 2, 5 }));
+        }
+
+        [Test] public void MarkedFaces_AbsentField_DefaultsEmpty() {
+            // Round-tripping a complex with no marks must not introduce the field.
+            var c = Cube4dBuilder.UnitCubeAtW(0, cellNormal: new Point(0, 0, 0, 1));
+            var json = PolyhedralComplex4dJson.ToJson(c, name: "cube");
+            Assert.That(json, Does.Not.Contain("marked_faces"));
+            var c2 = PolyhedralComplex4dJson.FromJson(json);
+            Assert.That(c2.markedFaces, Is.Empty);
+        }
     }
 }
