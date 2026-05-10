@@ -73,6 +73,36 @@ namespace D4BB.Geometry2Tests {
             Assert.That(v2, Is.EquivalentTo(v1));
         }
 
+        [Test, TestCase("tes.json"), TestCase("hap.json"), TestCase("rico.json"),
+                       TestCase("tip.json"), TestCase("tappy.json"), TestCase("dappat.json")]
+        public void NonTriangleFaceFile_LoadsViaCycleReconstruction(string fileName) {
+            // These files store face vertices as sorted sets, not cyclic orderings.
+            // The parser must reconstruct cyclic order from the edge graph; otherwise
+            // squares like [1,3,5,12] would map to non-existent edges (3,5)/(12,1).
+            var assemblyDir = Path.GetDirectoryName(typeof(PolyhedralComplex4dJsonTests).Assembly.Location);
+            var d = new DirectoryInfo(assemblyDir);
+            string path = null;
+            while (d != null) {
+                var p = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", fileName);
+                if (File.Exists(p)) { path = p; break; }
+                d = d.Parent;
+            }
+            if (path == null) { Assert.Ignore($"{fileName} not found"); return; }
+
+            var c = PolyhedralComplex4dJson.FromJson(File.ReadAllText(path));
+            Assert.That(c.cells.Count, Is.GreaterThan(0));
+            // Each face's edgeIds must form a closed cycle of valid edges (already enforced
+            // during parse — this just asserts shape sanity).
+            for (int f = 0; f < c.faces.Count; f++) {
+                var face = c.faces[f];
+                Assert.That(face.edgeIds.Length, Is.GreaterThanOrEqualTo(3),
+                    $"{fileName}: face {f} has only {face.edgeIds.Length} edges");
+                // FaceVertexIds traverses the cycle and asserts adjacent edges share a vertex.
+                var vIds = c.FaceVertexIds(f);
+                Assert.That(vIds.Length, Is.EqualTo(face.edgeIds.Length));
+            }
+        }
+
         [Test] public void ExistingPenJson_LoadsAndExercisesBsp() {
             // Locate Assets/tesserian/Resources/polychora/pen.json relative to the repo root.
             // Walk up from the test assembly to find a directory containing "Assets/tesserian".

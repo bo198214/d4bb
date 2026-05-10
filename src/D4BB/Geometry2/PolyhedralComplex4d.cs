@@ -219,6 +219,29 @@ namespace D4BB.Geometry2 {
                 if (!IsCoplanarEdge(i)) yield return i;
         }
 
+        /// Non-coplanar edges that should be rendered given a set of currently-visible
+        /// (front-facing) cell ids. An edge is rendered iff
+        ///   (a) it is free-floating — not contained in any 3-cell — OR
+        ///   (b) at least one of its incident 3-cells is in <paramref name="visibleCellIds"/>.
+        ///
+        /// Without this filter, edges that border only back-facing cells still get drawn and
+        /// project into the interior of front-facing cells' 3D shadows, producing a confusing
+        /// criss-cross pattern (visible through the translucent face material).
+        public IEnumerable<int> VisibleNonCoplanarEdgeIds(HashSet<int> visibleCellIds) {
+            foreach (int eId in NonCoplanarEdgeIds()) {
+                bool hasIncidentCell = false;
+                bool hasVisibleIncidentCell = false;
+                foreach (int fId in FacesPerEdge(eId)) {
+                    foreach (int cId in CellsPerFace(fId)) {
+                        hasIncidentCell = true;
+                        if (visibleCellIds.Contains(cId)) { hasVisibleIncidentCell = true; break; }
+                    }
+                    if (hasVisibleIncidentCell) break;
+                }
+                if (!hasIncidentCell || hasVisibleIncidentCell) yield return eId;
+            }
+        }
+
         // ── invalidate caches (call after mutating the lists in place) ─────────
 
         public void InvalidateCaches() {

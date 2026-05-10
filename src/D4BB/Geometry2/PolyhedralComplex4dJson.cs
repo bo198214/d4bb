@@ -110,14 +110,24 @@ namespace D4BB.Geometry2 {
                 var arr = (List<object>)f;
                 int n = arr.Count;
                 if (n < 3) throw new FormatException($"Face must have at least 3 vertices, got {n}");
-                var faceEdgeIds = new int[n];
-                for (int k = 0; k < n; k++) {
-                    int a = ToInt(arr[k]);
-                    int b = ToInt(arr[(k + 1) % n]);
-                    int lo = Math.Min(a, b), hi = Math.Max(a, b);
-                    if (!edgeMap.TryGetValue((lo, hi), out int eId))
-                        throw new FormatException($"Face references edge ({a},{b}) not present in 'edges'");
-                    faceEdgeIds[k] = eId;
+                var verts = new int[n];
+                for (int k = 0; k < n; k++) verts[k] = ToInt(arr[k]);
+                // Many existing JSON files store face vertices as a SORTED SET rather than as
+                // a cyclic ordering around the polygon. For triangles every permutation is a
+                // valid cycle (every pair shares an edge), but for ≥ 4-gons the sorted form
+                // typically references non-existent diagonals. Try the as-given order first;
+                // if that fails, reconstruct the cycle from the edge graph restricted to the
+                // vertex set (each polygon vertex has exactly 2 neighbors → unique cycle up
+                // to direction, which is fine for our consumers).
+                if (!TryBuildFaceEdgeIds(verts, edgeMap, out var faceEdgeIds)) {
+                    var reordered = ReconstructPolygonCycle(verts, edgeMap)
+                        ?? throw new FormatException(
+                            $"Face vertices {string.Join(",", verts)} cannot be ordered as a polygon: " +
+                            "neither the given order nor any reconstruction matches edges in 'edges'");
+                    if (!TryBuildFaceEdgeIds(reordered, edgeMap, out faceEdgeIds))
+                        throw new FormatException(
+                            $"Face vertices {string.Join(",", verts)} reordered to {string.Join(",", reordered)} " +
+                            "but edge lookup still fails");
                 }
                 faces.Add(new Face(faceEdgeIds));
             }
@@ -141,6 +151,51 @@ namespace D4BB.Geometry2 {
             }
 
             return new PolyhedralComplex4d(vertices, edges, faces, cells);
+        }
+
+        // ── face cycle reconstruction (reader) ─────────────────────────────────
+
+        static bool TryBuildFaceEdgeIds(int[] verts, Dictionary<(int,int), int> edgeMap, out int[] faceEdgeIds) {
+            int n = verts.Length;
+            faceEdgeIds = new int[n];
+            for (int k = 0; k < n; k++) {
+                int a = verts[k], b = verts[(k + 1) % n];
+                int lo = Math.Min(a, b), hi = Math.Max(a, b);
+                if (!edgeMap.TryGetValue((lo, hi), out int eId)) { faceEdgeIds = null; return false; }
+                faceEdgeIds[k] = eId;
+            }
+            return true;
+        }
+
+        /// Given a polygon's vertex set (in arbitrary order) and the global edge map,
+        /// reconstruct a cyclic ordering whose consecutive pairs are all edges. Returns
+        /// null if the induced subgraph on `verts` is not a single cycle (every vertex must
+        /// have exactly 2 neighbors within the set). The recovered direction is arbitrary
+        /// — for our consumers (renderer doesn't depend on outward orientation, face plane
+        /// is direction-independent) this is acceptable.
+        static int[] ReconstructPolygonCycle(int[] verts, Dictionary<(int,int), int> edgeMap) {
+            int n = verts.Length;
+            var nbrs = new Dictionary<int, List<int>>(n);
+            foreach (var v in verts) nbrs[v] = new List<int>(2);
+            for (int i = 0; i < n; i++)
+                for (int j = i + 1; j < n; j++) {
+                    int a = verts[i], b = verts[j];
+                    int lo = Math.Min(a, b), hi = Math.Max(a, b);
+                    if (edgeMap.ContainsKey((lo, hi))) { nbrs[a].Add(b); nbrs[b].Add(a); }
+                }
+            foreach (var kv in nbrs) if (kv.Value.Count != 2) return null;
+            var ordered = new int[n];
+            int start = verts[0];
+            int prev = -1, cur = start;
+            for (int i = 0; i < n; i++) {
+                ordered[i] = cur;
+                var ns = nbrs[cur];
+                int next = ns[0] == prev ? ns[1] : ns[0];
+                prev = cur;
+                cur = next;
+            }
+            if (cur != start) return null;
+            return ordered;
         }
 
         // ── writer helpers ─────────────────────────────────────────────────────
