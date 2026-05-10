@@ -122,14 +122,21 @@ namespace D4BB.Geometry2 {
                     int srcId = currentIds[idx];
                     if (FaceLiesEntirelyOnPlane(face, hs)) {
                         // Coincident: route by orientation. Mirrors Polyhedron3dBoundaryComplex.Split.
-                        //   counter-oriented (face outward opposes hs.normal) ⇒ this is the
-                        //     visible boundary on this halfspace's outside ⇒ permanently kept.
-                        //   co-oriented ⇒ this face is "behind" this halfspace from the cutter's
-                        //     POV, so it's inside w.r.t. THIS halfspace. It still needs to clear
-                        //     the OTHER halfspaces to actually be inside the whole cutter, so we
-                        //     route it to nextCurrent for further evaluation. If it ends up
-                        //     inside ALL halfspaces, it gets discarded at the very end. If at
-                        //     some later halfspace it goes outer, that fragment is preserved.
+                        //   counter-oriented (face outward opposes hs.normal) ⇒ visible boundary
+                        //     on this halfspace's outside ⇒ permanently kept.
+                        //   co-oriented ⇒ "behind" this halfspace from the cutter's POV; route to
+                        //     nextCurrent so later halfspaces still get a chance to peel off outer
+                        //     fragments. If it ends up inside ALL halfspaces, discarded at the end.
+                        //
+                        // Special case — free-floating 2-face (no parent 3-cell): cellCentroid
+                        // lies in the face's own plane, so face-outward direction is undefined.
+                        // Detected by `cellCentroid` having side==0 against this halfspace
+                        // (true iff the cutter's plane contains the cellCentroid, which only
+                        // happens for free-floating 2-faces or numerically-degenerate cells).
+                        // Per design: drop in this ambiguous case.
+                        if (hs.side(cellCentroid) == 0) {
+                            continue;
+                        }
                         if (!FaceOutwardCoOrientedWith(face, cellCentroid, hs.normal)) {
                             outerKeep.Add(face);
                             outerKeepIds.Add(srcId);
