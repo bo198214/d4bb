@@ -23,6 +23,11 @@ namespace D4BB.Geometry
 
         public IPolyhedron OpposingClone() {
             var res = (Vertex)Recreate(point);
+            // OpposingClone keeps the same 3D geometric position, so the 4D source point
+            // (pos4d) is identical too — copy it through. Without this, Face2d.Split's
+            // OpposingClone of cut vertices strips pos4d and downstream shaders that read
+            // it (e.g. DepthTrueColoredGlass via UV3) see null at cut-introduced vertices.
+            if (this is Vertex v) res.pos4d = v.pos4d;
             res.parent = parent;
             res.neighbor = this;
             this.neighbor = res;
@@ -148,12 +153,22 @@ namespace D4BB.Geometry
                 Point c = cutPlane.cutPoint(a.getPoint(),b.getPoint());
                 Vertex ci = (Vertex)a.Recreate(c);
                 Vertex co = (Vertex)b.Recreate(c);
+                // Cuts happen in 3D after the (affine) camera projection, so the parametric
+                // position t of c on [a,b] is the same in 3D and 4D — we can lift it back
+                // to interpolate pos4d. Without this, downstream shaders that read pos4d
+                // (e.g. DepthTrueColoredGlass via UV3) see null at cut-introduced vertices.
+                double[] pos4dCut1 = LerpPos4d(a.pos4d, b.pos4d, LerpParam(a.getPoint(), b.getPoint(), c));
+                ci.pos4d = pos4dCut1;
+                co.pos4d = pos4dCut1;
                 return new SplitResult {inner=Recreate(a,ci),innerCut=ci,outerCut=co,outer=Recreate(co,b)}.CrossReference(this,cutPlane);
             }
             if (aSide == HalfSpace.OUTSIDE && bSide == HalfSpace.INSIDE) {
                 var c = cutPlane.cutPoint(a.getPoint(),b.getPoint());
                 var ci = new Vertex(c,isCoplanarInterior);
                 var co = new Vertex(c,isCoplanarInterior);
+                double[] pos4dCut2 = LerpPos4d(a.pos4d, b.pos4d, LerpParam(a.getPoint(), b.getPoint(), c));
+                ci.pos4d = pos4dCut2;
+                co.pos4d = pos4dCut2;
                 return new SplitResult {inner=Recreate(ci,b),innerCut=ci,outerCut=co,outer=Recreate(a,co)}.CrossReference(this,cutPlane);
             }
             if (aSide == HalfSpace.CONTAINED && bSide == HalfSpace.CONTAINED) {
@@ -167,6 +182,30 @@ namespace D4BB.Geometry
             return 1;
         }
 
+        // Parametric position of c on the segment [a, b]; uses the longest component of
+        // (b - a) for numerical stability (avoids division by ~0 on near-degenerate axes
+        // without paying for a square root).
+        static double LerpParam(Point a, Point b, Point c) {
+            int n = a.x.Length;
+            int axis = 0;
+            double bestAbs = 0;
+            for (int i = 0; i < n; i++) {
+                double d = Math.Abs(b.x[i] - a.x[i]);
+                if (d > bestAbs) { bestAbs = d; axis = i; }
+            }
+            if (bestAbs == 0) return 0;
+            return (c.x[axis] - a.x[axis]) / (b.x[axis] - a.x[axis]);
+        }
+
+        // Component-wise lerp; returns null if either input is null so callers without
+        // a 4D context (pure-3D tests) see the original behavior.
+        static double[] LerpPos4d(double[] a, double[] b, double t) {
+            if (a == null || b == null || a.Length != b.Length) return null;
+            var r = new double[a.Length];
+            double u = 1.0 - t;
+            for (int i = 0; i < a.Length; i++) r[i] = a[i] * u + b[i] * t;
+            return r;
+        }
     }
     
     public static class PolyhedronCreate {
