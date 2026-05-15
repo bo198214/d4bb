@@ -374,6 +374,7 @@ public class Scene4dHashTests {
         public Point4d viewNormal => perturbedViewNormal;
         public Point3d Proj3d(Point p) => inner.Proj3d(p);
         public bool IsFacedBy(Point origin, Point normal) => inner.IsFacedBy(origin, normal);
+        public void rotate(double ph, Point a, Point b, Point c) => inner.rotate(ph, a, b, c);
     }
 
     // The "smoking gun" test for hypothesis A: ULP-level asymmetry in viewNormal

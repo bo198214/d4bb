@@ -4,6 +4,11 @@ public interface ICamera4d {
     public Point3d Proj3d(Point point4d);
     public bool IsFacedBy(Point origin, Point normal);
     public Point4d viewNormal {get;}
+    // Rotates the camera basis v[0..3] in the plane spanned by orthonormal
+    // a, b by angle ph, and rotates eye around center c in the same plane.
+    // Equivalent to rotating the world by -ph around c — useful as an O(1)
+    // alternative to rotating every vertex per frame.
+    void rotate(double ph, Point a, Point b, Point c);
 }
 public class Camera4dCentral : ICamera4d {
     public Point4d eye {get; set; }
@@ -28,6 +33,24 @@ public class Camera4dCentral : ICamera4d {
 	}
 	public void SetPerspective(Point4d eye) {
 		this.eye = eye;
+	}
+	// Builds an orthonormal 4D basis whose v[3] points along viewDirIn. Method:
+	// rotate the standard basis by the rotation that takes (0,0,0,1) to
+	// viewDirIn. The two-arg overload also transports eyeInOut by the same
+	// rotation (in-place), so the eye position stays consistent with the new
+	// viewing direction.
+	public static Point4d[] InitialV(Point4d viewDirIn) {
+		var w = new Point4d(0, 0, 0, 1);
+		var v = new Point4d[] {
+			new(1, 0, 0, 0), new(0, 1, 0, 0), new(0, 0, 1, 0), new(0, 0, 0, 1),
+		};
+		for (int i = 0; i < 4; i++) v[i].rotate(w, viewDirIn);
+		return v;
+	}
+	public static Point4d[] InitialV(Point4d viewDirIn, Point4d eyeInOut) {
+		var w = new Point4d(0, 0, 0, 1);
+		eyeInOut.rotate(w, viewDirIn);
+		return InitialV(viewDirIn);
 	}
 
 	public bool facedBy(HalfSpace oc) {
@@ -54,6 +77,11 @@ public class Camera4dCentral : ICamera4d {
 	}
 	public bool IsFacedBy(Point origin,Point normal) {
 		return normal.sc(origin,eye) > 0;
+	}
+	public void rotate(double ph, Point a, Point b, Point c) {
+		for (int i = 0; i < 4; i++) v[i].rotate(ph, a, b);
+		eye.rotate(ph, a, b, c);
+		AOP.orthoNormalize(v);
 	}
 }
 }

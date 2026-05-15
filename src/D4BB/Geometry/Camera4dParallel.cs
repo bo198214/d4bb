@@ -22,6 +22,24 @@ public class Camera4dParallel : ICamera4d
     public Camera4dParallel(Point4d eye) : this() {
         this.eye = eye;
     }
+    // Builds an orthonormal 4D basis whose v[3] points along viewDirIn. Method:
+    // rotate the standard basis by the rotation that takes (0,0,0,1) to
+    // viewDirIn. The two-arg overload also transports eyeInOut by the same
+    // rotation (in-place), so the eye position stays consistent with the new
+    // viewing direction.
+    public static Point4d[] InitialV(Point4d viewDirIn) {
+        var w = new Point4d(0, 0, 0, 1);
+        var v = new Point4d[] {
+            new(1, 0, 0, 0), new(0, 1, 0, 0), new(0, 0, 1, 0), new(0, 0, 0, 1),
+        };
+        for (int i = 0; i < 4; i++) v[i].rotate(w, viewDirIn);
+        return v;
+    }
+    public static Point4d[] InitialV(Point4d viewDirIn, Point4d eyeInOut) {
+        var w = new Point4d(0, 0, 0, 1);
+        eyeInOut.rotate(w, viewDirIn);
+        return InitialV(viewDirIn);
+    }
     public Point3d Proj3d(Point point4d) {
         Point3d res = new Point3d();
         Point diff = point4d.clone().subtract(eye);
@@ -51,6 +69,47 @@ public class Camera4dParallel : ICamera4d
     public bool IsFacedBy(double n0, double n1, double n2, double n3) {
         var vn = v[3].x;
         return vn[0]*n0 + vn[1]*n1 + vn[2]*n2 + vn[3]*n3 < 0;
+    }
+    // Generic camera rotation: rotates v[0..3] in the (a,b)-plane by ph and
+    // moves eye around center c in the same plane. Mathematically equivalent
+    // to rotating every 4D vertex by −ph around c, but O(1) per call.
+    //
+    // Note: unlike Camera4dCentral, Cavalier projection bases are NOT
+    // orthonormal (v[0]·v[1] = px*py ≠ 0), so AOP.orthoNormalize would corrupt
+    // the projection. The caller is expected to start from a fresh basis (or
+    // accept that pure rotations preserve inner products up to FP drift).
+    public void rotate(double ph, Point a, Point b, Point c) {
+        for (int i = 0; i < 4; i++) v[i].rotate(ph, a, b);
+        eye.rotate(ph, a, b, c);
+    }
+    // Allocation-free Clifford double-rotation helpers. Rotate v[0..3] (and
+    // eye) in the canonical (e0,e1) or (e2,e3) coordinate plane around the
+    // world origin. The two together form a Clifford rotation in S³.
+    public void RotateBasisXY(double angle) {
+        double co = Math.Cos(angle), si = Math.Sin(angle);
+        for (int k = 0; k < 4; k++) {
+            var x = v[k].x;
+            double x0 = x[0], x1 = x[1];
+            x[0] = co * x0 - si * x1;
+            x[1] = si * x0 + co * x1;
+        }
+        var e = _eye.x;
+        double e0 = e[0], e1 = e[1];
+        e[0] = co * e0 - si * e1;
+        e[1] = si * e0 + co * e1;
+    }
+    public void RotateBasisZW(double angle) {
+        double co = Math.Cos(angle), si = Math.Sin(angle);
+        for (int k = 0; k < 4; k++) {
+            var x = v[k].x;
+            double x2 = x[2], x3 = x[3];
+            x[2] = co * x2 - si * x3;
+            x[3] = si * x2 + co * x3;
+        }
+        var e = _eye.x;
+        double e2 = e[2], e3 = e[3];
+        e[2] = co * e2 - si * e3;
+        e[3] = si * e2 + co * e3;
     }
     // Orthographic isometric: e0->x, e1 in xy-plane.
     // v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.
