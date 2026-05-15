@@ -6,9 +6,6 @@ public class Camera4dParallel : ICamera4d
     public Point4d[] v;
     public Point4d viewNormal { get { return v[3]; } }
     private readonly double zoom3d = 1;
-    // 3D vector that one unit along the w-axis maps to; (0,0,0) = true orthographic
-    private Point4d _eye = new Point4d(0, 0, 0, 0);
-    public Point4d eye { get => _eye; set => _eye = value; }
     private Point3d _wDir;
     private bool isIsometric = false;
     public Point3d wDir {
@@ -18,9 +15,6 @@ public class Camera4dParallel : ICamera4d
 
     public Camera4dParallel() {
         SetCavalier();
-    }
-    public Camera4dParallel(Point4d eye) : this() {
-        this.eye = eye;
     }
     // Builds an orthonormal 4D basis whose v[3] points along viewDirIn. Method:
     // rotate the standard basis by the rotation that takes (0,0,0,1) to
@@ -42,23 +36,19 @@ public class Camera4dParallel : ICamera4d
     }
     public Point3d Proj3d(Point point4d) {
         Point3d res = new Point3d();
-        Point diff = point4d.clone().subtract(eye);
-        res.x[0] = v[0].sc(diff);
-        res.x[1] = v[1].sc(diff);
-        res.x[2] = v[2].sc(diff);
+        res.x[0] = v[0].sc(point4d);
+        res.x[1] = v[1].sc(point4d);
+        res.x[2] = v[2].sc(point4d);
         res.multiply(zoom3d);
         return res;
     }
-    // Allocation-free projection for hot per-vertex loops. The caller is responsible
-    // for invalidating cached basis copies after any SetCavalier/SetIsometric/eye change.
+    // Allocation-free projection for hot per-vertex loops.
     public void Proj3dInto(double x0, double x1, double x2, double x3,
                            out float ox, out float oy, out float oz) {
-        var e = _eye.x;
-        double d0 = x0 - e[0], d1 = x1 - e[1], d2 = x2 - e[2], d3 = x3 - e[3];
         var v0 = v[0].x; var v1 = v[1].x; var v2 = v[2].x;
-        ox = (float)((v0[0]*d0 + v0[1]*d1 + v0[2]*d2 + v0[3]*d3) * zoom3d);
-        oy = (float)((v1[0]*d0 + v1[1]*d1 + v1[2]*d2 + v1[3]*d3) * zoom3d);
-        oz = (float)((v2[0]*d0 + v2[1]*d1 + v2[2]*d2 + v2[3]*d3) * zoom3d);
+        ox = (float)((v0[0]*x0 + v0[1]*x1 + v0[2]*x2 + v0[3]*x3) * zoom3d);
+        oy = (float)((v1[0]*x0 + v1[1]*x1 + v1[2]*x2 + v1[3]*x3) * zoom3d);
+        oz = (float)((v2[0]*x0 + v2[1]*x1 + v2[2]*x2 + v2[3]*x3) * zoom3d);
     }
     public bool IsFacedBy(Point normal) {
         return viewNormal.sc(normal) < 0;
@@ -70,9 +60,11 @@ public class Camera4dParallel : ICamera4d
         var vn = v[3].x;
         return vn[0]*n0 + vn[1]*n1 + vn[2]*n2 + vn[3]*n3 < 0;
     }
-    // Generic camera rotation: rotates v[0..3] in the (a,b)-plane by ph and
-    // moves eye around center c in the same plane. Mathematically equivalent
-    // to rotating every 4D vertex by −ph around c, but O(1) per call.
+    // Generic camera rotation: rotates v[0..3] in the (a,b)-plane by ph.
+    // Mathematically equivalent to rotating every 4D vertex by −ph, but
+    // O(1) per call. The center c is unused (parallel projection has no eye
+    // anchor); it stays in the signature only to satisfy the ICamera4d
+    // contract shared with the perspective camera.
     //
     // Note: unlike Camera4dCentral, Cavalier projection bases are NOT
     // orthonormal (v[0]·v[1] = px*py ≠ 0), so AOP.orthoNormalize would corrupt
@@ -80,11 +72,10 @@ public class Camera4dParallel : ICamera4d
     // accept that pure rotations preserve inner products up to FP drift).
     public void rotate(double ph, Point a, Point b, Point c) {
         for (int i = 0; i < 4; i++) v[i].rotate(ph, a, b);
-        eye.rotate(ph, a, b, c);
     }
-    // Allocation-free Clifford double-rotation helpers. Rotate v[0..3] (and
-    // eye) in the canonical (e0,e1) or (e2,e3) coordinate plane around the
-    // world origin. The two together form a Clifford rotation in S³.
+    // Allocation-free Clifford double-rotation helpers. Rotate v[0..3] in the
+    // canonical (e0,e1) or (e2,e3) coordinate plane around the world origin.
+    // The two together form a Clifford rotation in S³.
     public void RotateBasisXY(double angle) {
         double co = Math.Cos(angle), si = Math.Sin(angle);
         for (int k = 0; k < 4; k++) {
@@ -93,10 +84,6 @@ public class Camera4dParallel : ICamera4d
             x[0] = co * x0 - si * x1;
             x[1] = si * x0 + co * x1;
         }
-        var e = _eye.x;
-        double e0 = e[0], e1 = e[1];
-        e[0] = co * e0 - si * e1;
-        e[1] = si * e0 + co * e1;
     }
     public void RotateBasisZW(double angle) {
         double co = Math.Cos(angle), si = Math.Sin(angle);
@@ -106,10 +93,6 @@ public class Camera4dParallel : ICamera4d
             x[2] = co * x2 - si * x3;
             x[3] = si * x2 + co * x3;
         }
-        var e = _eye.x;
-        double e2 = e[2], e3 = e[3];
-        e[2] = co * e2 - si * e3;
-        e[3] = si * e2 + co * e3;
     }
     // Orthographic isometric: e0->x, e1 in xy-plane.
     // v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.

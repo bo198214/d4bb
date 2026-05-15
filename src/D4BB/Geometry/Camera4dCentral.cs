@@ -1,11 +1,12 @@
 namespace D4BB.Geometry {
 public interface ICamera4d {
-    public Point4d eye {get;}
     public Point3d Proj3d(Point point4d);
     public bool IsFacedBy(Point origin, Point normal);
     public Point4d viewNormal {get;}
     // Rotates the camera basis v[0..3] in the plane spanned by orthonormal
-    // a, b by angle ph, and rotates eye around center c in the same plane.
+    // a, b by angle ph. For perspective cameras (Camera4dCentral) the eye
+    // also rotates around center c; for parallel cameras the eye doesn't
+    // exist and c is ignored.
     // Equivalent to rotating the world by -ph around c — useful as an O(1)
     // alternative to rotating every vertex per frame.
     void rotate(double ph, Point a, Point b, Point c);

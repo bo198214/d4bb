@@ -370,7 +370,6 @@ public class Scene4dHashTests {
         public PerturbedCamera(Camera4dParallel c, Point4d vn) {
             inner = c; perturbedViewNormal = vn;
         }
-        public Point4d eye => inner.eye;
         public Point4d viewNormal => perturbedViewNormal;
         public Point3d Proj3d(Point p) => inner.Proj3d(p);
         public bool IsFacedBy(Point origin, Point normal) => inner.IsFacedBy(origin, normal);

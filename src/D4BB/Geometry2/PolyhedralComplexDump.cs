@@ -38,10 +38,11 @@ namespace D4BB.Geometry2 {
             var json = (Dictionary<string, object>)MiniJson.Parse(text);
 
             if (json.TryGetValue("camera", out var camObj) && camObj is Dictionary<string, object> cam) {
-                var eye = ReadPoint4(cam, "eye");
                 var wDir = ReadPoint3(cam, "wDir");
-                dump.camera = new Camera4dParallel(eye);
+                dump.camera = new Camera4dParallel();
                 if (wDir != null) dump.camera.SetCavalier(wDir);
+                // Legacy dumps may carry an "eye" field; it's meaningless for
+                // Camera4dParallel (parallel projection has no eye) and is ignored.
             }
 
             if (json.TryGetValue("angles", out var anglesObj) && anglesObj is List<object> angles && angles.Count >= 2) {

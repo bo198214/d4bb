@@ -105,7 +105,7 @@ namespace D4BB.Geometry2Tests {
             var c = LoadPolychoron(fileName);
             if (c == null) { Assert.Ignore($"{fileName} not found"); return; }
             if (angle1 != 0 || angle2 != 0) Rotate(c, angle1, angle2);
-            var cam = new Camera4dParallel(new Point4d(0, 0, 0, -5));
+            var cam = new Camera4dParallel();
             var fronts = FrontFacingProjections(c, cam);
             Assert.That(fronts.Count, Is.GreaterThan(0),
                 $"{fileName}: no front-facing cells — camera/normals problem?");
@@ -187,7 +187,7 @@ namespace D4BB.Geometry2Tests {
         static void AssertFilterMatchesDefinition(string fileName) {
             var c = LoadPolychoron(fileName);
             if (c == null) { Assert.Ignore($"{fileName} not found"); return; }
-            var cam = new Camera4dParallel(new Point4d(0, 0, 0, -5));
+            var cam = new Camera4dParallel();
             var visibleCellIds = FrontFacingCellIds(c, cam);
             var actual = new HashSet<int>(c.VisibleNonCoplanarEdgeIds(visibleCellIds));
             var expected = ExpectedVisibleEdges(c, visibleCellIds);
@@ -207,7 +207,7 @@ namespace D4BB.Geometry2Tests {
         static void AssertFilterDropsSomething(string fileName) {
             var c = LoadPolychoron(fileName);
             if (c == null) { Assert.Ignore($"{fileName} not found"); return; }
-            var cam = new Camera4dParallel(new Point4d(0, 0, 0, -5));
+            var cam = new Camera4dParallel();
             var visibleCellIds = FrontFacingCellIds(c, cam);
             int total = c.NonCoplanarEdgeIds().Count();
             int visible = c.VisibleNonCoplanarEdgeIds(visibleCellIds).Count();

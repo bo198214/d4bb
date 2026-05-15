@@ -53,7 +53,7 @@ namespace D4BB.Geometry2Tests {
             var c = LoadPenJson();
             if (c == null) { Assert.Ignore("pen.json not found"); return; }
             var bsp = Bsp4d.Build(c);
-            var cam = new Camera4dParallel(new Point4d(0, 0, 0, -5));
+            var cam = new Camera4dParallel();
             int withCull = bsp.BackToFront(cam, cullBackfaces: true).Count();
             int withoutCull = bsp.BackToFront(cam, cullBackfaces: false).Count();
             Assert.That(withoutCull, Is.EqualTo(5), "all 5 simplex cells without culling");
@@ -71,7 +71,7 @@ namespace D4BB.Geometry2Tests {
             var c = LoadPenJson();
             if (c == null) { Assert.Ignore("pen.json not found"); return; }
             var bsp = Bsp4d.Build(c);
-            var cam = new Camera4dParallel(new Point4d(0, 0, 0, -5));
+            var cam = new Camera4dParallel();
             var processed = new List<CellRender3d>();
             var faceCountsBefore = new List<int>();
             foreach (var fragment in bsp.BackToFront(cam, cullBackfaces: true)) {

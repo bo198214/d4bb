@@ -10,7 +10,7 @@ namespace D4BB.Geometry2Tests {
         [Test] public void SingleCube_BspYieldsThatCube() {
             var c = Cube4dBuilder.UnitCubeAtW(0);
             var bsp = Bsp4d.Build(c);
-            var cam = new Camera4dParallel(new Point4d(0, 0, 0, -5));
+            var cam = new Camera4dParallel();
             var result = bsp.BackToFront(cam).ToList();
             Assert.That(result.Count, Is.EqualTo(1));
             Assert.That(result[0].sourceCellId, Is.EqualTo(0));

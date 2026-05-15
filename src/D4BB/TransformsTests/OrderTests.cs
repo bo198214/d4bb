@@ -136,6 +136,9 @@ namespace D4BB.CombTests
             var behind = new IntegerCell(new int[]{0,0,0,2});
             var inFront = new IntegerCell(new int[]{0,0,0,0});
             
+            // Camera4dParallel.IsFacedBy depends only on viewNormal (not eye),
+            // so a single instance covers all 8 eye positions used by the
+            // perspective cases below.
             foreach (ICamera4d camera in new ICamera4d[]{
                 new Camera4dCentral(new Point4d(3,3,3,-2)),
                 new Camera4dCentral(new Point4d(-1,3,3,-2)),
@@ -145,14 +148,7 @@ namespace D4BB.CombTests
                 new Camera4dCentral(new Point4d(-1,3,-1,-2)),
                 new Camera4dCentral(new Point4d(3,-1,-1,-2)),
                 new Camera4dCentral(new Point4d(-1,-1,-1,-2)),
-                new Camera4dParallel(new Point4d(3,3,3,-2)),
-                new Camera4dParallel(new Point4d(-1,3,3,-2)),
-                new Camera4dParallel(new Point4d(3,-1,3,-2)),
-                new Camera4dParallel(new Point4d(-1,-1,3,-2)),
-                new Camera4dParallel(new Point4d(3,3,-1,-2)),
-                new Camera4dParallel(new Point4d(-1,3,-1,-2)),
-                new Camera4dParallel(new Point4d(3,-1,-1,-2)),
-                new Camera4dParallel(new Point4d(-1,-1,-1,-2)),
+                new Camera4dParallel(),
             }) {
                 List<OrientedIntegerCell> facets = new();
                 foreach (var facet in behind.Facets().Union(inFront.Facets())) {
@@ -168,7 +164,7 @@ namespace D4BB.CombTests
                             var cmp2 = InFrontOfCellComparer.IsInFrontOf(facet2,facet3);
                             var cmp3 = InFrontOfCellComparer.IsInFrontOf(facet1,facet3);
                             if (cmp1 < 0 && cmp2 < 0) {
-                                Assert.That(cmp3, Is.LessThan(0), $"{camera.eye}: {facet1} {cmp1} {facet2} {cmp2} {facet3}");
+                                Assert.That(cmp3, Is.LessThan(0), $"{camera.GetType().Name}: {facet1} {cmp1} {facet2} {cmp2} {facet3}");
                             }
                         }
                     }
@@ -223,14 +219,7 @@ namespace D4BB.CombTests
                 new Camera4dCentral(new Point4d(-1,3,-1,-2)),
                 new Camera4dCentral(new Point4d(3,-1,-1,-2)),
                 new Camera4dCentral(new Point4d(-1,-1,-1,-2)),
-                new Camera4dParallel(new Point4d(3,3,3,-2)),
-                new Camera4dParallel(new Point4d(-1,3,3,-2)),
-                new Camera4dParallel(new Point4d(3,-1,3,-2)),
-                new Camera4dParallel(new Point4d(-1,-1,3,-2)),
-                new Camera4dParallel(new Point4d(3,3,-1,-2)),
-                new Camera4dParallel(new Point4d(-1,3,-1,-2)),
-                new Camera4dParallel(new Point4d(3,-1,-1,-2)),
-                new Camera4dParallel(new Point4d(-1,-1,-1,-2)),
+                new Camera4dParallel(),
             }) {
                 List<OrientedIntegerCell> facets = new();
                 foreach (var facet in behind.Facets().Union(inFront.Facets())) {

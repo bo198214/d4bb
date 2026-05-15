@@ -36,8 +36,6 @@ namespace D4BB.Geometry2Tests {
             Assert.That(dump.complex.vertices.Count, Is.EqualTo(8));
 
             Assert.That(dump.camera, Is.Not.Null);
-            Assert.That(dump.camera.eye.x[0], Is.EqualTo(0).Within(AOP.ERR));
-            Assert.That(dump.camera.eye.x[3], Is.EqualTo(-5).Within(AOP.ERR));
             Assert.That(dump.camera.wDir.x[0], Is.EqualTo(0.4).Within(AOP.ERR));
             Assert.That(dump.camera.wDir.x[1], Is.EqualTo(0.5).Within(AOP.ERR));
             Assert.That(dump.camera.wDir.x[2], Is.EqualTo(0.6).Within(AOP.ERR));
