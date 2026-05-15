@@ -5,6 +5,12 @@ public class Camera4dParallel : ICamera4d
 {
     public Point4d[] v;
     public Point4d viewNormal { get { return v[3]; } }
+    // Normal to the image hyperplane {w=0} — i.e. the world w-axis, expressed
+    // in the (rotated) camera state. Cached and updated incrementally by the
+    // rotation methods so dist(p) = imageNormal·p is a single 4-d dot product
+    // in hot loops. Initialised to e3 = (0,0,0,1) by SetCavalier/SetIsometric
+    // (zero-rotation state); subsequent rotate*-calls rotate it along with v[].
+    public Point4d imageNormal;
     private readonly double zoom3d = 1;
     private Point3d _wDir;
     private bool isIsometric = false;
@@ -60,6 +66,22 @@ public class Camera4dParallel : ICamera4d
         var vn = v[3].x;
         return vn[0]*n0 + vn[1]*n1 + vn[2]*n2 + vn[3]*n3 < 0;
     }
+    // Signed scalar projection of (x,y,z,w) onto v[3] — i.e. the perpendicular
+    // distance from p to the projection plane span(v[0..2]).
+    public double viewNormalDist(double x, double y, double z, double w) {
+        var vn = v[3].x;
+        return vn[0]*x + vn[1]*y + vn[2]*z + vn[3]*w;
+    }
+    // Signed perpendicular distance of (x,y,z,w) from the (rotated) image
+    // hyperplane {w=0} — the 4D analogue of "how far above/below the screen
+    // plane is this point". Equivalent to (R·p).w where R is the world
+    // rotation accumulated in the camera basis since SetCavalier/SetIsometric.
+    // Pure dot product against the cached imageNormal (e3 in the rotated
+    // camera state), kept current by the rotate* methods.
+    public double dist(double x, double y, double z, double w) {
+        var n = imageNormal.x;
+        return n[0]*x + n[1]*y + n[2]*z + n[3]*w;
+    }
     // Generic camera rotation: rotates v[0..3] in the (a,b)-plane by ph.
     // Mathematically equivalent to rotating every 4D vertex by −ph, but
     // O(1) per call. The center c is unused (parallel projection has no eye
@@ -72,10 +94,12 @@ public class Camera4dParallel : ICamera4d
     // accept that pure rotations preserve inner products up to FP drift).
     public void rotate(double ph, Point a, Point b, Point c) {
         for (int i = 0; i < 4; i++) v[i].rotate(ph, a, b);
+        imageNormal.rotate(ph, a, b);
     }
     // Allocation-free Clifford double-rotation helpers. Rotate v[0..3] in the
     // canonical (e0,e1) or (e2,e3) coordinate plane around the world origin.
-    // The two together form a Clifford rotation in S³.
+    // The two together form a Clifford rotation in S³. imageNormal is rotated
+    // along, so dist(p) stays consistent without recompute.
     public void RotateBasisXY(double angle) {
         double co = Math.Cos(angle), si = Math.Sin(angle);
         for (int k = 0; k < 4; k++) {
@@ -84,6 +108,10 @@ public class Camera4dParallel : ICamera4d
             x[0] = co * x0 - si * x1;
             x[1] = si * x0 + co * x1;
         }
+        var nx = imageNormal.x;
+        double n0 = nx[0], n1 = nx[1];
+        nx[0] = co * n0 - si * n1;
+        nx[1] = si * n0 + co * n1;
     }
     public void RotateBasisZW(double angle) {
         double co = Math.Cos(angle), si = Math.Sin(angle);
@@ -93,6 +121,10 @@ public class Camera4dParallel : ICamera4d
             x[2] = co * x2 - si * x3;
             x[3] = si * x2 + co * x3;
         }
+        var nx = imageNormal.x;
+        double n2 = nx[2], n3 = nx[3];
+        nx[2] = co * n2 - si * n3;
+        nx[3] = si * n2 + co * n3;
     }
     // Orthographic isometric: e0->x, e1 in xy-plane.
     // v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.
@@ -108,6 +140,7 @@ public class Camera4dParallel : ICamera4d
             (Point4d)new Point4d(    0,   0, 2*s2,-2*s2).normalize(),
             (Point4d)new Point4d(    1,   1,   1,     1).normalize()
         };
+        imageNormal = new Point4d(0, 0, 0, 1);
         isIsometric = true;
     }
     // Oblique parallel (cavalier): w-axis projected along diagonal (1,1,1) with length wLength.
@@ -128,6 +161,7 @@ public class Camera4dParallel : ICamera4d
             new(0, 0, 1, pz),
             new(-px*n, -py*n, -pz*n, n)
         };
+        imageNormal = new Point4d(0, 0, 0, 1);
     }
 }
 }
