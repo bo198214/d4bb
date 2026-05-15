@@ -31,11 +31,26 @@ public class Camera4dParallel : ICamera4d
         res.multiply(zoom3d);
         return res;
     }
+    // Allocation-free projection for hot per-vertex loops. The caller is responsible
+    // for invalidating cached basis copies after any SetCavalier/SetIsometric/eye change.
+    public void Proj3dInto(double x0, double x1, double x2, double x3,
+                           out float ox, out float oy, out float oz) {
+        var e = _eye.x;
+        double d0 = x0 - e[0], d1 = x1 - e[1], d2 = x2 - e[2], d3 = x3 - e[3];
+        var v0 = v[0].x; var v1 = v[1].x; var v2 = v[2].x;
+        ox = (float)((v0[0]*d0 + v0[1]*d1 + v0[2]*d2 + v0[3]*d3) * zoom3d);
+        oy = (float)((v1[0]*d0 + v1[1]*d1 + v1[2]*d2 + v1[3]*d3) * zoom3d);
+        oz = (float)((v2[0]*d0 + v2[1]*d1 + v2[2]*d2 + v2[3]*d3) * zoom3d);
+    }
     public bool IsFacedBy(Point normal) {
         return viewNormal.sc(normal) < 0;
     }
     public bool IsFacedBy(Point origin, Point normal) {
         return viewNormal.sc(normal) < 0;
+    }
+    public bool IsFacedBy(double n0, double n1, double n2, double n3) {
+        var vn = v[3].x;
+        return vn[0]*n0 + vn[1]*n1 + vn[2]*n2 + vn[3]*n3 < 0;
     }
     // Orthographic isometric: e0->x, e1 in xy-plane.
     // v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.
