@@ -28,12 +28,20 @@ namespace D4BB.TopLevel
             }
             return new double[][] { min, max };
         }
-        public static double[] cavaliersFrontCenter(Objective objective, ICamera4d camera, double z_offset = 2.0, double y_offset = 0)
+        public static double[] cavaliersFrontCenter(Objective objective, ICamera4d camera, double z_offset = 0, double y_offset = 0)
         {
+            // X/Y: piece-bbox center (intentionally raw grid coords — cavalier shear
+            // in x/y is small and the piece-bbox center gives the framing the levels
+            // were authored against).
             var min_max = objective.BoundingBox();
             var x = (min_max[0][0] + min_max[1][0])/2.0;
             var y = (min_max[0][1] + min_max[1][1])/2.0;
-            var z = min_max[0][2];
+            // Z: project the full 4D movement envelope through the camera and take
+            // the smallest world-z. Accounts for cavalier w-shear so z_offset=0
+            // really places the front of the play volume on world Z=0.
+            var bmm4d = objective.boundary_min_max ?? min_max;
+            var box3d = fieldBoundary3d(bmm4d, camera);
+            var z = box3d[0][2];
             return new double[] { x, y-y_offset, z-z_offset};
         }
     }

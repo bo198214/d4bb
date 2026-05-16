@@ -77,7 +77,10 @@ namespace D4BB.Game
                         if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
                         if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
                     }
-                res[0][k] -= padding;
+                // Cavalier world_z = z + pz·w (pz > 0): the viewer-facing surface of
+                // the play volume sits at (min z, min w). Front-padding on axes 2/3
+                // would let pieces drift into the viewer; we only pad the far side.
+                if (k < 2) res[0][k] -= padding;
                 res[1][k] += 1+padding;
             }
             return res;
