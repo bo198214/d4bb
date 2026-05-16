@@ -5,6 +5,8 @@ using D4BB.Comb;
 
 namespace D4BB.Game
 {
+    public enum MoveBlockReason { None, Overlap, OutOfBoundary }
+
     public class GameLevel
     {
         public List<Compound> compounds = new();
@@ -12,6 +14,7 @@ namespace D4BB.Game
         public int[][] goal;
         public GameStatus status = GameStatus.None;
         public Objective Objective { get; private set; }
+        public MoveBlockReason LastBlockReason { get; private set; } = MoveBlockReason.None;
 
         public int[][][] PieceOrigins => compounds.Select(c => c.origins).ToArray();
 
@@ -45,11 +48,19 @@ namespace D4BB.Game
             if (c == null) return false;
             int idx = selectedIndex;
             c.Translate(axis);
+            if (!IsInsideBoundary(c.origins))
+            {
+                c.Translate(new IntegerSignedAxis(-axis.Human()));
+                LastBlockReason = MoveBlockReason.OutOfBoundary;
+                return false;
+            }
             if (IsOverlapping())
             {
                 c.Translate(new IntegerSignedAxis(-axis.Human()));
+                LastBlockReason = MoveBlockReason.Overlap;
                 return false;
             }
+            LastBlockReason = MoveBlockReason.None;
             PropagateStatus();
             OnTranslate?.Invoke(idx, axis);
             OnChanged?.Invoke();
@@ -67,19 +78,30 @@ namespace D4BB.Game
                 : new IntegerCenter(c.origins, asCubes: true);
 
             // 1. Apply rotation to origins
-            foreach (var o in c.origins) 
+            foreach (var o in c.origins)
                 IntegerOps.RotateAsCenters(o, pivot, v, w);
 
-            // 2. Check for collisions
-            if (IsOverlapping())
+            // 2. Boundary check
+            if (!IsInsideBoundary(c.origins))
             {
-                // Revert if blocked
-                foreach (var o in c.origins) 
+                foreach (var o in c.origins)
                     IntegerOps.RotateAsCenters(o, pivot, w, v);
+                LastBlockReason = MoveBlockReason.OutOfBoundary;
                 return false;
             }
 
-            // 3. Success: Commit and notify
+            // 3. Check for collisions
+            if (IsOverlapping())
+            {
+                // Revert if blocked
+                foreach (var o in c.origins)
+                    IntegerOps.RotateAsCenters(o, pivot, w, v);
+                LastBlockReason = MoveBlockReason.Overlap;
+                return false;
+            }
+
+            // 4. Success: Commit and notify
+            LastBlockReason = MoveBlockReason.None;
             PropagateStatus();
             OnRotate?.Invoke(idx, v, w, pivotOrigin);
             OnChanged?.Invoke();
@@ -123,6 +145,22 @@ namespace D4BB.Game
         private bool IsOverlapping()
         {
             return IntegerOps.Intersecting(compounds.Select(c => c.origins).ToArray());
+        }
+
+        private bool IsInsideBoundary(int[][] origins)
+        {
+            var bmm = Objective?.boundary_min_max;
+            if (bmm == null || bmm.Length < 2 || bmm[0] == null || bmm[1] == null) return true;
+            int dims = bmm[0].Length;
+            foreach (var o in origins)
+            {
+                for (int a = 0; a < dims && a < o.Length; a++)
+                {
+                    if (o[a] < bmm[0][a]) return false;
+                    if (o[a] + 1 > bmm[1][a]) return false;
+                }
+            }
+            return true;
         }
 
         private List<Compound> FindAdjacent(Compound c0)
