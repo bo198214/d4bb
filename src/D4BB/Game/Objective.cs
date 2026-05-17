@@ -1,4 +1,5 @@
 using D4BB.Comb;
+using System;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -29,6 +30,9 @@ namespace D4BB.Game
             var data = JsonConvert.DeserializeObject<ObjectiveData>(json);
             if (data.BoundaryMinMax != null)
                 return new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);
+            if (data.PaddingsLowerUpper != null)
+                return new Objective(data.Name, data.Goal, data.Pieces,
+                                     BoundaryMinMax(data.Pieces, data.PaddingsLowerUpper));
             if (data.Padding.HasValue)
                 return new Objective(data.Name, data.Goal, data.Pieces, data.Padding.Value);
             return new Objective(data.Name, data.Goal, data.Pieces);
@@ -45,6 +49,8 @@ namespace D4BB.Game
             public int[][] BoundaryMinMax { get; set; }
             [JsonProperty("padding")]
             public int? Padding { get; set; }
+            [JsonProperty("paddings_lower_upper")]
+            public int[][] PaddingsLowerUpper { get; set; }
         }
 
         public int[][] BoundingBox()
@@ -82,6 +88,31 @@ namespace D4BB.Game
                 // would let pieces drift into the viewer; we only pad the far side.
                 if (k < 2) res[0][k] -= padding;
                 res[1][k] += 1+padding;
+            }
+            return res;
+        }
+        public static int[][] BoundaryMinMax(int[][][] pieces, int[][] paddingsLowerUpper)
+        {
+            if (paddingsLowerUpper == null
+                || paddingsLowerUpper.Length != 2
+                || paddingsLowerUpper[0] == null || paddingsLowerUpper[0].Length != 4
+                || paddingsLowerUpper[1] == null || paddingsLowerUpper[1].Length != 4)
+                throw new ArgumentException(
+                    "paddings_lower_upper must be an int[2][4]: [lower-padding[4], upper-padding[4]].",
+                    nameof(paddingsLowerUpper));
+            int[][] res = new int[2][];
+            res[0] = new int[4];
+            res[1] = new int[4];
+            for (int k = 0; k < 4; k++) {
+                res[0][k] = int.MaxValue;
+                res[1][k] = int.MinValue;
+                for (int i = 0; i < pieces.Length; i++)
+                    for (int j = 0; j < pieces[i].Length; j++) {
+                        if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
+                        if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
+                    }
+                res[0][k] -= paddingsLowerUpper[0][k];
+                res[1][k] += 1 + paddingsLowerUpper[1][k];
             }
             return res;
         }
