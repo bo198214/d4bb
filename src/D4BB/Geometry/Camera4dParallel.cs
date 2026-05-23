@@ -11,7 +11,7 @@ public class Camera4dParallel : ICamera4d
     // in hot loops. Initialised to e3 = (0,0,0,1) by SetCavalier/SetIsometric
     // (zero-rotation state); subsequent rotate*-calls rotate it along with v[].
     public Point4d imageNormal;
-    private readonly double zoom3d = 1;
+    public double zoom3d = 1;
     private Point3d _wDir;
     private bool isIsometric = false;
     public Point3d wDir {
