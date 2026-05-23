@@ -67,10 +67,16 @@ public class EdgesGenericMesh {
 
             List<ushort> target;
             int submesh;
-            // Grid-intersection edges (mark=MARK_GRID_INTERSECTION) are rendered as regular
-            // edges. They reach BoundaryEdges() only when showGridIntersections=true, and
-            // they always have a coplanar neighbor — which would otherwise have routed them
-            // to the invisible-debug submesh.
+            // Submesh routing:
+            //   0 = regular boundary edges (edgeRegularMaterial)
+            //   1 = cut-boundary edges (edgeCutMaterial): one side of a coplanar pair where
+            //       the other side was discarded by CutOut, so neighbor was nulled.
+            //   2 = intracoplanar-pair edges (edgeInvisibleMaterial): symmetric coplanar
+            //       pair where both halves are still present. Reached when a Split's
+            //       CrossReference paired them and no CutOut has since removed one side.
+            // Grid-intersection edges (mark=MARK_GRID_INTERSECTION) are a symmetric pair
+            // too, but route to 0 (regular) — they reach BoundaryEdges() only when the
+            // grid-toggle is on, and the user wants them with the regular material.
             if (edge.mark == IPolyhedron.MARK_GRID_INTERSECTION) {
                 target = triangles0;
                 submesh = 0;
