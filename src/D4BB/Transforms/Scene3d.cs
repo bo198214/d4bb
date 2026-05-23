@@ -9,6 +9,7 @@ public class Scene3d
 {
     public ICamera3d camera { get; set; }
     public bool showIntraCoplanarEdges;
+    public bool showGridIntersections = true;
     public bool enable3dOcclusion = true;
     public readonly List<Slab> slabs = new();
 
@@ -33,10 +34,11 @@ public class Scene3d
 
     // BSP for 3D occlusion (analogous to D4BSPofCells, reused directly)
 
-    public Scene3d(int[][][] origins, ICamera3d camera, bool showIntraCoplanarEdges = false)
+    public Scene3d(int[][][] origins, ICamera3d camera, bool showIntraCoplanarEdges = false, bool showGridIntersections = true)
     {
         this.camera = camera;
         this.showIntraCoplanarEdges = showIntraCoplanarEdges;
+        this.showGridIntersections = showGridIntersections;
         Update(origins);
     }
 
@@ -60,7 +62,7 @@ public class Scene3d
 
     public void Update(int[][][] pieceOrigins)
     {
-        RebuildSlabs(pieceOrigins, camera, enable3dOcclusion, showIntraCoplanarEdges, slabs);
+        RebuildSlabs(pieceOrigins, camera, enable3dOcclusion, showIntraCoplanarEdges, showGridIntersections, slabs);
         ApplyCameraOcclusion();
     }
 
@@ -69,7 +71,7 @@ public class Scene3d
         ApplyCameraOcclusion();
     }
 
-    private static void RebuildSlabs(int[][][] pieceOrigins, ICamera3d camera, bool enable3dOcclusion, bool showIntraCoplanarEdges, List<Slab> slabsOut)
+    private static void RebuildSlabs(int[][][] pieceOrigins, ICamera3d camera, bool enable3dOcclusion, bool showIntraCoplanarEdges, bool showGridIntersections, List<Slab> slabsOut)
     {
         slabsOut.Clear();
         if (pieceOrigins == null) return;
@@ -85,7 +87,7 @@ public class Scene3d
                     slabsOut.Add(new Slab {
                         pieceIndex = i,
                         cells = slabCells,
-                        pbc = new Polyhedron2dBoundaryComplex(slabCells, camera, showIntraCoplanarEdges),
+                        pbc = new Polyhedron2dBoundaryComplex(slabCells, camera, showIntraCoplanarEdges, showGridIntersections),
                     });
             }
         }

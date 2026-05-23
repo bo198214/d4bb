@@ -31,6 +31,7 @@ public class Face2dIC : Face2dWithIntegerCellAttribute
     {
         Debug.Assert(ic.Dim() == 2, "Face2dIC requires a 2-cell");
         camera = cam;
+        mark = IPolyhedron.MARK_GRID_INTERSECTION;
         var iEdges = ic.ClockwiseFromOutsideEdges2d();
         for (int k = 0; k < iEdges.Length; k++)
             i2p[iEdges[k]] = edges[k];
@@ -41,21 +42,21 @@ public class Face2dIC : Face2dWithIntegerCellAttribute
         var bOrig = e1.EdgeB().origin.Select(v => (double)v).ToArray();
         var pa = cam?.Proj2d(new Point(aOrig)) ?? new Point(aOrig);
         var pb = cam?.Proj2d(new Point(bOrig)) ?? new Point(bOrig);
-        var va = new Vertex(pa);
-        var vb = new Vertex(pb);
+        var va = new Vertex(pa) { mark = IPolyhedron.MARK_GRID_INTERSECTION };
+        var vb = new Vertex(pb) { mark = IPolyhedron.MARK_GRID_INTERSECTION };
         va.pos4d = aOrig; // original 3D position — reused for animation
         vb.pos4d = bOrig;
-        return new Edge(va, vb);
+        return new Edge(va, vb) { mark = IPolyhedron.MARK_GRID_INTERSECTION };
     }
 
     public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) =>
-        new Face2dIC(facets, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
+        new Face2dIC(facets, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc, mark = mark };
 
     public override Face2d Recreate(List<Edge> edges) =>
-        new Face2dIC(edges, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
+        new Face2dIC(edges, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc, mark = mark };
 
     public override Face2d Recreate(List<Point> points) =>
-        new Face2dIC(points, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc };
+        new Face2dIC(points, isCoplanarInterior, integerCell) { parent = parent, neighbor = neighbor, camera = camera, pbc = pbc, mark = mark };
 }
 
 public class CellBoundary2d
@@ -75,16 +76,19 @@ public class Polyhedron2dBoundaryComplex
     public Dictionary<IntegerCell, Face2dIC> i2p = new();
     public List<CellBoundary2d> cellBoundaries;
     bool showIntraCoplanarEdges;
+    bool showGridIntersections;
 
-    internal Polyhedron2dBoundaryComplex(List<Face2dIC> prebuiltFaces, bool showIntraCoplanarEdges) {
+    internal Polyhedron2dBoundaryComplex(List<Face2dIC> prebuiltFaces, bool showIntraCoplanarEdges, bool showGridIntersections) {
         this.showIntraCoplanarEdges = showIntraCoplanarEdges;
+        this.showGridIntersections = showGridIntersections;
         d2faces = prebuiltFaces;
         foreach (var face in d2faces)
             i2p[face.integerCell] = face;
     }
 
-    public Polyhedron2dBoundaryComplex(HashSet<OrientedIntegerCell> cells2, ICamera3d cam = null, bool showIntraCoplanarEdges = false) {
+    public Polyhedron2dBoundaryComplex(HashSet<OrientedIntegerCell> cells2, ICamera3d cam = null, bool showIntraCoplanarEdges = false, bool showGridIntersections = true) {
         this.showIntraCoplanarEdges = showIntraCoplanarEdges;
+        this.showGridIntersections = showGridIntersections;
 
         foreach (var ic2 in cells2) {
             var face = new Face2dIC(ic2, cam) { pbc = this };
@@ -124,7 +128,7 @@ public class Polyhedron2dBoundaryComplex
         cellBoundaries = new List<CellBoundary2d>();
         foreach (var ic2 in cells2)
             cellBoundaries.Add(new CellBoundary2d(ic2,
-                new Polyhedron2dBoundaryComplex(new List<Face2dIC> { i2p[ic2] }, showIntraCoplanarEdges)));
+                new Polyhedron2dBoundaryComplex(new List<Face2dIC> { i2p[ic2] }, showIntraCoplanarEdges, showGridIntersections)));
     }
 
     public List<Face2dIC> BoundaryFacets() {
@@ -142,9 +146,14 @@ public class Polyhedron2dBoundaryComplex
             ? cellBoundaries.SelectMany(cb => cb.pbc.d2faces)
             : (IEnumerable<Face2dIC>)d2faces;
         foreach (var face in faces)
-            foreach (var edge in face.edges)
-                if (showIntraCoplanarEdges || !edge.isCoplanarInterior || edge.neighbor == null)
-                    res.Add(edge);
+            foreach (var edge in face.edges) {
+                bool isInterior = edge.isCoplanarInterior && edge.neighbor != null;
+                bool show = !isInterior
+                    || (edge.mark == IPolyhedron.MARK_GRID_INTERSECTION
+                        ? showGridIntersections
+                        : showIntraCoplanarEdges);
+                if (show) res.Add(edge);
+            }
         return res;
     }
 }

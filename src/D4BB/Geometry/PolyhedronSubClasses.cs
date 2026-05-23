@@ -12,6 +12,7 @@ namespace D4BB.Geometry
         public bool isCoplanarInterior {get; set;}
         public IPolyhedron parent {get;set;}
         public IPolyhedron neighbor {get;set;}
+        public int mark {get;set;}
         protected readonly Point point;
 
         public HashSet<IPolyhedron> facets => new();
@@ -29,6 +30,7 @@ namespace D4BB.Geometry
             // it (e.g. DepthTrueColoredGlass via UV3) see null at cut-introduced vertices.
             if (this is Vertex v) res.pos4d = v.pos4d;
             res.parent = parent;
+            res.mark = mark;
             res.neighbor = this;
             this.neighbor = res;
             return res;
@@ -48,11 +50,11 @@ namespace D4BB.Geometry
 
         public IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
         {
-            return new Vertex(point, isCoplanarInterior) { parent = parent, neighbor=neighbor };
+            return new Vertex(point, isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
         }
         //  public Vertex(IntegerCell ic, bool isCoplanarInterior) : this(new Point(ic.origin),isCoplanarInterior) {}
         public virtual IPolyhedron Recreate(Point point) {
-            return new Vertex(point,isCoplanarInterior) { parent = parent, neighbor=neighbor };
+            return new Vertex(point,isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
         }
 
         public int Side(HalfSpace halfSpace) {
@@ -101,6 +103,7 @@ namespace D4BB.Geometry
         public bool isCoplanarInterior {get; set;}
         public IPolyhedron parent {get;set;}
         public IPolyhedron neighbor {get;set;}
+        public int mark {get;set;}
         public HashSet<IPolyhedron> facets {
             get { return new() {a,b}; }
         }
@@ -112,8 +115,8 @@ namespace D4BB.Geometry
         public Edge(HashSet<Vertex> vertices, bool isCoplanarInterior) : base(vertices) {this.isCoplanarInterior=isCoplanarInterior;}
         public Edge(HashSet<IPolyhedron> vertices, bool isCoplanarInterior) :
                 base(vertices.Cast<Vertex>().ToHashSet()) {this.isCoplanarInterior=isCoplanarInterior;}
-        public IPolyhedron Recreate(HashSet<IPolyhedron> vertices) { return new Edge(vertices,isCoplanarInterior) { neighbor=neighbor, parent = parent }; }
-        public virtual IPolyhedron Recreate(Vertex a, Vertex b) { return new Edge(a, b, isCoplanarInterior) { neighbor=neighbor, parent = parent }; }
+        public IPolyhedron Recreate(HashSet<IPolyhedron> vertices) { return new Edge(vertices,isCoplanarInterior) { neighbor=neighbor, parent = parent, mark=mark }; }
+        public virtual IPolyhedron Recreate(Vertex a, Vertex b) { return new Edge(a, b, isCoplanarInterior) { neighbor=neighbor, parent = parent, mark=mark }; }
         public IPolyhedron OpposingClone() { 
             var res = (Edge) Recreate((Vertex)b.OpposingClone(),(Vertex)a.OpposingClone());
             res.neighbor = this;
@@ -153,6 +156,10 @@ namespace D4BB.Geometry
                 Point c = cutPlane.cutPoint(a.getPoint(),b.getPoint());
                 Vertex ci = (Vertex)a.Recreate(c);
                 Vertex co = (Vertex)b.Recreate(c);
+                // Cut vertices are fresh geometry at the cut plane, not the same point as
+                // a or b — Recreate would have inherited their mark, override to MARK_NONE.
+                ci.mark = IPolyhedron.MARK_NONE;
+                co.mark = IPolyhedron.MARK_NONE;
                 // Cuts happen in 3D after the (affine) camera projection, so the parametric
                 // position t of c on [a,b] is the same in 3D and 4D — we can lift it back
                 // to interpolate pos4d. Without this, downstream shaders that read pos4d
@@ -166,6 +173,7 @@ namespace D4BB.Geometry
                 var c = cutPlane.cutPoint(a.getPoint(),b.getPoint());
                 var ci = new Vertex(c,isCoplanarInterior);
                 var co = new Vertex(c,isCoplanarInterior);
+                // `new Vertex` already gives mark=0 by default — same effect as above branch.
                 double[] pos4dCut2 = LerpPos4d(a.pos4d, b.pos4d, LerpParam(a.getPoint(), b.getPoint(), c));
                 ci.pos4d = pos4dCut2;
                 co.pos4d = pos4dCut2;

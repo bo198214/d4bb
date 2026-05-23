@@ -35,9 +35,18 @@ public class PolyhedronBoundaryComplexTests {
         Assert.That(bottomFrontEdge.a.getPoint(),Is.EqualTo(new Point(0,0,0)));
     }
     [Test] public void Polyhedron3dBoundaryComplex_TwoCubes_Numbers() {
+        // Default showGridIntersections=true: the 4 grid lines where the two cubes meet on
+        // the outer faces (front/back/top/bottom) are visible — 12 silhouette edges + 4 grid
+        // = 16 + 4 = 20.
         var cubes = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0},new int[]{1,0,0}});
         Assert.That(cubes.BoundaryFacets(),Has.Count.EqualTo(10));
-        Assert.That(cubes.BoundaryEdges(),Has.Count.EqualTo(16));
+        Assert.That(cubes.BoundaryEdges(),Has.Count.EqualTo(20));
+
+        // showGridIntersections=false hides those 4 grid lines — back to the legacy count of 16.
+        var cubesNoGrid = new Polyhedron3dBoundaryComplex(
+            new int[][]{new int[]{0,0,0},new int[]{1,0,0}},
+            cam: null, showIntraCoplanarEdges: false, showGridIntersections: false);
+        Assert.That(cubesNoGrid.BoundaryEdges(),Has.Count.EqualTo(16));
     }
     [Test] public void Polyhedron3dBoundaryComplex_TwoCubes_Links() {
         var cubes = new Polyhedron3dBoundaryComplex(new int[][]{new int[]{0,0,0},new int[]{1,0,0}});

@@ -14,6 +14,7 @@ namespace D4BB.Geometry
         public bool isCoplanarInterior { get; set; }
         public IPolyhedron parent {get; set; }
         public IPolyhedron neighbor {get;set;}
+        public int mark {get;set;}
         public HashSet<IPolyhedron> facets {
             get {
                 return new HashSet<IPolyhedron>(edges);
@@ -52,14 +53,14 @@ namespace D4BB.Geometry
             SetNeighbors();
         }
         public Face2d(HashSet<IPolyhedron> edges, bool isConnecting) : this(SortedEdges(edges),isConnecting) {}
-        public virtual IPolyhedron Recreate(HashSet<IPolyhedron> facets) { 
-            return new Face2d(facets, isCoplanarInterior) { parent = parent, neighbor=neighbor };
+        public virtual IPolyhedron Recreate(HashSet<IPolyhedron> facets) {
+            return new Face2d(facets, isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
         }
         public virtual Face2d Recreate(List<Edge> edges) {
-            return new Face2d(edges, isCoplanarInterior) { parent = parent, neighbor=neighbor };
+            return new Face2d(edges, isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
         }
         public virtual Face2d Recreate(List<Point> points) {
-            return new Face2d(points, isCoplanarInterior) { parent = parent, neighbor=neighbor };
+            return new Face2d(points, isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
         }
         public IPolyhedron OpposingClone() {
             List<Edge> newEdges = new();
@@ -67,7 +68,7 @@ namespace D4BB.Geometry
                 newEdges.Add((Edge)edge.OpposingClone());
             }
             newEdges.Reverse();
-            var res = new Face2d(newEdges,isCoplanarInterior) { parent = parent };
+            var res = new Face2d(newEdges,isCoplanarInterior) { parent = parent, mark = mark };
             res.neighbor = this;
             this.neighbor = res;
             return res;
@@ -505,6 +506,11 @@ namespace D4BB.Geometry
             Edge proto = edges[0];
             Edge innerCutEdge = (Edge)proto.Recreate(innerCutFromV, innerCutToV);
             Edge outerCutEdge = (Edge)proto.Recreate(outerCutFromV, outerCutToV);
+            // Recreate would have inherited proto.mark, but the cut edge is fresh geometry
+            // at the cut plane — reset to MARK_NONE so grid-intersection toggles don't
+            // accidentally hide BSP-cut edges.
+            innerCutEdge.mark = IPolyhedron.MARK_NONE;
+            outerCutEdge.mark = IPolyhedron.MARK_NONE;
 
             // Build chained lists in CCW cycle order. SortedEdges (used by Recreate(HashSet))
             // relies on Vertex.Equals which is type-strict — it fails when a face mixes
@@ -684,15 +690,15 @@ namespace D4BB.Geometry
             integerCell = ic;
         }
         public override Face2d Recreate(List<Edge> edges) {
-            return new Face2dWithIntegerCellAttribute(edges,isCoplanarInterior,integerCell) { parent=parent, neighbor=neighbor };
+            return new Face2dWithIntegerCellAttribute(edges,isCoplanarInterior,integerCell) { parent=parent, neighbor=neighbor, mark=mark };
         }
         public override Face2d Recreate(List<Point> points)
         {
-            return new Face2dWithIntegerCellAttribute(points, isCoplanarInterior,integerCell) { parent=parent, neighbor=neighbor};
+            return new Face2dWithIntegerCellAttribute(points, isCoplanarInterior,integerCell) { parent=parent, neighbor=neighbor, mark=mark };
         }
         public override IPolyhedron Recreate(HashSet<IPolyhedron> facets) {
 
-            return new Face2dWithIntegerCellAttribute(facets, isCoplanarInterior, integerCell) { parent=parent, neighbor=neighbor};
+            return new Face2dWithIntegerCellAttribute(facets, isCoplanarInterior, integerCell) { parent=parent, neighbor=neighbor, mark=mark };
         }
     }
     public class Face2dOrientedEquality : IEqualityComparer<Face2d>

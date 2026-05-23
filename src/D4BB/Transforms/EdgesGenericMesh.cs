@@ -67,7 +67,15 @@ public class EdgesGenericMesh {
 
             List<ushort> target;
             int submesh;
-            if (edge.isCoplanarInterior && edge.neighbor==null) {
+            // Grid-intersection edges (mark=MARK_GRID_INTERSECTION) are rendered as regular
+            // edges. They reach BoundaryEdges() only when showGridIntersections=true, and
+            // they always have a coplanar neighbor — which would otherwise have routed them
+            // to the invisible-debug submesh.
+            if (edge.mark == IPolyhedron.MARK_GRID_INTERSECTION) {
+                target = triangles0;
+                submesh = 0;
+            }
+            else if (edge.isCoplanarInterior && edge.neighbor==null) {
                 target = triangles1;
                 submesh = 1;
             } else if (edge.neighbor!=null && edge.neighbor.isCoplanarInterior) {

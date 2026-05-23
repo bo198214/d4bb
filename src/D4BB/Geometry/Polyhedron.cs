@@ -67,9 +67,16 @@ namespace D4BB.Geometry
         }
     }
     public interface IPolyhedron {
+        // Identifies the origin of a polyhedron, propagated through Recreate/OpposingClone
+        // so cut halves keep the parent's mark, while elements freshly created at a cut
+        // (cut vertex, cut edge, cut face) stay at MARK_NONE.
+        public const int MARK_NONE = 0;
+        public const int MARK_GRID_INTERSECTION = 1;
+
         public HashSet<IPolyhedron> facets {get;}
         public IPolyhedron parent {get;set;}
         public IPolyhedron neighbor {get;set;}
+        public int mark {get;set;}
         public int Dim();
         public SplitResult Split(HalfSpace cutPlane);
         public IPolyhedron Recreate(HashSet<IPolyhedron> _facets);
@@ -293,6 +300,7 @@ namespace D4BB.Geometry
         public bool isCoplanarInterior {get; set;}
         public IPolyhedron parent {get; set;}
         public IPolyhedron neighbor {get;set;}
+        public int mark {get;set;}
 
         protected Polyhedron(bool isCoplanarInterior) {
             this.isCoplanarInterior = isCoplanarInterior;
@@ -307,11 +315,11 @@ namespace D4BB.Geometry
         }
         public virtual IPolyhedron Recreate(HashSet<IPolyhedron> _facets)
         {
-            return new Polyhedron(_facets,isCoplanarInterior) { parent = parent, neighbor=neighbor };
+            return new Polyhedron(_facets,isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
         }
         public virtual IPolyhedron OpposingClone() {
             //we have no orientation, so opposingClone is just a copy
-            var res = new Polyhedron(facets,isCoplanarInterior) { parent = parent };
+            var res = new Polyhedron(facets,isCoplanarInterior) { parent = parent, mark = mark };
             res.neighbor = this;
             neighbor = res;
             return res;
@@ -399,6 +407,10 @@ namespace D4BB.Geometry
                 }
                 res.innerCut = someFacet.Recreate(innerCutsOpposing);
                 res.outerCut = someFacet.Recreate(outerCutsOpposing);
+                // Recreate() would have copied someFacet.mark; but the cut face is fresh
+                // geometry at the cut plane, not the same polyhedron — reset to MARK_NONE.
+                res.innerCut.mark = IPolyhedron.MARK_NONE;
+                res.outerCut.mark = IPolyhedron.MARK_NONE;
                 inners.Add(res.innerCut);
                 outers.Add(res.outerCut);
             }

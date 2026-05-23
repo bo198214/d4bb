@@ -355,10 +355,10 @@ public class Scene4dHashTests {
         var ctor = typeof(Polyhedron3dBoundaryComplex).GetConstructor(
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public,
             null,
-            new System.Type[] { typeof(System.Collections.Generic.List<Face2dBC>), typeof(bool) },
+            new System.Type[] { typeof(System.Collections.Generic.List<Face2dBC>), typeof(bool), typeof(bool) },
             null);
-        Assert.That(ctor, Is.Not.Null, "couldn't find Polyhedron3dBoundaryComplex(List<Face2dBC>, bool)");
-        return (Polyhedron3dBoundaryComplex)ctor.Invoke(new object[] { permutedFaces, false });
+        Assert.That(ctor, Is.Not.Null, "couldn't find Polyhedron3dBoundaryComplex(List<Face2dBC>, bool, bool)");
+        return (Polyhedron3dBoundaryComplex)ctor.Invoke(new object[] { permutedFaces, false, true });
     }
 
     // Wraps Camera4dParallel and perturbs viewNormal slightly so that the otherwise-
