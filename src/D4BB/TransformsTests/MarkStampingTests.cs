@@ -7,11 +7,11 @@ using D4BB.Geometry;
 namespace D4BB.Transforms {
 
 // Stamping tests for the *BC pipeline: every polyhedron originating from an IntegerCell
-// is tagged with mark=MARK_GRID_INTERSECTION so the showGridIntersections toggle can
+// is tagged with mark=MARK_GRID_DIVISION so the showGridDivisions toggle can
 // distinguish them from BSP-cut geometry (mark=MARK_NONE).
 public class MarkStampingTests
 {
-    const int GI = IPolyhedron.MARK_GRID_INTERSECTION;
+    const int GI = IPolyhedron.MARK_GRID_DIVISION;
     const int NONE = IPolyhedron.MARK_NONE;
 
     [Test] public void Face2dBC_FromIntegerCell_StampsGridIntersection() {

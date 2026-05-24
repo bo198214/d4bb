@@ -15,7 +15,7 @@ namespace D4BB.Geometry
 //     get mark=MARK_NONE — they are new geometry, not the original polyhedron.
 public class MarkPropagationTests
 {
-    const int GI = IPolyhedron.MARK_GRID_INTERSECTION;
+    const int GI = IPolyhedron.MARK_GRID_DIVISION;
     const int NONE = IPolyhedron.MARK_NONE;
 
     // ── Edge.Split ────────────────────────────────────────────────────────

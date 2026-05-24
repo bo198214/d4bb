@@ -9,7 +9,7 @@ namespace D4BB.Transforms
     {
         public ICamera4d camera { get; set; }
         public bool showIntraCoplanarEdges;
-        public bool showGridIntersections = true;
+        public bool showGridDivisions = true;
         public bool enable4dOcclusion = true;
         public bool cullBackFaces = true;
         public bool stepMode = false;
@@ -30,11 +30,11 @@ namespace D4BB.Transforms
 
         private int numPieces = 0;
 
-        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridIntersections = true)
+        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridDivisions = true)
         {
             this.camera = camera;
             this.showIntraCoplanarEdges = showIntraCoplanarEdges;
-            this.showGridIntersections = showGridIntersections;
+            this.showGridDivisions = showGridDivisions;
             this.cullBackFaces = cullBackFaces;
             Update(origins);
         }
@@ -219,7 +219,7 @@ namespace D4BB.Transforms
             foreach (var c3 in occluderCells)
             {
                 var faces = ownedFacesOf.TryGetValue(c3, out var fs) ? fs : new List<Face2dBC>();
-                var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges, showGridIntersections);
+                var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges, showGridDivisions);
                 foreach (var pf in faces) pf.pbc = cellPbc;
                 cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
                 addedHere++;

@@ -74,10 +74,10 @@ public class EdgesGenericMesh {
             //   2 = intracoplanar-pair edges (edgeInvisibleMaterial): symmetric coplanar
             //       pair where both halves are still present. Reached when a Split's
             //       CrossReference paired them and no CutOut has since removed one side.
-            // Grid-intersection edges (mark=MARK_GRID_INTERSECTION) are a symmetric pair
+            // Grid-intersection edges (mark=MARK_GRID_DIVISION) are a symmetric pair
             // too, but route to 0 (regular) — they reach BoundaryEdges() only when the
             // grid-toggle is on, and the user wants them with the regular material.
-            if (edge.mark == IPolyhedron.MARK_GRID_INTERSECTION) {
+            if (edge.mark == IPolyhedron.MARK_GRID_DIVISION) {
                 target = triangles0;
                 submesh = 0;
             }

@@ -71,7 +71,7 @@ namespace D4BB.Geometry
         // so cut halves keep the parent's mark, while elements freshly created at a cut
         // (cut vertex, cut edge, cut face) stay at MARK_NONE.
         public const int MARK_NONE = 0;
-        public const int MARK_GRID_INTERSECTION = 1;
+        public const int MARK_GRID_DIVISION = 1;
 
         public HashSet<IPolyhedron> facets {get;}
         public IPolyhedron parent {get;set;}

@@ -13,7 +13,7 @@ public class VertexBC : Vertex
     public VertexBC(IntegerCell ic) : base(new Point(ic.origin))
     {
         Debug.Assert(ic.Dim()==0,"2852144565");
-        mark = IPolyhedron.MARK_GRID_INTERSECTION;
+        mark = IPolyhedron.MARK_GRID_DIVISION;
     }
 }
 public class EdgeBC : Edge
@@ -27,11 +27,11 @@ public class EdgeBC : Edge
         a.pos4d = ic.EdgeA().origin.Select(v => (double)v).ToArray();
         b.pos4d = ic.EdgeB().origin.Select(v => (double)v).ToArray();
         // Mark this edge and its endpoints as originating from the IntegerComplex grid,
-        // so the showGridIntersections filter can route them through the grid-specific
+        // so the showGridDivisions filter can route them through the grid-specific
         // toggle rather than the BSP-cut toggle (showIntraCoplanarEdges).
-        mark = IPolyhedron.MARK_GRID_INTERSECTION;
-        a.mark = IPolyhedron.MARK_GRID_INTERSECTION;
-        b.mark = IPolyhedron.MARK_GRID_INTERSECTION;
+        mark = IPolyhedron.MARK_GRID_DIVISION;
+        a.mark = IPolyhedron.MARK_GRID_DIVISION;
+        b.mark = IPolyhedron.MARK_GRID_DIVISION;
     }
     public override IPolyhedron Recreate(Vertex a, Vertex b) {
         return new EdgeBC(a,b,isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
@@ -51,7 +51,7 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
             base(ic.ClockwiseFromOutsideEdges2d().Select(e => new EdgeBC(e, cam)).Cast<Edge>().ToList(), false, ic) {
         Debug.Assert(ic.Dim()==2,"7065983586");
         camera = cam;
-        mark = IPolyhedron.MARK_GRID_INTERSECTION;
+        mark = IPolyhedron.MARK_GRID_DIVISION;
         int i=0;
         foreach (var iEdge in ic.ClockwiseFromOutsideEdges2d()) {
             i2p[iEdge] = (EdgeBC)edges[i];
@@ -115,14 +115,14 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
             foreach (var vi in vertices) {
                 points.Add(new Point(vi));
             }
-            var face = new Face2dBC(points,false, ic) { mark = IPolyhedron.MARK_GRID_INTERSECTION };
+            var face = new Face2dBC(points,false, ic) { mark = IPolyhedron.MARK_GRID_DIVISION };
             // The points-based Face2dBC ctor builds plain Edges/Vertices via Points2Edges,
             // which don't go through EdgeBC.ctor — stamp the inner edges and vertices here
             // so the whole face tree is consistently marked as grid-intersection.
             foreach (var e in face.edges) {
-                e.mark = IPolyhedron.MARK_GRID_INTERSECTION;
-                e.a.mark = IPolyhedron.MARK_GRID_INTERSECTION;
-                e.b.mark = IPolyhedron.MARK_GRID_INTERSECTION;
+                e.mark = IPolyhedron.MARK_GRID_DIVISION;
+                e.a.mark = IPolyhedron.MARK_GRID_DIVISION;
+                e.b.mark = IPolyhedron.MARK_GRID_DIVISION;
             }
             return face;
         }
@@ -132,7 +132,7 @@ public class Face2dBC : Face2dWithIntegerCellAttribute {
         foreach (var cell in ibc.cells) {
             resFacets.Add(FromIntegerCell(cell));
         }
-        var res =  new Polyhedron(resFacets, false) { mark = IPolyhedron.MARK_GRID_INTERSECTION }; //we need the extra information only for 2d facet
+        var res =  new Polyhedron(resFacets, false) { mark = IPolyhedron.MARK_GRID_DIVISION }; //we need the extra information only for 2d facet
         // if (center==null) center = res.CenterPoint();
         // if (ic.Dim()==3) {
         //     foreach (var facet in resFacets) {
@@ -163,18 +163,18 @@ public class Polyhedron3dBoundaryComplex {
     // public List<EdgeBC> visibleEdges = new();
     // public List<VertexBC> visibleVertices = new();
     bool showIntraCoplanarEdges;
-    bool showGridIntersections;
+    bool showGridDivisions;
 
     public List<CellBoundary> cellBoundaries;
-    internal Polyhedron3dBoundaryComplex(List<Face2dBC> prebuiltFaces, bool showIntraCoplanarEdges, bool showGridIntersections = true) {
+    internal Polyhedron3dBoundaryComplex(List<Face2dBC> prebuiltFaces, bool showIntraCoplanarEdges, bool showGridDivisions = true) {
         this.showIntraCoplanarEdges = showIntraCoplanarEdges;
-        this.showGridIntersections = showGridIntersections;
+        this.showGridDivisions = showGridDivisions;
         d2faces = new HashSet<Face2dBC>(prebuiltFaces, ByRef.I);
         foreach (var face in d2faces)
             i2p[face.integerCell] = face;
     }
-    public Polyhedron3dBoundaryComplex(HashSet<OrientedIntegerCell> cells3, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridIntersections=true)
-            : this(new IntegerBoundaryComplex(cells3), cam, showIntraCoplanarEdges, showGridIntersections) {
+    public Polyhedron3dBoundaryComplex(HashSet<OrientedIntegerCell> cells3, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridDivisions=true)
+            : this(new IntegerBoundaryComplex(cells3), cam, showIntraCoplanarEdges, showGridDivisions) {
         cellBoundaries = new List<CellBoundary>();
         foreach (var c3 in cells3) {
             var cellFaces = new List<Face2dBC>(); //collecting the projected 2d faces from this PBC that belong to c3
@@ -182,16 +182,16 @@ public class Polyhedron3dBoundaryComplex {
                 if (i2p.TryGetValue(c2, out var face))
                     cellFaces.Add(face);
             cellBoundaries.Add(new CellBoundary(c3,
-                new Polyhedron3dBoundaryComplex(cellFaces, showIntraCoplanarEdges, showGridIntersections)));
+                new Polyhedron3dBoundaryComplex(cellFaces, showIntraCoplanarEdges, showGridDivisions)));
         }
     }
-    public Polyhedron3dBoundaryComplex(int[] origin, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridIntersections=true)
-            : this(new IntegerBoundaryComplex(origin), cam, showIntraCoplanarEdges, showGridIntersections) {}
-    public Polyhedron3dBoundaryComplex(int[][] origins, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridIntersections=true)
-            : this(new IntegerBoundaryComplex(origins), cam, showIntraCoplanarEdges, showGridIntersections) {}
-    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridIntersections=true) {
+    public Polyhedron3dBoundaryComplex(int[] origin, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridDivisions=true)
+            : this(new IntegerBoundaryComplex(origin), cam, showIntraCoplanarEdges, showGridDivisions) {}
+    public Polyhedron3dBoundaryComplex(int[][] origins, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridDivisions=true)
+            : this(new IntegerBoundaryComplex(origins), cam, showIntraCoplanarEdges, showGridDivisions) {}
+    public Polyhedron3dBoundaryComplex(IntegerBoundaryComplex i3bc, ICamera4d cam=null, bool showIntraCoplanarEdges=false, bool showGridDivisions=true) {
         this.showIntraCoplanarEdges = showIntraCoplanarEdges;
-        this.showGridIntersections = showGridIntersections;
+        this.showGridDivisions = showGridDivisions;
         foreach (var i2c in i3bc.cells) {
             var pc = new Face2dBC(i2c, cam) { pbc = this};
             i2p[i2c] = pc;
@@ -327,8 +327,8 @@ public class Polyhedron3dBoundaryComplex {
                 // The `mark` field routes each isCoplanarInterior edge to its own toggle.
                 bool isInterior = edge.isCoplanarInterior && edge.neighbor != null;
                 bool show = !isInterior
-                    || (edge.mark == IPolyhedron.MARK_GRID_INTERSECTION
-                        ? showGridIntersections
+                    || (edge.mark == IPolyhedron.MARK_GRID_DIVISION
+                        ? showGridDivisions
                         : showIntraCoplanarEdges);
                 if (show) {
                     res.Add((EdgeBC)edge);
