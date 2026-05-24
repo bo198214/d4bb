@@ -25,6 +25,14 @@ namespace D4BB.Transforms
         public class PieceTopology {
             public int[][] origins;  // current tesseract origins (owned copy)
             public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces;
+            // Interior 2-faces between two coplanar boundary 3-cells of the same piece
+            // (the "Grid-Division" faces — the 2D subdivision that lives one dimension
+            // deeper than coplanar grid edges). Filtered out in ComputePieceTopology with
+            // `continue`, but kept here so RebuildCellsFromPieceTopology can re-add them as
+            // Face2dBCs when showGridDivisions=true.
+            // (c3 is the lexicographically smaller of the two coplanar parents — pragmatic
+            // ownership choice so the face attaches to a single PBC for CutOut.)
+            public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] interiorDivisionFaces;
         }
         public PieceTopology[] pieceTopologies { get; private set; } = System.Array.Empty<PieceTopology>();
 
@@ -47,7 +55,7 @@ namespace D4BB.Transforms
         public void Update(int[][][] pieceOrigins)
         {
             numPieces = pieceOrigins?.Length ?? 0;
-            pieceTopologies = ComputeAllTopologies(pieceOrigins);
+            pieceTopologies = ComputeAllTopologies(pieceOrigins, showGridDivisions);
             RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
@@ -74,6 +82,12 @@ namespace D4BB.Transforms
                 c3.Translate(axis);
                 f2.Translate(axis);
             }
+            // Interior division f2 are disjoint from coplanarBoundaryFaces' f2 — translate
+            // separately. owner_c3 is already an `ibc.cells` member and was translated above
+            // (same reference, just reached via a different tuple). Only the f2 still needs it.
+            if (topo.interiorDivisionFaces != null)
+                foreach (var (_, f2) in topo.interiorDivisionFaces)
+                    f2.Translate(axis);
             RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
@@ -88,6 +102,9 @@ namespace D4BB.Transforms
                 c3.Rotate(center, v, w);
                 f2.Rotate(center, v, w);
             }
+            if (topo.interiorDivisionFaces != null)
+                foreach (var (_, f2) in topo.interiorDivisionFaces)
+                    f2.Rotate(center, v, w);
             RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
@@ -95,12 +112,12 @@ namespace D4BB.Transforms
 
         // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
 
-        private static PieceTopology[] ComputeAllTopologies(int[][][] pieceOrigins)
+        private static PieceTopology[] ComputeAllTopologies(int[][][] pieceOrigins, bool showGridDivisions)
         {
             if (pieceOrigins == null) return System.Array.Empty<PieceTopology>();
             var result = new PieceTopology[pieceOrigins.Length];
             for (int i = 0; i < pieceOrigins.Length; i++)
-                result[i] = ComputePieceTopology(pieceOrigins[i]);
+                result[i] = ComputePieceTopology(pieceOrigins[i], showGridDivisions);
             return result;
         }
 
@@ -110,24 +127,41 @@ namespace D4BB.Transforms
         // Note: the same f2 may appear with multiple c3's (from different hyperplanes). Dedup
         // happens later in RebuildCellsFromPieceTopology, after backface culling, so that a backface-
         // culled c3 cannot block f2 from being claimed by a front-facing c3'.
-        private static PieceTopology ComputePieceTopology(int[][] origins)
+        private static PieceTopology ComputePieceTopology(int[][] origins, bool showGridDivisions)
         {
             var ibc = new IntegerBoundaryComplex(origins);
             var coplanarBoundaryFaces = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>();
+            // Only allocate interior-collection plumbing when the toggle is on; saves work
+            // and allocations on the common path. The toggle is propagated from Scene4d via
+            // ComputeAllTopologies — a Game.cs toggle flip triggers scene4d.Update, which
+            // re-runs ComputeAllTopologies with the new flag, so the cache stays in sync.
+            var interiorDivisionFaces = showGridDivisions
+                ? new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>() : null;
+            // Track interior f2s already collected (from the other coplanar parent's iteration)
+            // so we don't add them twice. Pick the lexicographically smaller c3 as the owner.
+            var interiorClaimed = showGridDivisions ? new HashSet<IntegerCell>() : null;
 
             foreach (OrientedIntegerCell c3 in ibc.cells)
             {
                 foreach (var f2 in c3.Facets())
                 {
                     if (ibc.neighborOfVia[c3].TryGetValue(f2, out var ibcNeighbor)
-                        && ibcNeighbor.Equals(c3.SameSpaceOtherParent(f2))) continue; // interior
+                        && ibcNeighbor.Equals(c3.SameSpaceOtherParent(f2)))
+                    {
+                        if (showGridDivisions && interiorClaimed.Add(f2)) {
+                            var owner = CompareCells(c3, ibcNeighbor) <= 0 ? c3 : ibcNeighbor;
+                            interiorDivisionFaces.Add((owner, f2));
+                        }
+                        continue;
+                    }
                     coplanarBoundaryFaces.Add((c3, f2));
                 }
             }
 
             return new PieceTopology {
                 origins = DeepCloneOrigins(origins),
-                coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray()
+                coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray(),
+                interiorDivisionFaces = interiorDivisionFaces?.ToArray()
             };
         }
 
@@ -212,6 +246,27 @@ namespace D4BB.Transforms
                     {
                         pEdge1.isCoplanarInterior = false;
                     }
+                }
+            }
+
+            // Lazy creation of interior Grid-Division 2-faces: only when the toggle is on.
+            // They attach to the lexicographically-smaller (owner) c3's PBC so each interior
+            // face lives in exactly one PBC for CutOut bookkeeping. The two coplanar parent
+            // 3-cells share the same hyperplane, so any occluder that cuts one also cuts the
+            // other — the choice of owner doesn't affect visual correctness.
+            // The interior Face2dBCs are marked isCoplanarInterior=true (semantically: they
+            // sit between two coplanar parents) and inherit mark=GRID_DIVISION from the
+            // Face2dBC(OrientedIntegerCell,…) ctor stamp.
+            if (showGridDivisions && topo.interiorDivisionFaces != null)
+            {
+                foreach (var (owner_c3, f2) in topo.interiorDivisionFaces)
+                {
+                    if (cullBackFaces && !camera.IsFacedBy(new Point(owner_c3.origin), new Point(owner_c3.Normal())))
+                        continue; // owner backface-culled → drop the division face with it
+                    occluderCells.Add(owner_c3); // ensure owner has a PBC
+                    var pf = new Face2dBC(f2, camera) { isCoplanarInterior = true };
+                    if (!ownedFacesOf.ContainsKey(owner_c3)) ownedFacesOf[owner_c3] = new();
+                    ownedFacesOf[owner_c3].Add(pf);
                 }
             }
 

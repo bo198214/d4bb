@@ -38,5 +38,41 @@ public class MarkStampingTests
         Assert.That(sr.innerCut.mark, Is.EqualTo(NONE), "New cut face at split plane is not grid.");
         Assert.That(sr.outerCut.mark, Is.EqualTo(NONE), "New cut face (outer) at split plane is not grid.");
     }
+
+    // Compound of two 4D tesseracts touching at the (1,_,_,_)-hyperplane: their shared
+    // internal 3-cell has 6 boundary 2-faces. These 6 are the Grid-Division interior
+    // faces — invisible by default, visible when showGridDivisions=true.
+    [Test] public void Scene4d_TwoTesseractsCompound_GridDivisionFaces_Lazy() {
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0}, new int[] {1,0,0,0} }   // one piece, two tesseracts
+        };
+        var camera = new Camera4dParallel();
+
+        // showGridDivisions=false → no interior faces created (lazy)
+        var sceneOff = new Scene4d(origins, camera, showIntraCoplanarEdges: false, cullBackFaces: false, showGridDivisions: false);
+        sceneOff.enable4dOcclusion = false;
+        sceneOff.Update(origins);
+        int facesOff = sceneOff.VisibleFacets(0).Count;
+
+        // showGridDivisions=true → interior division faces added
+        var sceneOn = new Scene4d(origins, camera, showIntraCoplanarEdges: false, cullBackFaces: false, showGridDivisions: true);
+        sceneOn.enable4dOcclusion = false;
+        sceneOn.Update(origins);
+        int facesOn = sceneOn.VisibleFacets(0).Count;
+
+        Assert.That(facesOn, Is.GreaterThan(facesOff),
+            "showGridDivisions=true must expose at least one extra Face2dBC compared to =false.");
+        Assert.That(facesOn - facesOff, Is.EqualTo(6),
+            "Two touching tesseracts share an internal hexahedral 3-cell with 6 boundary 2-faces.");
+
+        // Every extra face has mark=GRID_DIVISION and is isCoplanarInterior=true
+        var offSet = new HashSet<Face2d>(sceneOff.VisibleFacets(0), new Face2dUnOrientedEquality(AOP.binaryPrecision));
+        foreach (var f in sceneOn.VisibleFacets(0))
+        {
+            if (offSet.Contains(f)) continue;
+            Assert.That(f.mark, Is.EqualTo(GI), "Extra face must be marked as Grid-Division.");
+            Assert.That(f.isCoplanarInterior, Is.True, "Extra face must be marked isCoplanarInterior.");
+        }
+    }
 }
 }
