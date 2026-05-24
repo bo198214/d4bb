@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using D4BB.Comb;
 using D4BB.Geometry;
 
@@ -7,6 +8,14 @@ namespace D4BB.Transforms
 {
     public class Scene4d
     {
+        // Reference-identity comparer for OrientedIntegerCell — Translate/Rotate need to
+        // mutate every distinct *instance* exactly once, regardless of content equality.
+        private sealed class ByRefCellComparer : IEqualityComparer<OrientedIntegerCell> {
+            internal static readonly ByRefCellComparer I = new();
+            public bool Equals(OrientedIntegerCell x, OrientedIntegerCell y) => ReferenceEquals(x, y);
+            public int GetHashCode(OrientedIntegerCell c) => RuntimeHelpers.GetHashCode(c);
+        }
+
         public ICamera4d camera { get; set; }
         public bool showIntraCoplanarEdges;
         public bool showGridDivisions = true;
@@ -23,7 +32,9 @@ namespace D4BB.Transforms
         // IntegerBoundaryComplex. Translate/Rotate only mutate the origins/spans in-place,
         // so the face selection stays valid and the expensive IBC rebuild is avoided.
         public class PieceTopology {
-            public int[][] origins;  // current tesseract origins (owned copy)
+            // Origins are not stored — single source of truth is gameLevel.compounds[i].origins.
+            // Topology mutations (Translate/Rotate) act on the OrientedIntegerCell instances
+            // *inside* these tuple arrays directly.
             public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces;
             // Interior 2-faces between two coplanar boundary 3-cells of the same piece
             // (the "Grid-Division" faces — the 2D subdivision that lives one dimension
@@ -73,21 +84,26 @@ namespace D4BB.Transforms
             RefreshVisibleCache();
         }
 
+        // Mutates topology in place — every OrientedIntegerCell in the tuple arrays gets
+        // Translate/Rotate called exactly once. The same c3 reference appears in up to 6
+        // boundary tuples (one per facet) and possibly also in interior tuples; only the
+        // first occurrence is mutated. f2 instances are unique per tuple (Facets() builds
+        // fresh OrientedIntegerCells), so they need no dedup.
         public void Translate(int pieceIndex, IntegerSignedAxis axis)
         {
             var topo = pieceTopologies[pieceIndex];
-            IntegerOps.Translate(topo.origins, axis);
+            var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
             foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
             {
-                c3.Translate(axis);
+                if (seen.Add(c3)) c3.Translate(axis);
                 f2.Translate(axis);
             }
-            // Interior division f2 are disjoint from coplanarBoundaryFaces' f2 — translate
-            // separately. owner_c3 is already an `ibc.cells` member and was translated above
-            // (same reference, just reached via a different tuple). Only the f2 still needs it.
             if (topo.interiorDivisionFaces != null)
-                foreach (var (_, f2) in topo.interiorDivisionFaces)
+                foreach (var (c3, f2) in topo.interiorDivisionFaces)
+                {
+                    if (seen.Add(c3)) c3.Translate(axis);
                     f2.Translate(axis);
+                }
             RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
@@ -96,15 +112,18 @@ namespace D4BB.Transforms
         public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
         {
             var topo = pieceTopologies[pieceIndex];
-            IntegerOps.Rotate(topo.origins, center, v, w);
+            var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
             foreach (var (c3, f2) in topo.coplanarBoundaryFaces)
             {
-                c3.Rotate(center, v, w);
+                if (seen.Add(c3)) c3.Rotate(center, v, w);
                 f2.Rotate(center, v, w);
             }
             if (topo.interiorDivisionFaces != null)
-                foreach (var (_, f2) in topo.interiorDivisionFaces)
+                foreach (var (c3, f2) in topo.interiorDivisionFaces)
+                {
+                    if (seen.Add(c3)) c3.Rotate(center, v, w);
                     f2.Rotate(center, v, w);
+                }
             RebuildCellsFromTopologies();
             ApplyCameraOcclusion();
             RefreshVisibleCache();
@@ -159,7 +178,6 @@ namespace D4BB.Transforms
             }
 
             return new PieceTopology {
-                origins = DeepCloneOrigins(origins),
                 coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray(),
                 interiorDivisionFaces = interiorDivisionFaces?.ToArray()
             };
@@ -402,12 +420,5 @@ namespace D4BB.Transforms
             return res;
         }
 
-        private static int[][] DeepCloneOrigins(int[][] origins)
-        {
-            var clone = new int[origins.Length][];
-            for (int i = 0; i < origins.Length; i++)
-                clone[i] = (int[])origins[i].Clone();
-            return clone;
-        }
     }
 }
