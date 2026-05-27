@@ -220,6 +220,12 @@ namespace D4BB.Transforms
         // ApplyCameraOcclusion) destructively modifies them by severing neighbor links.
         // Reusing objects from a previous frame would leave stale topology.
         private void RebuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex)
+            => cells.AddRange(BuildCellsFromPieceTopology(topo, pieceIndex, cullBackFaces));
+
+        // Pure builder — does not touch this.cells. Caller decides what to do with the result
+        // (RebuildCellsFromPieceTopology appends to this.cells; ComputePieceBoundaryEdges runs
+        // BoundaryEdges() locally without participating in occlusion).
+        private List<CellBoundary> BuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex, bool cullBackFacesArg)
         {
             // Role (b): every front-facing c3 must contribute halfspaces, regardless of f2 ownership.
             var occluderCells = new HashSet<OrientedIntegerCell>();
@@ -235,7 +241,7 @@ namespace D4BB.Transforms
 
             foreach (var (c3, f2) in orderedPairs)
             {
-                if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
+                if (cullBackFacesArg && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
                     continue;
                 occluderCells.Add(c3);
                 if (faceOf.ContainsKey(f2)) continue; // already claimed by an earlier c3 in dedup order
@@ -279,7 +285,7 @@ namespace D4BB.Transforms
             {
                 foreach (var (owner_c3, f2) in topo.interiorDivisionFaces)
                 {
-                    if (cullBackFaces && !camera.IsFacedBy(new Point(owner_c3.origin), new Point(owner_c3.Normal())))
+                    if (cullBackFacesArg && !camera.IsFacedBy(new Point(owner_c3.origin), new Point(owner_c3.Normal())))
                         continue; // owner backface-culled → drop the division face with it
                     occluderCells.Add(owner_c3); // ensure owner has a PBC
                     var pf = new Face2dBC(f2, camera) { isCoplanarInterior = true };
@@ -288,18 +294,31 @@ namespace D4BB.Transforms
                 }
             }
 
-            int addedHere = 0;
+            var result = new List<CellBoundary>(occluderCells.Count);
             foreach (var c3 in occluderCells)
             {
                 var faces = ownedFacesOf.TryGetValue(c3, out var fs) ? fs : new List<Face2dBC>();
                 var cellPbc = new Polyhedron3dBoundaryComplex(faces, showIntraCoplanarEdges, showGridDivisions);
                 foreach (var pf in faces) pf.pbc = cellPbc;
-                cells.Add(new CellBoundary(c3, cellPbc, pieceIndex));
-                addedHere++;
+                result.Add(new CellBoundary(c3, cellPbc, pieceIndex));
             }
             // Invariant: every front-facing c3 contributes an occluder, even ownerless ones.
-            Debug.Assert(addedHere == occluderCells.Count,
-                "RebuildCellsFromPieceTopology: every front-facing c3 must contribute an occluder.");
+            Debug.Assert(result.Count == occluderCells.Count,
+                "BuildCellsFromPieceTopology: every front-facing c3 must contribute an occluder.");
+            return result;
+        }
+
+        // Edges of a single piece without participating in scene-wide occlusion or mutating
+        // this.cells. Used for the drag-ghost snapshot: pass cullBackFaces=false to get the
+        // full hull of the piece (front + back facing cells).
+        public HashSet<IPolyhedron> ComputePieceBoundaryEdges(int pieceIndex, bool cullBackFaces)
+        {
+            var topo = pieceTopologies[pieceIndex];
+            var cellsLocal = BuildCellsFromPieceTopology(topo, pieceIndex, cullBackFaces);
+            var res = new HashSet<IPolyhedron>();
+            foreach (var cb in cellsLocal)
+                foreach (var e in cb.pbc.BoundaryEdges()) res.Add(e);
+            return res;
         }
 
         // Lexicographic tiebreaker over the (c3, f2) iteration so f2-dedup is deterministic.
