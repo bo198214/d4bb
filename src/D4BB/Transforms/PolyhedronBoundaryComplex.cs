@@ -18,6 +18,10 @@ public class VertexBC : Vertex
 }
 public class EdgeBC : Edge
 {
+    // The 2-face this edge bounds (set in Polyhedron3dBoundaryComplex.BoundaryEdges from the
+    // owning Face2dBC). Lets consumers attribute an edge to its elementary tesseract exactly
+    // like faces, instead of re-deriving it geometrically at render time.
+    public IntegerCell integerCell;
     protected EdgeBC(Vertex a, Vertex b, bool isCoplanarInterior = false) : base(a, b, isCoplanarInterior)    {}
     public EdgeBC(OrientedIntegerCell ic, ICamera4d cam=null) : base(
             cam == null ? new Point(ic.EdgeA().origin) : cam.Proj3d(new Point4d(ic.EdgeA().origin)),
@@ -34,7 +38,7 @@ public class EdgeBC : Edge
         b.mark = IPolyhedron.MARK_GRID_DIVISION;
     }
     public override IPolyhedron Recreate(Vertex a, Vertex b) {
-        return new EdgeBC(a,b,isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark };
+        return new EdgeBC(a,b,isCoplanarInterior) { parent = parent, neighbor=neighbor, mark=mark, integerCell=integerCell };
     }
 }
 public class Face2dBC : Face2dWithIntegerCellAttribute {
@@ -331,7 +335,13 @@ public class Polyhedron3dBoundaryComplex {
                         ? showGridDivisions
                         : showIntraCoplanarEdges);
                 if (show) {
-                    res.Add((EdgeBC)edge);
+                    var ebc = (EdgeBC)edge;
+                    // Attribute the edge to its owning 2-face so consumers can resolve the
+                    // elementary tesseract (and thus depth) the same way faces do. Shared edges
+                    // get whichever face is visited last — fine, since OwningMinDepth on either
+                    // 2-face resolves to the same tesseract for non-grid edges.
+                    ebc.integerCell = facet.integerCell;
+                    res.Add(ebc);
                 }
             }
         }

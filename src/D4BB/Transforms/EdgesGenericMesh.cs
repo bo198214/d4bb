@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using D4BB.Geometry;
+using D4BB.Comb;
 
 namespace D4BB.Transforms
 {
@@ -46,6 +47,7 @@ public struct EdgeClassInfo {
     public bool isCoplanarInterior;
     public bool neighborNull;
     public bool neighborCoplanarInterior;
+    public IntegerCell integerCell;  // owning 2-face (from EdgeBC), null if unknown
 }
 
 public class EdgesGenericMesh {
@@ -105,6 +107,7 @@ public class EdgesGenericMesh {
                 isCoplanarInterior = edge.isCoplanarInterior,
                 neighborNull = edge.neighbor == null,
                 neighborCoplanarInterior = edge.neighbor != null && edge.neighbor.isCoplanarInterior,
+                integerCell = (edge as EdgeBC)?.integerCell,
             });
 
             var i0 = (ushort)vertices.Count;
