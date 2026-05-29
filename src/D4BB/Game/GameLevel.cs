@@ -28,8 +28,8 @@ namespace D4BB.Game
         {
             Objective = obj;
             goal = IntegerOps.Clone(obj.goal);
-            foreach (var piece in obj.pieces)
-                compounds.Add(new Compound(piece));
+            for (int i = 0; i < obj.pieces.Length; i++)
+                compounds.Add(new Compound(obj.pieces[i]) { colorSlot = i });
             PropagateStatus();
         }
 
@@ -127,8 +127,8 @@ namespace D4BB.Game
         public void Reset()
         {
             compounds.Clear();
-            foreach (var piece in Objective.pieces)
-                compounds.Add(new Compound(piece));
+            for (int i = 0; i < Objective.pieces.Length; i++)
+                compounds.Add(new Compound(Objective.pieces[i]) { colorSlot = i });
             selectedIndex = 0;
             PropagateStatus();
             OnReset?.Invoke();
