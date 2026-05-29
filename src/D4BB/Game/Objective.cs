@@ -53,12 +53,17 @@ namespace D4BB.Game
             public int[][] PaddingsLowerUpper { get; set; }
         }
 
+        // Spatial dimension of the puzzle, inferred from the piece coordinates (4 for the
+        // main 4D game, 3 for Game3d). Every cell origin carries one coord per axis.
+        static int Dim(int[][][] pieces) => pieces[0][0].Length;
+
         public int[][] BoundingBox()
         {
+            int dim = Dim(pieces);
             int[][] res = new int[2][];
-            res[0] = new int[4];
-            res[1] = new int[4];
-            for (int k = 0; k < 4; k++) {
+            res[0] = new int[dim];
+            res[1] = new int[dim];
+            for (int k = 0; k < dim; k++) {
                 res[0][k] = int.MaxValue;
                 res[1][k] = int.MinValue;
                 for (int i = 0; i < pieces.Length; i++)
@@ -72,10 +77,11 @@ namespace D4BB.Game
         }
         public static int[][] BoundaryMinMax(int[][][] pieces, int padding)
         {
+            int dim = Dim(pieces);
             int[][] res = new int[2][];
-            res[0] = new int[4];
-            res[1] = new int[4];
-            for (int k = 0; k < 4; k++) {
+            res[0] = new int[dim];
+            res[1] = new int[dim];
+            for (int k = 0; k < dim; k++) {
                 res[0][k] = int.MaxValue;
                 res[1][k] = int.MinValue;
                 for (int i = 0; i < pieces.Length; i++)
@@ -84,8 +90,9 @@ namespace D4BB.Game
                         if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
                     }
                 // Cavalier world_z = z + pz·w (pz > 0): the viewer-facing surface of
-                // the play volume sits at (min z, min w). Front-padding on axes 2/3
-                // would let pieces drift into the viewer; we only pad the far side.
+                // the play volume sits at (min z, min w). Front-padding on the depth
+                // axes (2 and up) would let pieces drift into the viewer; we only pad
+                // the far side. Axes 0/1 (the projection plane) are padded both sides.
                 if (k < 2) res[0][k] -= padding;
                 res[1][k] += 1+padding;
             }
@@ -93,17 +100,18 @@ namespace D4BB.Game
         }
         public static int[][] BoundaryMinMax(int[][][] pieces, int[][] paddingsLowerUpper)
         {
+            int dim = Dim(pieces);
             if (paddingsLowerUpper == null
                 || paddingsLowerUpper.Length != 2
-                || paddingsLowerUpper[0] == null || paddingsLowerUpper[0].Length != 4
-                || paddingsLowerUpper[1] == null || paddingsLowerUpper[1].Length != 4)
+                || paddingsLowerUpper[0] == null || paddingsLowerUpper[0].Length != dim
+                || paddingsLowerUpper[1] == null || paddingsLowerUpper[1].Length != dim)
                 throw new ArgumentException(
-                    "paddings_lower_upper must be an int[2][4]: [lower-padding[4], upper-padding[4]].",
+                    $"paddings_lower_upper must be an int[2][{dim}]: [lower-padding[{dim}], upper-padding[{dim}]].",
                     nameof(paddingsLowerUpper));
             int[][] res = new int[2][];
-            res[0] = new int[4];
-            res[1] = new int[4];
-            for (int k = 0; k < 4; k++) {
+            res[0] = new int[dim];
+            res[1] = new int[dim];
+            for (int k = 0; k < dim; k++) {
                 res[0][k] = int.MaxValue;
                 res[1][k] = int.MinValue;
                 for (int i = 0; i < pieces.Length; i++)

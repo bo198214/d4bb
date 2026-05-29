@@ -196,14 +196,17 @@ public class FacetsGenericMesh {
                     vertices4d.Add(v.pos4d);
                     
                     normals?.Add(normal.x);
-                    if (pt.isCoplanarInterior) {
-                        uvs?.Add(new double[]{0,0});
-                    }
-                    else {
-                        if (((Face2dBC)pt).camera!=null) {
-                            uvs?.Add(UV(p,pt.integerCell,((Face2dBC)pt).camera));
+                    // The camera-based UV path casts to Face2dBC; only the 4D pipeline feeds
+                    // Face2dBC faces. Callers that don't request UVs (e.g. Game3d, which passes
+                    // plain Face2dWithIntegerCellAttribute faces) must skip the cast entirely.
+                    if (uvs != null) {
+                        if (pt.isCoplanarInterior) {
+                            uvs.Add(new double[]{0,0});
+                        }
+                        else if (((Face2dBC)pt).camera!=null) {
+                            uvs.Add(UV(p,pt.integerCell,((Face2dBC)pt).camera));
                         } else {
-                            uvs?.Add(UVFromIntegerFace(p,pt.integerCell,normal.x));
+                            uvs.Add(UVFromIntegerFace(p,pt.integerCell,normal.x));
                         }
                     }
                 }
