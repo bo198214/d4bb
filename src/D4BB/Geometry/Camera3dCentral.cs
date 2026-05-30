@@ -1,10 +1,10 @@
 namespace D4BB.Geometry {
+// Mirrors ICamera4d (which has no eye / SetPerspective): perspective-specific members live on
+// Camera3dCentral itself, so parallel cameras (Camera3dParallel) don't need to stub them.
 public interface ICamera3d {
-    public Point3d eye {get;}
     public Point Proj2d(Point point3d);
     public bool IsFacedBy(Point origin, Point normal);
     public Point3d viewNormal {get;}
-	public void SetPerspective(Point3d point);
 }
 public class Camera3dCentral : ICamera3d {
     public Point3d eye {get; set; }

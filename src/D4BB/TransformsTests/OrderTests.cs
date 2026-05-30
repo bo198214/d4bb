@@ -180,10 +180,13 @@ namespace D4BB.CombTests
                 new Camera3dCentral(new Point3d(-1,3,-2)),
                 new Camera3dCentral(new Point3d(3,-1,-2)),
                 new Camera3dCentral(new Point3d(-1,-1,-2)),
-                new Camera3dOrthographic(new Point3d(3,3,-2)),
-                new Camera3dOrthographic(new Point3d(-1,3,-2)),
-                new Camera3dOrthographic(new Point3d(3,-1,-2)),
-                new Camera3dOrthographic(new Point3d(-1,-1,-2)),
+                // Cavalier shears equivalent to the old Camera3dOrthographic(eye=(x,y,-2)),
+                // i.e. zDir = eye.xy / (-eye.z) = (x/2, y/2). The four signs span the same
+                // shear quadrants the eye positions used to cover.
+                new Camera3dParallel(new Point( 1.5,  1.5)),
+                new Camera3dParallel(new Point(-0.5,  1.5)),
+                new Camera3dParallel(new Point( 1.5, -0.5)),
+                new Camera3dParallel(new Point(-0.5, -0.5)),
             }) {
                 List<OrientedIntegerCell> facets = new();
                 foreach (var facet in behind.Facets().Union(inFront.Facets())) {
@@ -199,7 +202,7 @@ namespace D4BB.CombTests
                             var cmp2 = InFrontOfCellComparer.IsInFrontOf(facet2,facet3);
                             var cmp3 = InFrontOfCellComparer.IsInFrontOf(facet1,facet3);
                             if (cmp1 < 0 && cmp2 < 0) {
-                                Assert.That(cmp3, Is.LessThan(0), $"{camera.eye}: {facet1} {cmp1} {facet2} {cmp2} {facet3}");
+                                Assert.That(cmp3, Is.LessThan(0), $"{camera.viewNormal}: {facet1} {cmp1} {facet2} {cmp2} {facet3}");
                             }
                         }
                     }
