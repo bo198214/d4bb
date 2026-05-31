@@ -239,17 +239,41 @@ namespace D4BB.Transforms
             var orderedPairs = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>(topo.coplanarBoundaryFaces);
             orderedPairs.Sort(ComparePairsForDedup);
 
+            // f2-dedup ownership decides each face's winding (it follows the owner cell's
+            // outward orientation). A surface 2-face is shared by a camera-facing and a
+            // camera-averted 3-cell; the front owner produces the front-wound copy a
+            // single-sided MeshCollider raycast can hit. With cullBackFaces=on the averted
+            // cell is culled so the front cell always owns it; with cullBackFaces=off both
+            // survive and a pure geometry sort could hand ownership to the back cell, leaving
+            // the surface face back-wound (ray passes through it). So claim faces for FACING
+            // owners first (pass 1), then let averted owners pick up the rest (pass 2) — those
+            // are back/back shared faces on the far side, harmless to a single-sided raycast.
             foreach (var (c3, f2) in orderedPairs)
             {
-                if (cullBackFacesArg && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal())))
+                bool facing = camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()));
+                if (cullBackFacesArg && !facing)
                     continue;
                 occluderCells.Add(c3);
-                if (faceOf.ContainsKey(f2)) continue; // already claimed by an earlier c3 in dedup order
+                if (!facing) continue; // defer ownership to pass 2
+                if (faceOf.ContainsKey(f2)) continue; // already claimed by an earlier facing c3
 
                 var pf = new Face2dBC(f2, camera);
                 faceOf[f2] = pf;
                 if (!ownedFacesOf.ContainsKey(c3)) ownedFacesOf[c3] = new();
                 ownedFacesOf[c3].Add(pf);
+            }
+            if (!cullBackFacesArg)
+            {
+                foreach (var (c3, f2) in orderedPairs)
+                {
+                    if (camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) continue;
+                    if (faceOf.ContainsKey(f2)) continue;
+
+                    var pf = new Face2dBC(f2, camera);
+                    faceOf[f2] = pf;
+                    if (!ownedFacesOf.ContainsKey(c3)) ownedFacesOf[c3] = new();
+                    ownedFacesOf[c3].Add(pf);
+                }
             }
 
             // Set up edge neighbor links between adjacent visible faces.
