@@ -156,6 +156,78 @@ public class Polyhedron2dBoundaryComplex
             }
         return res;
     }
+
+    // ── camera occlusion (CutOut) ─────────────────────────────────────────────
+    // Ported from Polyhedron3dBoundaryComplex.CutOut, one dimension down: here the faces are
+    // 2D quads (projected onto the camera's z=0 plane) and the half-spaces are 2D lines (their
+    // normals lie in that plane). The clip/split routines are point-dimension-agnostic — they
+    // only call HalfSpace.side / cutPoint and Face2d.Split — so the body mirrors the 3D one with
+    // Face2dBC → Face2dIC. Faces here carry no face-level neighbor (only their edges do), so
+    // Face2d.Split's CrossReference never recurses into a neighbor face and no Split override is
+    // needed (unlike Face2dBC, whose override matters only for the BSP path).
+    //
+    // Phase 1: keep faces whose projection doesn't overlap the cut region (noSplit).
+    // Phase 2: clip the rest against each half-space, collecting the surviving outer fragments;
+    //          the leftover innerFacets1 are the parts being occluded away.
+    // Finally sever the neighbor links of the removed faces so the now-exposed edges of adjacent
+    // faces (in other cells' PBCs) become visible cut-boundary edges (mark=NONE → edgeCutMaterial).
+    public void CutOut(HalfSpace[] halfSpaces) {
+        var noSplit = new List<Face2dIC>();
+        var innerFacets1 = new List<Face2dIC>();
+        foreach (var facet in d2faces) {
+            if (FaceIntersectsPolyhedron(facet, halfSpaces)) innerFacets1.Add(facet);
+            else                                             noSplit.Add(facet);
+        }
+        var outerFacets = new List<Face2dIC>();
+        foreach (var halfSpace in halfSpaces) {
+            var innerFacets2 = new List<Face2dIC>();
+            Split(halfSpace, innerFacets1, innerFacets2, outerFacets);
+            innerFacets1 = innerFacets2;
+        }
+        foreach (var facet in innerFacets1)
+            foreach (var edge in facet.facets)
+                if (edge.neighbor != null) edge.neighbor.neighbor = null;
+        outerFacets.AddRange(noSplit);
+        d2faces = outerFacets;
+    }
+
+    // Routing for faces lying exactly on a cutter's line: by orientation (see the 3D twin).
+    // Cannot occur for a non-degenerate 2D quad vs a 2D cut line, so this is defensive only.
+    static void Split(HalfSpace halfSpace, IEnumerable<Face2dIC> facets, List<Face2dIC> out_inner, List<Face2dIC> out_outer) {
+        foreach (var facet in facets) {
+            var split = facet.Split(halfSpace);
+            if (split.inner != null) out_inner.Add((Face2dIC)split.inner);
+            if (split.outer != null) out_outer.Add((Face2dIC)split.outer);
+            if (split.isContained) {
+                if (AOP.gt(facet.Normal().sc(halfSpace.normal), 0)) out_inner.Add(facet);
+                else                                                out_outer.Add(facet);
+            }
+        }
+    }
+
+    static bool FaceIntersectsPolyhedron(Face2dIC facet, HalfSpace[] halfSpaces) {
+        List<Point> pts = facet.points;
+        foreach (var hs in halfSpaces) {
+            pts = ClipConvexPolygon(pts, hs);
+            if (pts.Count < 3) return false;
+        }
+        return true;
+    }
+
+    static List<Point> ClipConvexPolygon(List<Point> polygon, HalfSpace hs) {
+        var result = new List<Point>(polygon.Count + 1);
+        int n = polygon.Count;
+        for (int i = 0; i < n; i++) {
+            Point cur = polygon[i];
+            Point nxt = polygon[(i + 1) % n];
+            int cs = hs.side(cur);
+            int ns = hs.side(nxt);
+            if (cs <= 0) result.Add(cur);
+            if ((cs < 0 && ns > 0) || (cs > 0 && ns < 0))
+                result.Add(hs.cutPoint(cur, nxt));
+        }
+        return result;
+    }
 }
 
 }

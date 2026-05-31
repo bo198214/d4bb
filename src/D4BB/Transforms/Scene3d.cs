@@ -12,6 +12,9 @@ public class Scene3d
     public bool showGridDivisions = true;
     public bool enable3dOcclusion = true;
     public readonly List<Slab> slabs = new();
+    // Last origins passed to Update — lets UpdateCamera rebuild the slabs before re-occluding,
+    // so the destructive CutOut always starts from a clean state (see UpdateCamera).
+    private int[][][] lastPieceOrigins;
 
     public class Slab
     {
@@ -62,12 +65,18 @@ public class Scene3d
 
     public void Update(int[][][] pieceOrigins)
     {
+        lastPieceOrigins = pieceOrigins;
         RebuildSlabs(pieceOrigins, camera, enable3dOcclusion, showIntraCoplanarEdges, showGridDivisions, slabs);
         ApplyCameraOcclusion();
     }
 
     public void UpdateCamera()
     {
+        // Must rebuild before re-occluding: ApplyCameraOcclusion mutates the per-cell PBCs
+        // destructively (CutOut), so calling it twice on the same slabs would erode d2faces
+        // cumulatively. Cheap — RebuildSlabs just reprojects the cached origins. Mirrors
+        // Scene4d.UpdateCamera (see Scene4dHashTests.NOTES.md for the bug this guards against).
+        RebuildSlabs(lastPieceOrigins, camera, enable3dOcclusion, showIntraCoplanarEdges, showGridDivisions, slabs);
         ApplyCameraOcclusion();
     }
 
@@ -93,10 +102,76 @@ public class Scene3d
         }
     }
 
+    // 3D→2D camera occlusion, one dimension down from Scene4d.ApplyCameraOcclusion. The
+    // occludable unit is the individual (convex) 2-cell, exposed per slab as a CellBoundary2d
+    // with its own PBC — the same per-cell PBCs that VisibleFacets/VisibleEdges already read
+    // through BoundaryFacets()/BoundaryEdges(). Painter's algorithm far→near: each nearer cell
+    // cuts away the projection of every farther cell via CutOut against the nearer cell's
+    // projected silhouette (DefiningHalfSpaces2d). RebuildSlabs already builds fresh PBCs each
+    // Update, so the destructive CutOut starts from a clean state every frame.
     private void ApplyCameraOcclusion()
     {
-        // TODO: implement 3D→2D occlusion analogous to Scene4d.ApplyCameraOcclusion
-        // Requires CutOut on Polyhedron2dBoundaryComplex (uses 2D half-spaces).
+        if (!enable3dOcclusion) return;
+
+        var viewNormal = camera.viewNormal.x;
+
+        // Flatten the front-facing per-cell units across all slabs (back-facing slabs were
+        // already dropped in RebuildSlabs when occlusion is on).
+        var units = new List<(OrientedIntegerCell cell, Polyhedron2dBoundaryComplex pbc)>();
+        foreach (var slab in slabs)
+            if (slab.pbc.cellBoundaries != null)
+                foreach (var cb in slab.pbc.cellBoundaries)
+                    units.Add((cb.cell, cb.pbc));
+
+        // Far → near: larger depth (along viewNormal) is farther from the camera.
+        units.Sort((a, b) => Depth(b.cell, viewNormal).CompareTo(Depth(a.cell, viewNormal)));
+
+        var back = new List<(OrientedIntegerCell cell, Polyhedron2dBoundaryComplex pbc)>();
+        foreach (var near in units)
+        {
+            var nearDepth = Depth(near.cell, viewNormal);
+            var halfSpaces = DefiningHalfSpaces2d(near.cell, camera);
+            foreach (var far in back)
+                if (Depth(far.cell, viewNormal) != nearDepth)   // equal-depth cells coexist
+                    far.pbc.CutOut(halfSpaces);
+            back.Add(near);
+        }
+    }
+
+    private static double Depth(IntegerCell cell, double[] viewNormal)
+    {
+        var c = cell.Center();
+        double sum = 0;
+        for (int i = 0; i < viewNormal.Length; i++) sum += viewNormal[i] * c[i];
+        return sum;
+    }
+
+    // The four 2D half-spaces bounding the projected silhouette of a 2-cell (a square face),
+    // analogous to Scene4d.DefiningHalfSpaces (which returns six for a projected cube). Each
+    // edge of the cell projects to a screen-space segment; its in-plane perpendicular gives a
+    // half-space whose normal is flipped so the cell's projected center is on the inside. A
+    // point inside all four lies inside the projected quad — exactly the occluded region.
+    public static HalfSpace[] DefiningHalfSpaces2d(OrientedIntegerCell cell, ICamera3d cam)
+    {
+        var center = new Point3d();
+        var verts = cell.Vertices();
+        foreach (var corner in verts) center.add(cam.Proj2d(new Point(corner)));
+        center.multiply(1.0 / verts.Length);
+
+        var facets = cell.Facets();         // the cell's four edges (1-cells)
+        var res = new HalfSpace[facets.Count];
+        int i = 0;
+        foreach (var edge in facets)
+        {
+            var o = cam.Proj2d(new Point(edge.EdgeA().origin));
+            var p = cam.Proj2d(new Point(edge.EdgeB().origin));
+            var d = p.clone().subtract(o);                       // edge direction (z = 0)
+            var normal = new Point3d(d.x[1], -d.x[0], 0).normalize();   // in-plane perpendicular
+            var hs = new HalfSpace(o, normal);
+            if (hs.side(center) == HalfSpace.OUTSIDE) hs = hs.flip();
+            res[i++] = hs;
+        }
+        return res;
     }
 }
 }
