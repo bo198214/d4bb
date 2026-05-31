@@ -26,6 +26,38 @@ namespace D4BB.Game
         public static Objective FromJsonFile(string filePath) {
             return FromJson(File.ReadAllText(filePath));
         }
+        // Serialize back to the same JSON shape FromJson reads (name / goal / pieces /
+        // boundary_min_max). boundary_min_max is written explicitly rather than padding, so the
+        // round-trip is exact regardless of how this Objective was originally constructed.
+        // InlineIntArrayConverter keeps each coordinate tuple on one line ([0, 0, 0, 0]) while the
+        // surrounding structure stays indented — matches the hand-written level files.
+        public string ToJson() {
+            var data = new ObjectiveData {
+                Name = name,
+                Goal = goal,
+                Pieces = pieces,
+                BoundaryMinMax = boundary_min_max,
+            };
+            return JsonConvert.SerializeObject(data, new JsonSerializerSettings {
+                Formatting = Formatting.Indented,
+                NullValueHandling = NullValueHandling.Ignore,
+                Converters = { new InlineIntArrayConverter() },
+            });
+        }
+
+        // Writes an int[] as a single inline JSON array ([0, 0, 0, 0]) regardless of the
+        // serializer's indentation. WriteRawValue keeps the parent array's indentation intact, so
+        // only the innermost coordinate tuples collapse to one line. Serialize-only.
+        private class InlineIntArrayConverter : JsonConverter<int[]> {
+            public override bool CanRead => false;
+            public override int[] ReadJson(JsonReader reader, Type objectType, int[] existingValue,
+                                           bool hasExistingValue, JsonSerializer serializer)
+                => throw new NotSupportedException();
+            public override void WriteJson(JsonWriter writer, int[] value, JsonSerializer serializer) {
+                if (value == null) { writer.WriteNull(); return; }
+                writer.WriteRawValue("[" + string.Join(", ", value) + "]");
+            }
+        }
         public static Objective FromJson(string json) {
             var data = JsonConvert.DeserializeObject<ObjectiveData>(json);
             if (data.BoundaryMinMax != null)
