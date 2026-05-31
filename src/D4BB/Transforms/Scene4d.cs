@@ -239,6 +239,20 @@ namespace D4BB.Transforms
             var orderedPairs = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>(topo.coplanarBoundaryFaces);
             orderedPairs.Sort(ComparePairsForDedup);
 
+            // Memoize the camera-facing test per 3-cell: the same c3 reference recurs in up to
+            // 6 pairs (one per facet) and the two ownership passes below revisit them, so this
+            // avoids recomputing IsFacedBy (and its two Point allocations) per pair.
+            var facingOf = new Dictionary<OrientedIntegerCell, bool>(ByRefCellComparer.I);
+            bool Facing(OrientedIntegerCell c3)
+            {
+                if (!facingOf.TryGetValue(c3, out var f))
+                {
+                    f = camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()));
+                    facingOf[c3] = f;
+                }
+                return f;
+            }
+
             // f2-dedup ownership decides each face's winding (it follows the owner cell's
             // outward orientation). A surface 2-face is shared by a camera-facing and a
             // camera-averted 3-cell; the front owner produces the front-wound copy a
@@ -250,7 +264,7 @@ namespace D4BB.Transforms
             // are back/back shared faces on the far side, harmless to a single-sided raycast.
             foreach (var (c3, f2) in orderedPairs)
             {
-                bool facing = camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()));
+                bool facing = Facing(c3);
                 if (cullBackFacesArg && !facing)
                     continue;
                 occluderCells.Add(c3);
@@ -266,7 +280,7 @@ namespace D4BB.Transforms
             {
                 foreach (var (c3, f2) in orderedPairs)
                 {
-                    if (camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) continue;
+                    if (Facing(c3)) continue;
                     if (faceOf.ContainsKey(f2)) continue;
 
                     var pf = new Face2dBC(f2, camera);
