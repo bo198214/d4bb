@@ -49,12 +49,13 @@ namespace D4BB.Transforms
 
         private int numPieces = 0;
 
-        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridDivisions = true)
+        public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridDivisions = true, bool enable4dOcclusion = true)
         {
             this.camera = camera;
             this.showIntraCoplanarEdges = showIntraCoplanarEdges;
             this.showGridDivisions = showGridDivisions;
             this.cullBackFaces = cullBackFaces;
+            this.enable4dOcclusion = enable4dOcclusion;
             Update(origins);
         }
 
