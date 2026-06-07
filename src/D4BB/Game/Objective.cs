@@ -6,12 +6,25 @@ using Newtonsoft.Json.Serialization;
 
 namespace D4BB.Game
 {
+    /// <summary>
+    /// How a level's goal is matched against the player's assembled compound.
+    /// <list type="bullet">
+    /// <item><b>Absolute</b> (default): the single remaining compound must be
+    /// <i>congruent</i> with the goal — exactly the same cell origins, no
+    /// translation or rotation allowed.</item>
+    /// <item><b>Shape</b>: the compound must match the goal only up to
+    /// translation/rotation (the classic "build this shape anywhere" rule).</item>
+    /// </list>
+    /// </summary>
+    public enum GoalMode { Absolute, Shape }
+
     public class Objective
     {
         public string name;
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
+        public GoalMode mode = GoalMode.Absolute;
 
         public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, goal, padding)) {}
         public Objective(string name, int[][] goal, int[][][] pieces, int[][] boundary_min_max)
@@ -37,6 +50,9 @@ namespace D4BB.Game
                 Goal = goal,
                 Pieces = pieces,
                 BoundaryMinMax = boundary_min_max,
+                // Only emit "mode" when it deviates from the Absolute default, keeping
+                // existing level files byte-identical on round-trip.
+                Mode = mode == GoalMode.Absolute ? null : "shape",
             };
             return JsonConvert.SerializeObject(data, new JsonSerializerSettings {
                 Formatting = Formatting.Indented,
@@ -60,14 +76,26 @@ namespace D4BB.Game
         }
         public static Objective FromJson(string json) {
             var data = JsonConvert.DeserializeObject<ObjectiveData>(json);
+            Objective obj;
             if (data.BoundaryMinMax != null)
-                return new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);
-            if (data.PaddingsLowerUpper != null)
-                return new Objective(data.Name, data.Goal, data.Pieces,
-                                     BoundaryMinMax(data.Pieces, data.Goal, data.PaddingsLowerUpper));
-            if (data.Padding.HasValue)
-                return new Objective(data.Name, data.Goal, data.Pieces, data.Padding.Value);
-            return new Objective(data.Name, data.Goal, data.Pieces);
+                obj = new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);
+            else if (data.PaddingsLowerUpper != null)
+                obj = new Objective(data.Name, data.Goal, data.Pieces,
+                                    BoundaryMinMax(data.Pieces, data.Goal, data.PaddingsLowerUpper));
+            else if (data.Padding.HasValue)
+                obj = new Objective(data.Name, data.Goal, data.Pieces, data.Padding.Value);
+            else
+                obj = new Objective(data.Name, data.Goal, data.Pieces);
+            obj.mode = ParseMode(data.Mode);
+            return obj;
+        }
+
+        // Absent / unknown "mode" → Absolute (the default). Only "shape"
+        // (case-insensitive) selects motion-modulo matching.
+        private static GoalMode ParseMode(string mode) {
+            return string.Equals(mode, "shape", StringComparison.OrdinalIgnoreCase)
+                ? GoalMode.Shape
+                : GoalMode.Absolute;
         }
 
         private class ObjectiveData {
@@ -79,6 +107,8 @@ namespace D4BB.Game
             public int[][][] Pieces { get; set; }
             [JsonProperty("boundary_min_max")]
             public int[][] BoundaryMinMax { get; set; }
+            [JsonProperty("mode")]
+            public string Mode { get; set; }
             [JsonProperty("padding")]
             public int? Padding { get; set; }
             [JsonProperty("paddings_lower_upper")]

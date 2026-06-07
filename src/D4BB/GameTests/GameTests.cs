@@ -84,6 +84,51 @@ public class GameTests
     }
 
     [Test]
+    public void GameLevel_Absolute_TranslatedShapeIsMissed()
+    {
+        // Goal lives at x=0..1; the single compound is the same shape but shifted to
+        // x=2..3. Absolute mode (the default) must reject it — congruence required.
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var obj = new Objective("shifted", goal,
+            new int[][][] {
+                new int[][] { new int[] { 2,0,0,0 }, new int[] { 3,0,0,0 } },
+            });
+        Assert.That(obj.mode, Is.EqualTo(GoalMode.Absolute));
+        var level = new GameLevel(obj);
+        Assert.That(level.status, Is.EqualTo(GameStatus.Missed));
+    }
+
+    [Test]
+    public void GameLevel_Shape_TranslatedShapeIsReached()
+    {
+        // Same translated shape, but in Shape mode equality-modulo-motion accepts it.
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var obj = new Objective("shifted", goal,
+            new int[][][] {
+                new int[][] { new int[] { 2,0,0,0 }, new int[] { 3,0,0,0 } },
+            });
+        obj.mode = GoalMode.Shape;
+        var level = new GameLevel(obj);
+        Assert.That(level.status, Is.EqualTo(GameStatus.Reached));
+    }
+
+    [Test]
+    public void Objective_ModeJsonRoundTrip()
+    {
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
+
+        // Default (Absolute) omits "mode" and round-trips back to Absolute.
+        var def = new Objective("d", goal, pieces);
+        Assert.That(def.ToJson(), Does.Not.Contain("mode"));
+        Assert.That(Objective.FromJson(def.ToJson()).mode, Is.EqualTo(GoalMode.Absolute));
+
+        // Shape is emitted and parsed back.
+        var shaped = new Objective("s", goal, pieces) { mode = GoalMode.Shape };
+        Assert.That(Objective.FromJson(shaped.ToJson()).mode, Is.EqualTo(GoalMode.Shape));
+    }
+
+    [Test]
     public void GameLevel_CombineAndReach()
     {
         // Two single cells, goal is their union

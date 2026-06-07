@@ -179,18 +179,29 @@ namespace D4BB.Game
                 status = GameStatus.None;
                 return;
             }
+            // Absolute (default): the goal is reached only when the single remaining
+            // compound is congruent with the goal (same cell origins — no translation
+            // or rotation). Shape: equality modulo translation/rotation, as before.
+            bool absolute = Objective == null || Objective.mode == GoalMode.Absolute;
             if (compounds.Count == 1)
             {
-                status = IntegerOps.MotionEqual(goal, compounds[0].origins)
-                    ? GameStatus.Reached
-                    : GameStatus.Missed;
+                bool reached = absolute
+                    ? IntegerOps.SetEqual(goal, compounds[0].origins)
+                    : IntegerOps.MotionEqual(goal, compounds[0].origins);
+                status = reached ? GameStatus.Reached : GameStatus.Missed;
                 return;
             }
             var sel = Selected;
-            if (sel != null && !IntegerOps.MotionContained(sel.origins, goal))
+            if (sel != null)
             {
-                status = GameStatus.Missed;
-                return;
+                bool contained = absolute
+                    ? IntegerOps.SetContained(sel.origins, goal)
+                    : IntegerOps.MotionContained(sel.origins, goal);
+                if (!contained)
+                {
+                    status = GameStatus.Missed;
+                    return;
+                }
             }
             if (status != GameStatus.Pending)
                 status = GameStatus.Pending;
