@@ -13,7 +13,7 @@ namespace D4BB.Game
         public int[][][] pieces;
         public int[][] boundary_min_max;
 
-        public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, padding)) {}
+        public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, goal, padding)) {}
         public Objective(string name, int[][] goal, int[][][] pieces, int[][] boundary_min_max)
         {
             this.name = name;
@@ -64,7 +64,7 @@ namespace D4BB.Game
                 return new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);
             if (data.PaddingsLowerUpper != null)
                 return new Objective(data.Name, data.Goal, data.Pieces,
-                                     BoundaryMinMax(data.Pieces, data.PaddingsLowerUpper));
+                                     BoundaryMinMax(data.Pieces, data.Goal, data.PaddingsLowerUpper));
             if (data.Padding.HasValue)
                 return new Objective(data.Name, data.Goal, data.Pieces, data.Padding.Value);
             return new Objective(data.Name, data.Goal, data.Pieces);
@@ -91,36 +91,40 @@ namespace D4BB.Game
 
         public int[][] BoundingBox()
         {
-            int dim = Dim(pieces);
+            int dim = pieces.Length > 0 ? pieces[0][0].Length : goal[0].Length;
             int[][] res = new int[2][];
             res[0] = new int[dim];
             res[1] = new int[dim];
             for (int k = 0; k < dim; k++) {
                 res[0][k] = int.MaxValue;
                 res[1][k] = int.MinValue;
-                for (int i = 0; i < pieces.Length; i++)
-                    for (int j = 0; j < pieces[i].Length; j++) {
-                        if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
-                        if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
+                for (int i = 0; i <= pieces.Length; i++) {
+                    var o = i==pieces.Length ? goal : pieces[i];
+                    for (int j = 0; j < o.Length; j++) {
+                        if (o[j][k] < res[0][k]) { res[0][k] = o[j][k]; }
+                        if (o[j][k] > res[1][k]) { res[1][k] = o[j][k]; }
                     }
+                }
                 res[1][k] += 1;
             }
             return res;
         }
-        public static int[][] BoundaryMinMax(int[][][] pieces, int padding)
+        public static int[][] BoundaryMinMax(int[][][] pieces, int[][] goal, int padding)
         {
-            int dim = Dim(pieces);
+            int dim = pieces.Length > 0 ? pieces[0][0].Length : goal[0].Length;
             int[][] res = new int[2][];
             res[0] = new int[dim];
             res[1] = new int[dim];
             for (int k = 0; k < dim; k++) {
                 res[0][k] = int.MaxValue;
                 res[1][k] = int.MinValue;
-                for (int i = 0; i < pieces.Length; i++)
-                    for (int j = 0; j < pieces[i].Length; j++) {
-                        if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
-                        if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
+                for (int i = 0; i <= pieces.Length; i++) {
+                    var o = i==pieces.Length ? goal : pieces[i];
+                    for (int j = 0; j < o.Length; j++) {
+                        if (o[j][k] < res[0][k]) { res[0][k] = o[j][k]; }
+                        if (o[j][k] > res[1][k]) { res[1][k] = o[j][k]; }
                     }
+                }
                 // Cavalier world_z = z + pz·w (pz > 0): the viewer-facing surface of
                 // the play volume sits at (min z, min w). Front-padding on the depth
                 // axes (2 and up) would let pieces drift into the viewer; we only pad
@@ -130,9 +134,9 @@ namespace D4BB.Game
             }
             return res;
         }
-        public static int[][] BoundaryMinMax(int[][][] pieces, int[][] paddingsLowerUpper)
+        public static int[][] BoundaryMinMax(int[][][] pieces, int[][] goal, int[][] paddingsLowerUpper)
         {
-            int dim = Dim(pieces);
+            int dim = pieces.Length > 0 ? pieces[0][0].Length : goal[0].Length;
             if (paddingsLowerUpper == null
                 || paddingsLowerUpper.Length != 2
                 || paddingsLowerUpper[0] == null || paddingsLowerUpper[0].Length != dim
@@ -146,11 +150,13 @@ namespace D4BB.Game
             for (int k = 0; k < dim; k++) {
                 res[0][k] = int.MaxValue;
                 res[1][k] = int.MinValue;
-                for (int i = 0; i < pieces.Length; i++)
-                    for (int j = 0; j < pieces[i].Length; j++) {
-                        if (pieces[i][j][k] < res[0][k]) { res[0][k] = pieces[i][j][k]; }
-                        if (pieces[i][j][k] > res[1][k]) { res[1][k] = pieces[i][j][k]; }
+                for (int i = 0; i <= pieces.Length; i++) {
+                    var o = i==pieces.Length ? goal : pieces[i];
+                    for (int j = 0; j < o.Length; j++) {
+                        if (o[j][k] < res[0][k]) { res[0][k] = o[j][k]; }
+                        if (o[j][k] > res[1][k]) { res[1][k] = o[j][k]; }
                     }
+                }
                 res[0][k] -= paddingsLowerUpper[0][k];
                 res[1][k] += 1 + paddingsLowerUpper[1][k];
             }
