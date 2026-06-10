@@ -63,7 +63,9 @@ namespace D4BB.Comb
                 nr = new int[1][][];
                 nr[0] = new int[1][];
                 nr[0][0] = new int[1];
-                nr[0][0][0] = 1;
+                nr[0][0][0] = -1; // the 1x1 mirror has det -1; with +1 here every
+                                  // higher-dim Rotations/MirrorRotations degrades into a
+                                  // 50/50 det +-1 mix (not a group), breaking MotionEqual.
             }
             else
             {
