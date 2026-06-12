@@ -1,4 +1,4 @@
 {
 	"name": "Game",
-	"references": [ "Comb", "General" ]
+	"references": [ "Comb", "General", "Geometry" ]
 }
