@@ -179,10 +179,10 @@ namespace D4BB.Game
                 status = GameStatus.None;
                 return;
             }
-            // Absolute (default): the goal is reached only when the single remaining
-            // compound is congruent with the goal (same cell origins — no translation
-            // or rotation). Shape: equality modulo translation/rotation, as before.
-            bool absolute = Objective == null || Objective.mode == GoalMode.Absolute;
+            // Shape (default): equality modulo translation/rotation. Absolute: the goal
+            // is reached only when the single remaining compound is congruent with the
+            // goal (same cell origins — no translation or rotation).
+            bool absolute = Objective != null && Objective.mode == GoalMode.Absolute;
             if (compounds.Count == 1)
             {
                 bool reached = absolute

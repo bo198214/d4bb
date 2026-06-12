@@ -87,12 +87,12 @@ public class GameTests
     public void GameLevel_Absolute_TranslatedShapeIsMissed()
     {
         // Goal lives at x=0..1; the single compound is the same shape but shifted to
-        // x=2..3. Absolute mode (the default) must reject it — congruence required.
+        // x=2..3. Absolute mode must reject it — congruence required.
         var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
         var obj = new Objective("shifted", goal,
             new int[][][] {
                 new int[][] { new int[] { 2,0,0,0 }, new int[] { 3,0,0,0 } },
-            });
+            }) { mode = GoalMode.Absolute };
         Assert.That(obj.mode, Is.EqualTo(GoalMode.Absolute));
         var level = new GameLevel(obj);
         Assert.That(level.status, Is.EqualTo(GameStatus.Missed));
@@ -118,14 +118,15 @@ public class GameTests
         var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
         var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
 
-        // Default (Absolute) omits "mode" and round-trips back to Absolute.
+        // Default (Shape) omits "mode" and round-trips back to Shape.
         var def = new Objective("d", goal, pieces);
         Assert.That(def.ToJson(), Does.Not.Contain("mode"));
-        Assert.That(Objective.FromJson(def.ToJson()).mode, Is.EqualTo(GoalMode.Absolute));
+        Assert.That(Objective.FromJson(def.ToJson()).mode, Is.EqualTo(GoalMode.Shape));
 
-        // Shape is emitted and parsed back.
-        var shaped = new Objective("s", goal, pieces) { mode = GoalMode.Shape };
-        Assert.That(Objective.FromJson(shaped.ToJson()).mode, Is.EqualTo(GoalMode.Shape));
+        // Absolute is emitted and parsed back.
+        var abs = new Objective("a", goal, pieces) { mode = GoalMode.Absolute };
+        Assert.That(abs.ToJson(), Does.Contain("absolute"));
+        Assert.That(Objective.FromJson(abs.ToJson()).mode, Is.EqualTo(GoalMode.Absolute));
     }
 
     [Test]

@@ -9,11 +9,11 @@ namespace D4BB.Game
     /// <summary>
     /// How a level's goal is matched against the player's assembled compound.
     /// <list type="bullet">
-    /// <item><b>Absolute</b> (default): the single remaining compound must be
+    /// <item><b>Shape</b> (default): the compound must match the goal only up to
+    /// translation/rotation (the classic "build this shape anywhere" rule).</item>
+    /// <item><b>Absolute</b>: the single remaining compound must be
     /// <i>congruent</i> with the goal — exactly the same cell origins, no
     /// translation or rotation allowed.</item>
-    /// <item><b>Shape</b>: the compound must match the goal only up to
-    /// translation/rotation (the classic "build this shape anywhere" rule).</item>
     /// </list>
     /// </summary>
     public enum GoalMode { Absolute, Shape }
@@ -24,7 +24,7 @@ namespace D4BB.Game
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
-        public GoalMode mode = GoalMode.Absolute;
+        public GoalMode mode = GoalMode.Shape;
 
         public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, goal, padding)) {}
         public Objective(string name, int[][] goal, int[][][] pieces, int[][] boundary_min_max)
@@ -50,9 +50,9 @@ namespace D4BB.Game
                 Goal = goal,
                 Pieces = pieces,
                 BoundaryMinMax = boundary_min_max,
-                // Only emit "mode" when it deviates from the Absolute default, keeping
-                // existing level files byte-identical on round-trip.
-                Mode = mode == GoalMode.Absolute ? null : "shape",
+                // Only emit "mode" when it deviates from the Shape default, keeping
+                // shape-mode level files free of a redundant field on round-trip.
+                Mode = mode == GoalMode.Shape ? null : "absolute",
             };
             return JsonConvert.SerializeObject(data, new JsonSerializerSettings {
                 Formatting = Formatting.Indented,
@@ -90,12 +90,12 @@ namespace D4BB.Game
             return obj;
         }
 
-        // Absent / unknown "mode" → Absolute (the default). Only "shape"
-        // (case-insensitive) selects motion-modulo matching.
+        // Absent / unknown "mode" → Shape (the default). Only "absolute"
+        // (case-insensitive) selects exact-congruence matching.
         private static GoalMode ParseMode(string mode) {
-            return string.Equals(mode, "shape", StringComparison.OrdinalIgnoreCase)
-                ? GoalMode.Shape
-                : GoalMode.Absolute;
+            return string.Equals(mode, "absolute", StringComparison.OrdinalIgnoreCase)
+                ? GoalMode.Absolute
+                : GoalMode.Shape;
         }
 
         private class ObjectiveData {
