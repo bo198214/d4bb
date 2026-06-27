@@ -83,7 +83,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var axis in axes) {
             inc.Translate(1, axis);
-            reference.pieces[1].topology.Translate(axis); reference.UpdateCamera();
+            reference.pieces[1].Translate(axis); reference.UpdateCamera();
             expectedOrigins = WithTranslate(expectedOrigins, 1, axis);
             var fresh = new Scene4d(expectedOrigins, new Camera4dParallel());
 
@@ -109,7 +109,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var axis in axes) {
             inc.Translate(1, axis);
-            reference.pieces[1].topology.Translate(axis); reference.UpdateCamera();
+            reference.pieces[1].Translate(axis); reference.UpdateCamera();
             AssertSameGeom(inc, reference, $"apart/back step {step} axis {axis.Human()}");
             step++;
         }
@@ -130,7 +130,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var axis in axes) {
             inc.Translate(1, axis);
-            reference.pieces[1].topology.Translate(axis); reference.UpdateCamera();
+            reference.pieces[1].Translate(axis); reference.UpdateCamera();
             AssertSameGeom(inc, reference, $"middle step {step} axis {axis.Human()}");
             step++;
         }
@@ -140,7 +140,7 @@ public class Scene4dIncrementalTests {
 
     // A two-cube piece (so a 90° rotation actually moves cells) behind a single cube. Rotating it in
     // several planes must match the full rebuild. The reference mirrors with
-    // pieces[i].topology.Rotate + UpdateCamera, so no hand-computed rotated origins are needed.
+    // pieces[i].Rotate + UpdateCamera, so no hand-computed rotated origins are needed.
     [Test] public void TwoCubePiece_Rotate_MatchesFullRebuild() {
         var origins = new int[][][] {
             new int[][] { new int[] {0,0,0,0}, new int[] {1,0,0,0} }, // piece 0: 2 cubes along x
@@ -155,7 +155,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var (v, w) in planes) {
             inc.Rotate(0, v, w, center);
-            reference.pieces[0].topology.Rotate(v, w, center); reference.UpdateCamera();
+            reference.pieces[0].Rotate(v, w, center); reference.UpdateCamera();
             AssertSameGeom(inc, reference, $"rotate step {step} plane ({v},{w})");
             step++;
         }

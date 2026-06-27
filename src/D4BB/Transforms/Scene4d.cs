@@ -38,7 +38,7 @@ namespace D4BB.Transforms
             int n = pieceOrigins?.Length ?? 0;
             pieces = new Piece[n];
             for (int i = 0; i < n; i++)
-                pieces[i] = new Piece(ComputePieceTopology(pieceOrigins[i], showGridDivisions));
+                pieces[i] = ComputePiece(pieceOrigins[i], showGridDivisions);
             RebuildAllPieces();
             RefreshVisibleCache();
         }
@@ -56,20 +56,20 @@ namespace D4BB.Transforms
         // Incremental piece move — a scene-level operation (it re-occludes every piece whose projected
         // AABB overlaps the moved piece before or after the move; see ReoccludeAfterPieceChange), so it
         // lives on Scene4d, not on Piece. Only the moved piece is reprojected. The piece's own in-place
-        // topology mutation goes through pieces[pieceIndex].topology.Translate/Rotate (callers that only
-        // want the topology mutation — e.g. the batched drag path — call that directly). Currently
-        // unused by the game (the drag path still goes through the full UpdateCamera); wired up later.
+        // topology mutation goes through pieces[pieceIndex].Translate/Rotate (callers that only want the
+        // topology mutation — e.g. the batched drag path — call that directly). Currently unused by the
+        // game (the drag path still goes through the full UpdateCamera); wired up later.
         public void Translate(int pieceIndex, IntegerSignedAxis axis)
         {
             var prev = pieces[pieceIndex].bounds;
-            pieces[pieceIndex].topology.Translate(axis);
+            pieces[pieceIndex].Translate(axis);
             ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
         public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
         {
             var prev = pieces[pieceIndex].bounds;
-            pieces[pieceIndex].topology.Rotate(v, w, center);
+            pieces[pieceIndex].Rotate(v, w, center);
             ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
@@ -79,15 +79,15 @@ namespace D4BB.Transforms
         // neighbor of c3 via f2 equals the same-space sibling of c3 — i.e. both cells sharing
         // f2 lie in the same hyperplane. Such faces are excluded from the boundary.
         // Note: the same f2 may appear with multiple c3's (from different hyperplanes). Dedup
-        // happens later in BuildCellsFromPieceTopology, after backface culling, so that a backface-
+        // happens later in BuildPieceCells, after backface culling, so that a backface-
         // culled c3 cannot block f2 from being claimed by a front-facing c3'.
-        private static PieceTopology ComputePieceTopology(int[][] origins, bool showGridDivisions)
+        private static Piece ComputePiece(int[][] origins, bool showGridDivisions)
         {
             var ibc = new IntegerBoundaryComplex(origins);
             var coplanarBoundaryFaces = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>();
             // Only allocate interior-collection plumbing when the toggle is on; saves work
             // and allocations on the common path. The toggle is propagated from Scene4d via Update,
-            // which re-runs ComputePieceTopology with the new flag, so the cache stays in sync.
+            // which re-runs ComputePiece with the new flag, so the cache stays in sync.
             var interiorDivisionFaces = showGridDivisions
                 ? new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>() : null;
             // Track interior f2s already collected (from the other coplanar parent's iteration)
@@ -111,10 +111,7 @@ namespace D4BB.Transforms
                 }
             }
 
-            return new PieceTopology {
-                coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray(),
-                interiorDivisionFaces = interiorDivisionFaces?.ToArray()
-            };
+            return new Piece(coplanarBoundaryFaces.ToArray(), interiorDivisionFaces?.ToArray());
         }
 
         // ── fast rebuild from precomputed topology (skips IntegerBoundaryComplex) ─
@@ -159,7 +156,7 @@ namespace D4BB.Transforms
         // start from a clean projection every time it is re-occluded.
         private List<CellBoundary> BuildOccludedPieceCells(int p, List<Occluder> occludersFarToNear)
         {
-            var pieceCells = BuildCellsFromPieceTopology(pieces[p].topology, p, cullBackFaces);
+            var pieceCells = BuildPieceCells(pieces[p], p, cullBackFaces);
             if (enable4dOcclusion) OccludePieceCells(p, pieceCells, occludersFarToNear);
             return pieceCells;
         }
@@ -212,7 +209,7 @@ namespace D4BB.Transforms
         // the 3DBox hole had no owned f2's, so its halfspaces were missing from occlusion, and the
         // diagonal-corner quadrant of the inner-hole wall survived the cut. (ComputeOccluders mirrors
         // this occluder set exactly, including the interior-division owner cells below.)
-        private List<CellBoundary> BuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex, bool cullBackFacesArg)
+        private List<CellBoundary> BuildPieceCells(Piece piece, int pieceIndex, bool cullBackFacesArg)
         {
             // Role (b): every front-facing c3 must contribute halfspaces, regardless of f2 ownership.
             var occluderCells = new HashSet<OrientedIntegerCell>();
@@ -223,7 +220,7 @@ namespace D4BB.Transforms
             // Iterate in a deterministic order so f2-dedup ownership is reproducible across
             // runs (HashSet iteration in coplanarBoundaryFaces' source is not stable).
             // Tiebreaker: lexicographic by (c3.origin, c3.span, f2.origin, f2.span).
-            var orderedPairs = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>(topo.coplanarBoundaryFaces);
+            var orderedPairs = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>(piece.coplanarBoundaryFaces);
             orderedPairs.Sort(ComparePairsForDedup);
 
             // Memoize the camera-facing test per 3-cell: the same c3 reference recurs in up to
@@ -306,9 +303,9 @@ namespace D4BB.Transforms
             // The interior Face2dBCs are marked isCoplanarInterior=true (semantically: they
             // sit between two coplanar parents) and inherit mark=GRID_DIVISION from the
             // Face2dBC(OrientedIntegerCell,…) ctor stamp.
-            if (showGridDivisions && topo.interiorDivisionFaces != null)
+            if (showGridDivisions && piece.interiorDivisionFaces != null)
             {
-                foreach (var (owner_c3, f2) in topo.interiorDivisionFaces)
+                foreach (var (owner_c3, f2) in piece.interiorDivisionFaces)
                 {
                     if (cullBackFacesArg && !camera.IsFacedBy(new Point(owner_c3.origin), new Point(owner_c3.Normal())))
                         continue; // owner backface-culled → drop the division face with it
@@ -329,7 +326,7 @@ namespace D4BB.Transforms
             }
             // Invariant: every front-facing c3 contributes an occluder, even ownerless ones.
             Debug.Assert(result.Count == occluderCells.Count,
-                "BuildCellsFromPieceTopology: every front-facing c3 must contribute an occluder.");
+                "BuildPieceCells: every front-facing c3 must contribute an occluder.");
             return result;
         }
 
@@ -338,8 +335,7 @@ namespace D4BB.Transforms
         // full hull of the piece (front + back facing cells).
         public HashSet<IPolyhedron> ComputePieceBoundaryEdges(int pieceIndex, bool cullBackFaces)
         {
-            var topo = pieces[pieceIndex].topology;
-            var cellsLocal = BuildCellsFromPieceTopology(topo, pieceIndex, cullBackFaces);
+            var cellsLocal = BuildPieceCells(pieces[pieceIndex], pieceIndex, cullBackFaces);
             var res = new HashSet<IPolyhedron>();
             foreach (var cb in cellsLocal)
                 foreach (var e in cb.pbc.BoundaryEdges()) res.Add(e);
@@ -395,10 +391,10 @@ namespace D4BB.Transforms
         }
 
         // Build the occluder set for the whole scene and (re)fill each piece's bounds. This must mirror
-        // the occluder cells that BuildCellsFromPieceTopology adds — the front-facing distinct c3 from
+        // the occluder cells that BuildPieceCells adds — the front-facing distinct c3 from
         // the coplanar boundary faces, plus the interior-division owner cells when grid divisions are on
         // (those can own zero boundary 2-faces yet are still required as occluders; see the Box3D note
-        // on BuildCellsFromPieceTopology). Cheap: only a facing test + an 8-vertex projection per c3,
+        // on BuildPieceCells). Cheap: only a facing test + an 8-vertex projection per c3,
         // no face construction.
         private List<Occluder> ComputeOccluders()
         {
@@ -408,7 +404,6 @@ namespace D4BB.Transforms
             {
                 var piece = pieces[p];
                 piece.bounds = ScreenBounds.Empty();
-                var topo = piece.topology;
                 var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
                 void Add(OrientedIntegerCell c3)
                 {
@@ -418,9 +413,9 @@ namespace D4BB.Transforms
                     result.Add(new Occluder(c3, p, Depth(c3, viewNormal), b));
                     piece.bounds.Encapsulate(b);
                 }
-                foreach (var (c3, _) in topo.coplanarBoundaryFaces) Add(c3);
-                if (showGridDivisions && topo.interiorDivisionFaces != null)
-                    foreach (var (owner, _) in topo.interiorDivisionFaces) Add(owner);
+                foreach (var (c3, _) in piece.coplanarBoundaryFaces) Add(c3);
+                if (showGridDivisions && piece.interiorDivisionFaces != null)
+                    foreach (var (owner, _) in piece.interiorDivisionFaces) Add(owner);
             }
             return result;
         }

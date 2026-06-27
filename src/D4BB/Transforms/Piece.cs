@@ -14,22 +14,41 @@ namespace D4BB.Transforms
         public int GetHashCode(OrientedIntegerCell c) => RuntimeHelpers.GetHashCode(c);
     }
 
-    // The (3-cell, 2-face) boundary pairs of a piece, computed once via IntegerBoundaryComplex. A
-    // Translate/Rotate only mutates the origins/spans of these cells in place, so the face *selection*
-    // stays valid and the expensive IBC rebuild is avoided.
-    public class PieceTopology
+    // One render piece in a Scene4d: its combinatorial boundary topology plus the per-piece render
+    // state derived from it. Replaces the former parallel arrays (pieceTopologies[] / cellsByPiece[] /
+    // pieceBounds[]) that were coupled only by array index.
+    public class Piece
     {
-        // Origins are not stored — single source of truth is gameLevel.compounds[i].origins.
-        // Topology mutations (Translate/Rotate) act on the OrientedIntegerCell instances *inside* these
-        // tuple arrays directly.
+        // ── topology (the IBC boundary, computed once; mutated in place by Translate/Rotate) ──
+        // The (3-cell, 2-face) boundary pairs of the piece, computed once via IntegerBoundaryComplex.
+        // A Translate/Rotate only mutates the origins/spans of these cells in place, so the face
+        // *selection* stays valid and the expensive IBC rebuild is avoided. Origins are not stored
+        // here — the single source of truth is gameLevel.compounds[i].origins.
         public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces;
         // Interior 2-faces between two coplanar boundary 3-cells of the same piece (the "Grid-Division"
         // faces — the 2D subdivision that lives one dimension deeper than coplanar grid edges). Filtered
-        // out of the boundary in Scene4d.ComputePieceTopology with `continue`, but kept here so the cell
-        // builder can re-add them as Face2dBCs when showGridDivisions=true.
-        // (c3 is the lexicographically smaller of the two coplanar parents — pragmatic ownership choice
-        // so the face attaches to a single PBC for CutOut.)
+        // out of the boundary in Scene4d.ComputePiece with `continue`, but kept here so the cell builder
+        // can re-add them as Face2dBCs when showGridDivisions=true. (c3 is the lexicographically smaller
+        // of the two coplanar parents — pragmatic ownership choice so the face attaches to a single PBC.)
         public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] interiorDivisionFaces;
+
+        // ── render state, derived from the topology + camera ──
+        // Occluded (cut) cells of this piece — rebuilt from topology + camera on every (re)occlusion.
+        public List<CellBoundary> cells = new();
+        // Projected 3D AABB, union over this piece's occluder cells. The dependency signal for the
+        // incremental path: a piece overlapping the moved piece (before or after) may need re-cutting.
+        public ScreenBounds bounds = ScreenBounds.Empty();
+        // The piece's visible 2-faces / boundary edges, derived from `cells` after occlusion. This is
+        // what the renderer reads to build the Unity mesh. (Re)filled by Scene4d.RefreshVisibleCache.
+        public HashSet<Face2d> visibleFacets = new();
+        public HashSet<IPolyhedron> visibleEdges = new();
+
+        public Piece((OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces,
+                     (OrientedIntegerCell c3, OrientedIntegerCell f2)[] interiorDivisionFaces)
+        {
+            this.coplanarBoundaryFaces = coplanarBoundaryFaces;
+            this.interiorDivisionFaces = interiorDivisionFaces;
+        }
 
         // In-place topology mutation. Every OrientedIntegerCell in the tuple arrays gets Translate/Rotate
         // called exactly once: the same c3 reference appears in up to 6 boundary tuples (one per facet)
@@ -66,25 +85,5 @@ namespace D4BB.Transforms
                     f2.Rotate(center, v, w);
                 }
         }
-    }
-
-    // One render piece in a Scene4d: its combinatorial topology plus the per-piece render state derived
-    // from it. Replaces the former parallel arrays (pieceTopologies[] / cellsByPiece[] / pieceBounds[])
-    // that were coupled only by array index.
-    public class Piece
-    {
-        // Cached boundary topology (the IBC result); mutated in place by Translate/Rotate.
-        public readonly PieceTopology topology;
-        // Occluded (cut) cells of this piece — rebuilt from topology + camera on every (re)occlusion.
-        public List<CellBoundary> cells = new();
-        // Projected 3D AABB, union over this piece's occluder cells. The dependency signal for the
-        // incremental path: a piece overlapping the moved piece (before or after) may need re-cutting.
-        public ScreenBounds bounds = ScreenBounds.Empty();
-        // The piece's visible 2-faces / boundary edges, derived from `cells` after occlusion. This is
-        // what the renderer reads to build the Unity mesh. (Re)filled by Scene4d.RefreshVisibleCache.
-        public HashSet<Face2d> visibleFacets = new();
-        public HashSet<IPolyhedron> visibleEdges = new();
-
-        public Piece(PieceTopology topology) { this.topology = topology; }
     }
 }
