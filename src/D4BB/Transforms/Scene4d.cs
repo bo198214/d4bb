@@ -20,8 +20,6 @@ namespace D4BB.Transforms
         // view, not stored state).
         public Piece[] pieces { get; private set; } = System.Array.Empty<Piece>();
         public IEnumerable<CellBoundary> AllCells => pieces.SelectMany(p => p.cells);
-        public HashSet<Face2d>[] visibleFacets { get; private set; } = System.Array.Empty<HashSet<Face2d>>();
-        public HashSet<IPolyhedron>[] visibleEdges { get; private set; } = System.Array.Empty<HashSet<IPolyhedron>>();
 
         public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridDivisions = true, bool enable4dOcclusion = true)
         {
@@ -32,9 +30,6 @@ namespace D4BB.Transforms
             this.enable4dOcclusion = enable4dOcclusion;
             Update(origins);
         }
-
-        public HashSet<Face2d> VisibleFacets(int pieceIndex) => visibleFacets[pieceIndex];
-        public HashSet<IPolyhedron> VisibleEdges(int pieceIndex) => visibleEdges[pieceIndex];
 
         // ── public API ────────────────────────────────────────────────────────
 
@@ -58,34 +53,25 @@ namespace D4BB.Transforms
             RefreshVisibleCache();
         }
 
-        // Incremental piece move. Only the moved piece is reprojected, and only pieces whose projected
-        // AABB overlaps the moved piece (before or after the move) are re-occluded — see
-        // ReoccludeAfterPieceChange. Currently unused by the game (the drag path still goes through the
-        // full UpdateCamera); wired up in a later session.
+        // Incremental piece move — a scene-level operation (it re-occludes every piece whose projected
+        // AABB overlaps the moved piece before or after the move; see ReoccludeAfterPieceChange), so it
+        // lives on Scene4d, not on Piece. Only the moved piece is reprojected. The piece's own in-place
+        // topology mutation goes through pieces[pieceIndex].topology.Translate/Rotate (callers that only
+        // want the topology mutation — e.g. the batched drag path — call that directly). Currently
+        // unused by the game (the drag path still goes through the full UpdateCamera); wired up later.
         public void Translate(int pieceIndex, IntegerSignedAxis axis)
         {
             var prev = pieces[pieceIndex].bounds;
-            TranslateTopology(pieceIndex, axis);
+            pieces[pieceIndex].topology.Translate(axis);
             ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
         public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
         {
             var prev = pieces[pieceIndex].bounds;
-            RotateTopology(pieceIndex, v, w, center);
+            pieces[pieceIndex].topology.Rotate(v, w, center);
             ReoccludeAfterPieceChange(pieceIndex, prev);
         }
-
-        // Topology-only mutation (delegates to PieceTopology), no cell rebuild / occlusion / cache
-        // refresh. Lets a caller mirror several committed moves into the cached topology and then run a
-        // single UpdateCamera (RebuildCells + Occlusion + RefreshVisibleCache, all without the expensive
-        // IBC) — used by the drag path so multi-step drags occlude once, not per micro-step. Kept as a
-        // public Scene4d entry point because the drag path addresses pieces by index.
-        public void TranslateTopology(int pieceIndex, IntegerSignedAxis axis)
-            => pieces[pieceIndex].topology.Translate(axis);
-
-        public void RotateTopology(int pieceIndex, int v, int w, IntegerCenter center)
-            => pieces[pieceIndex].topology.Rotate(v, w, center);
 
         // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
 
@@ -467,8 +453,6 @@ namespace D4BB.Transforms
 
         private void RefreshVisibleCache()
         {
-            visibleFacets = new HashSet<Face2d>[pieces.Length];
-            visibleEdges = new HashSet<IPolyhedron>[pieces.Length];
             for (int i = 0; i < pieces.Length; i++) RefreshVisibleCacheForPiece(i);
         }
         // Affected-only refresh for the incremental path: pieces not in `pieceIndices` keep their cached sets.
@@ -485,8 +469,8 @@ namespace D4BB.Transforms
                 foreach (var facet in cb.pbc.d2faces) facets.Add(facet);
                 foreach (var edge in cb.pbc.BoundaryEdges()) edges.Add(edge);
             }
-            visibleFacets[i] = facets;
-            visibleEdges[i] = edges;
+            pieces[i].visibleFacets = facets;
+            pieces[i].visibleEdges = edges;
         }
 
         // ── helpers ───────────────────────────────────────────────────────────

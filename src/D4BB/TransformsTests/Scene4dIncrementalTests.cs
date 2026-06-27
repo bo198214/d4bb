@@ -26,7 +26,7 @@ public class Scene4dIncrementalTests {
     // Strict per-face geometry key: integerCell + its (orientation-independent, sorted) projected
     // vertices. Catches both a vanished/extra face and a mis-cut fragment.
     static List<string> VisibleGeom(Scene4d s, int piece) =>
-        s.VisibleFacets(piece).Select(f => {
+        s.pieces[piece].visibleFacets.Select(f => {
             var ic = ((Face2dWithIntegerCellAttribute)f).integerCell.ToString();
             var pts = f.points
                 .Select(p => string.Format(CultureInfo.InvariantCulture, "({0:F4},{1:F4},{2:F4})", p.x[0], p.x[1], p.x[2]))
@@ -36,18 +36,18 @@ public class Scene4dIncrementalTests {
 
     // Looser key for the fresh-scene cross-check: the set of visible integerCells per piece.
     static HashSet<string> VisibleCellSet(Scene4d s, int piece) =>
-        s.VisibleFacets(piece).Select(f => ((Face2dWithIntegerCellAttribute)f).integerCell.ToString()).ToHashSet();
+        s.pieces[piece].visibleFacets.Select(f => ((Face2dWithIntegerCellAttribute)f).integerCell.ToString()).ToHashSet();
 
     static void AssertSameGeom(Scene4d inc, Scene4d reference, string ctx) {
-        Assert.That(inc.visibleFacets.Length, Is.EqualTo(reference.visibleFacets.Length), $"{ctx}: piece count");
-        for (int i = 0; i < inc.visibleFacets.Length; i++)
+        Assert.That(inc.pieces.Length, Is.EqualTo(reference.pieces.Length), $"{ctx}: piece count");
+        for (int i = 0; i < inc.pieces.Length; i++)
             Assert.That(VisibleGeom(inc, i), Is.EqualTo(VisibleGeom(reference, i)),
                 $"{ctx}: piece {i} visible geometry differs (incremental vs full)");
     }
 
     static void AssertSameCellSet(Scene4d inc, Scene4d reference, string ctx) {
-        Assert.That(inc.visibleFacets.Length, Is.EqualTo(reference.visibleFacets.Length), $"{ctx}: piece count");
-        for (int i = 0; i < inc.visibleFacets.Length; i++)
+        Assert.That(inc.pieces.Length, Is.EqualTo(reference.pieces.Length), $"{ctx}: piece count");
+        for (int i = 0; i < inc.pieces.Length; i++)
             Assert.That(VisibleCellSet(inc, i), Is.EquivalentTo(VisibleCellSet(reference, i)),
                 $"{ctx}: piece {i} visible cell set differs");
     }
@@ -83,7 +83,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var axis in axes) {
             inc.Translate(1, axis);
-            reference.TranslateTopology(1, axis); reference.UpdateCamera();
+            reference.pieces[1].topology.Translate(axis); reference.UpdateCamera();
             expectedOrigins = WithTranslate(expectedOrigins, 1, axis);
             var fresh = new Scene4d(expectedOrigins, new Camera4dParallel());
 
@@ -109,7 +109,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var axis in axes) {
             inc.Translate(1, axis);
-            reference.TranslateTopology(1, axis); reference.UpdateCamera();
+            reference.pieces[1].topology.Translate(axis); reference.UpdateCamera();
             AssertSameGeom(inc, reference, $"apart/back step {step} axis {axis.Human()}");
             step++;
         }
@@ -130,7 +130,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var axis in axes) {
             inc.Translate(1, axis);
-            reference.TranslateTopology(1, axis); reference.UpdateCamera();
+            reference.pieces[1].topology.Translate(axis); reference.UpdateCamera();
             AssertSameGeom(inc, reference, $"middle step {step} axis {axis.Human()}");
             step++;
         }
@@ -139,8 +139,8 @@ public class Scene4dIncrementalTests {
     // ── rotate equivalence ──────────────────────────────────────────────────────
 
     // A two-cube piece (so a 90° rotation actually moves cells) behind a single cube. Rotating it in
-    // several planes must match the full rebuild. The reference mirrors with RotateTopology +
-    // UpdateCamera, so no hand-computed rotated origins are needed.
+    // several planes must match the full rebuild. The reference mirrors with
+    // pieces[i].topology.Rotate + UpdateCamera, so no hand-computed rotated origins are needed.
     [Test] public void TwoCubePiece_Rotate_MatchesFullRebuild() {
         var origins = new int[][][] {
             new int[][] { new int[] {0,0,0,0}, new int[] {1,0,0,0} }, // piece 0: 2 cubes along x
@@ -155,7 +155,7 @@ public class Scene4dIncrementalTests {
         int step = 0;
         foreach (var (v, w) in planes) {
             inc.Rotate(0, v, w, center);
-            reference.RotateTopology(0, v, w, center); reference.UpdateCamera();
+            reference.pieces[0].topology.Rotate(v, w, center); reference.UpdateCamera();
             AssertSameGeom(inc, reference, $"rotate step {step} plane ({v},{w})");
             step++;
         }
@@ -172,13 +172,13 @@ public class Scene4dIncrementalTests {
         };
         var scene = new Scene4d(origins, new Camera4dParallel());
         var before = new List<List<string>>();
-        for (int i = 0; i < scene.visibleFacets.Length; i++) before.Add(VisibleGeom(scene, i));
+        for (int i = 0; i < scene.pieces.Length; i++) before.Add(VisibleGeom(scene, i));
 
         for (int rep = 0; rep < 5; rep++) {
             scene.Translate(1, IntegerSignedAxis.PD1);
             scene.Translate(1, IntegerSignedAxis.MD1);
         }
-        for (int i = 0; i < scene.visibleFacets.Length; i++)
+        for (int i = 0; i < scene.pieces.Length; i++)
             Assert.That(VisibleGeom(scene, i), Is.EqualTo(before[i]), $"round trip changed piece {i}");
     }
 }

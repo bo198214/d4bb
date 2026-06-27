@@ -29,7 +29,7 @@ public class Scene4dHashTests {
     // for Camera4dCentral; for the cavalier camera we just want to know it.
     [Test] public void Cavalier_SingleHypercube_VisibleFacetsCount() {
         var scene = BuildSingleHypercubeScene();
-        var facets = scene.VisibleFacets(0);
+        var facets = scene.pieces[0].visibleFacets;
         TestContext.Progress.WriteLine($"visible facets: {facets.Count}");
         TestContext.Progress.WriteLine($"cells: {scene.AllCells.Count()}");
         foreach (var f in facets) TestContext.Progress.WriteLine($"  {FaceKey(f)}");
@@ -45,7 +45,7 @@ public class Scene4dHashTests {
         HashSet<string> reference = null;
         for (int run = 0; run < N; run++) {
             var scene = BuildSingleHypercubeScene();
-            var keys = scene.VisibleFacets(0).Select(FaceKey).ToHashSet();
+            var keys = scene.pieces[0].visibleFacets.Select(FaceKey).ToHashSet();
             if (reference == null) reference = keys;
             else {
                 var missing = reference.Except(keys).ToList();
@@ -68,7 +68,7 @@ public class Scene4dHashTests {
         HashSet<string> reference = null;
         for (int run = 0; run < N; run++) {
             var scene = BuildSingleHypercubeScene();
-            var keys = scene.VisibleFacets(0)
+            var keys = scene.pieces[0].visibleFacets
                 .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
                 .Select(FaceKey)
                 .ToHashSet();
@@ -109,7 +109,7 @@ public class Scene4dHashTests {
         var scene = new Scene4d(origins, camera);
         scene.enable4dOcclusion = false;
         scene.Update(origins);
-        var facets = scene.VisibleFacets(0);
+        var facets = scene.pieces[0].visibleFacets;
         TestContext.Progress.WriteLine($"no-occlusion visible facets: {facets.Count}");
         foreach (var f in facets) TestContext.Progress.WriteLine($"  {FaceKey(f)}");
         // The 4 front-facing 3-cells contribute 4*6 - shared = 18 unique faces.
@@ -126,14 +126,14 @@ public class Scene4dHashTests {
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
 
         var sceneOcc = new Scene4d(origins, camera);
-        var setOcc = sceneOcc.VisibleFacets(0)
+        var setOcc = sceneOcc.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
 
         var sceneNo = new Scene4d(origins, camera);
         sceneNo.enable4dOcclusion = false;
         sceneNo.Update(origins);
-        var setNo = sceneNo.VisibleFacets(0)
+        var setNo = sceneNo.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
 
@@ -206,14 +206,14 @@ public class Scene4dHashTests {
     // any failure here is the user-reported bug.
     [Test] public void Cavalier_SingleHypercube_All_4dGoing_BoundaryFaces_AreVisible() {
         var scene = BuildSingleHypercubeScene();
-        var visibleKeys = scene.VisibleFacets(0).Select(FaceKey).ToHashSet();
+        var visibleKeys = scene.pieces[0].visibleFacets.Select(FaceKey).ToHashSet();
         // Enumerate the 9 4D-going faces that should be visible:
         // facets of front-facing c3s (a,b,c) whose span contains axis 3, dedup'd as IntegerCell.
         var expected4d = new HashSet<string> {
             "[1,0,0,0]:[1, 3]",  // span and origin formatting derived from IntegerCell.ToString
         };
         // Easier: just count visible 4D-going faces and ensure the right number.
-        var fourD = scene.VisibleFacets(0)
+        var fourD = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Count();
         Assert.That(fourD, Is.EqualTo(9),
@@ -235,12 +235,12 @@ public class Scene4dHashTests {
         // (deterministic) ordering. As an additional probe, we also disable occlusion
         // and verify the same set of 4D-going faces is reported.
         var scene = new Scene4d(origins, camera);
-        var occOn  = scene.VisibleFacets(0)
+        var occOn  = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
         scene.enable4dOcclusion = false;
         scene.Update(origins);
-        var occOff = scene.VisibleFacets(0)
+        var occOff = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
         Assert.That(occOn, Is.EquivalentTo(occOff),
@@ -263,7 +263,7 @@ public class Scene4dHashTests {
             new int[][] { new int[] {0,0,0,0}, new int[] {1,0,0,0} }
         };
         var scene = new Scene4d(origins, camera);
-        var visible = scene.VisibleFacets(0);
+        var visible = scene.pieces[0].visibleFacets;
         var fourD = visible.Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3)).ToList();
         TestContext.Progress.WriteLine($"two cubes: {visible.Count} visible, {fourD.Count} 4D-going");
         foreach (var f in fourD.OrderBy(f => FaceKey(f)))
@@ -279,7 +279,7 @@ public class Scene4dHashTests {
             new int[][] { new int[] {0,0,0,0}, new int[] {0,0,0,1} }
         };
         var scene = new Scene4d(origins, camera);
-        var visible = scene.VisibleFacets(0);
+        var visible = scene.pieces[0].visibleFacets;
         var fourD = visible.Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3)).ToList();
         TestContext.Progress.WriteLine($"axis3 stack: {visible.Count} visible, {fourD.Count} 4D-going");
         foreach (var f in fourD.OrderBy(f => FaceKey(f)))
@@ -296,8 +296,8 @@ public class Scene4dHashTests {
             new int[][] { new int[] {1,0,0,0} },
         };
         var scene = new Scene4d(origins, camera);
-        var visible0 = scene.VisibleFacets(0);
-        var visible1 = scene.VisibleFacets(1);
+        var visible0 = scene.pieces[0].visibleFacets;
+        var visible1 = scene.pieces[1].visibleFacets;
         var fourD0 = visible0.Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3)).ToList();
         var fourD1 = visible1.Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3)).ToList();
         TestContext.Progress.WriteLine($"piece0: {visible0.Count} visible, {fourD0.Count} 4D-going");
@@ -398,7 +398,7 @@ public class Scene4dHashTests {
         var camera = new PerturbedCamera(inner, vn);
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
-        var visible = scene.VisibleFacets(0);
+        var visible = scene.pieces[0].visibleFacets;
         var fourD = visible.Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3)).ToList();
         TestContext.Progress.WriteLine($"perturbed by {rel:G2}: {visible.Count} visible, {fourD.Count} 4D-going");
         foreach (var f in fourD.OrderBy(f => FaceKey(f)))
@@ -425,7 +425,7 @@ public class Scene4dHashTests {
         var camera = new Camera4dParallel();
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
-        var initial4d = scene.VisibleFacets(0)
+        var initial4d = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
         Assert.That(initial4d.Count, Is.EqualTo(9), "baseline 4D-going count must be 9");
@@ -437,7 +437,7 @@ public class Scene4dHashTests {
             var asFloat = new UnityEngine_Vector3((float)wDir.x[0], (float)wDir.x[1], (float)wDir.x[2]);
             camera.wDir = new Point3d(asFloat.x, asFloat.y, asFloat.z); // triggers SetCavalier
             scene.UpdateCamera();
-            var now4d = scene.VisibleFacets(0)
+            var now4d = scene.pieces[0].visibleFacets
                 .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
                 .Select(FaceKey).ToHashSet();
             var lost = initial4d.Except(now4d).ToList();
@@ -454,12 +454,12 @@ public class Scene4dHashTests {
         var camera = new Camera4dParallel();
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
-        var initial = scene.VisibleFacets(0).Select(FaceKey).ToHashSet();
+        var initial = scene.pieces[0].visibleFacets.Select(FaceKey).ToHashSet();
         TestContext.Progress.WriteLine($"initial visible count: {initial.Count}");
 
         for (int frame = 0; frame < 5; frame++) {
             scene.UpdateCamera(); // no camera change at all
-            var now = scene.VisibleFacets(0).Select(FaceKey).ToHashSet();
+            var now = scene.pieces[0].visibleFacets.Select(FaceKey).ToHashSet();
             var lost = initial.Except(now).ToList();
             TestContext.Progress.WriteLine($"frame {frame}: visible={now.Count} lost=[{string.Join(",", lost)}]");
             Assert.That(now, Is.EquivalentTo(initial),
@@ -473,7 +473,7 @@ public class Scene4dHashTests {
         var camera = new Camera4dParallel();
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
-        var initial4d = scene.VisibleFacets(0)
+        var initial4d = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
         Assert.That(initial4d.Count, Is.EqualTo(9));
@@ -487,7 +487,7 @@ public class Scene4dHashTests {
                 w.x[1] + (rnd.NextDouble() - 0.5) * 1e-6,
                 w.x[2] + (rnd.NextDouble() - 0.5) * 1e-6);
             scene.UpdateCamera();
-            var now4d = scene.VisibleFacets(0)
+            var now4d = scene.pieces[0].visibleFacets
                 .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
                 .Select(FaceKey).ToHashSet();
             var lost = initial4d.Except(now4d).ToList();
@@ -519,7 +519,7 @@ public class Scene4dHashTests {
         camera.wDir = new Point3d(camera.wDir.x[0] + eps, camera.wDir.x[1], camera.wDir.x[2]);
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
-        var fourD = scene.VisibleFacets(0)
+        var fourD = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Count();
         Assert.That(fourD, Is.EqualTo(9), $"eps={eps:G2}: lost shared 4D-going faces");
@@ -540,7 +540,7 @@ public class Scene4dHashTests {
         camera.wDir = new Point3d(w.x[0] + dx, w.x[1] + dy, w.x[2] + dz);
         var origins = new int[][][] { new int[][] { new int[] {0,0,0,0} } };
         var scene = new Scene4d(origins, camera);
-        var fourD = scene.VisibleFacets(0)
+        var fourD = scene.pieces[0].visibleFacets
             .Where(f => ((Face2dWithIntegerCellAttribute)f).integerCell.span.Contains(3))
             .Select(FaceKey).ToHashSet();
         TestContext.Progress.WriteLine($"wDir+={dx},{dy},{dz}: {fourD.Count} 4D-going visible");

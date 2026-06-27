@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using D4BB.Comb;
+using D4BB.Geometry;
 
 namespace D4BB.Transforms
 {
@@ -79,6 +80,10 @@ namespace D4BB.Transforms
         // Projected 3D AABB, union over this piece's occluder cells. The dependency signal for the
         // incremental path: a piece overlapping the moved piece (before or after) may need re-cutting.
         public ScreenBounds bounds = ScreenBounds.Empty();
+        // The piece's visible 2-faces / boundary edges, derived from `cells` after occlusion. This is
+        // what the renderer reads to build the Unity mesh. (Re)filled by Scene4d.RefreshVisibleCache.
+        public HashSet<Face2d> visibleFacets = new();
+        public HashSet<IPolyhedron> visibleEdges = new();
 
         public Piece(PieceTopology topology) { this.topology = topology; }
     }

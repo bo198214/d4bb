@@ -52,13 +52,13 @@ public class MarkStampingTests
         var sceneOff = new Scene4d(origins, camera, showIntraCoplanarEdges: false, cullBackFaces: false, showGridDivisions: false);
         sceneOff.enable4dOcclusion = false;
         sceneOff.Update(origins);
-        int facesOff = sceneOff.VisibleFacets(0).Count;
+        int facesOff = sceneOff.pieces[0].visibleFacets.Count;
 
         // showGridDivisions=true → interior division faces added
         var sceneOn = new Scene4d(origins, camera, showIntraCoplanarEdges: false, cullBackFaces: false, showGridDivisions: true);
         sceneOn.enable4dOcclusion = false;
         sceneOn.Update(origins);
-        int facesOn = sceneOn.VisibleFacets(0).Count;
+        int facesOn = sceneOn.pieces[0].visibleFacets.Count;
 
         Assert.That(facesOn, Is.GreaterThan(facesOff),
             "showGridDivisions=true must expose at least one extra Face2dBC compared to =false.");
@@ -66,8 +66,8 @@ public class MarkStampingTests
             "Two touching tesseracts share an internal hexahedral 3-cell with 6 boundary 2-faces.");
 
         // Every extra face has mark=GRID_DIVISION and is isCoplanarInterior=true
-        var offSet = new HashSet<Face2d>(sceneOff.VisibleFacets(0), new Face2dUnOrientedEquality(AOP.binaryPrecision));
-        foreach (var f in sceneOn.VisibleFacets(0))
+        var offSet = new HashSet<Face2d>(sceneOff.pieces[0].visibleFacets, new Face2dUnOrientedEquality(AOP.binaryPrecision));
+        foreach (var f in sceneOn.pieces[0].visibleFacets)
         {
             if (offSet.Contains(f)) continue;
             Assert.That(f.mark, Is.EqualTo(GI), "Extra face must be marked as Grid-Division.");
@@ -100,15 +100,15 @@ public class MarkStampingTests
         sceneRef.enable4dOcclusion = false;
         sceneRef.Update(translated);
 
-        Assert.That(sceneFast.VisibleFacets(0).Count, Is.EqualTo(sceneRef.VisibleFacets(0).Count),
+        Assert.That(sceneFast.pieces[0].visibleFacets.Count, Is.EqualTo(sceneRef.pieces[0].visibleFacets.Count),
             "In-place Translate must yield the same face count as a fresh build at the translated origin.");
-        Assert.That(sceneFast.VisibleEdges(0).Count, Is.EqualTo(sceneRef.VisibleEdges(0).Count),
+        Assert.That(sceneFast.pieces[0].visibleEdges.Count, Is.EqualTo(sceneRef.pieces[0].visibleEdges.Count),
             "In-place Translate must yield the same edge count as a fresh build.");
 
         // Geometric correspondence: every Face2dBC origin in the fast scene must match
         // exactly one in the reference scene (set equality via Face2dUnOrientedEquality).
-        var refSet = new HashSet<Face2d>(sceneRef.VisibleFacets(0), new Face2dUnOrientedEquality(AOP.binaryPrecision));
-        foreach (var f in sceneFast.VisibleFacets(0))
+        var refSet = new HashSet<Face2d>(sceneRef.pieces[0].visibleFacets, new Face2dUnOrientedEquality(AOP.binaryPrecision));
+        foreach (var f in sceneFast.pieces[0].visibleFacets)
             Assert.That(refSet.Contains(f), Is.True,
                 $"Fast-path face {f} not found in reference build — Translate produced wrong geometry.");
     }
@@ -138,10 +138,10 @@ public class MarkStampingTests
         sceneRef.enable4dOcclusion = false;
         sceneRef.Update(rotated);
 
-        Assert.That(sceneFast.VisibleFacets(0).Count, Is.EqualTo(sceneRef.VisibleFacets(0).Count),
+        Assert.That(sceneFast.pieces[0].visibleFacets.Count, Is.EqualTo(sceneRef.pieces[0].visibleFacets.Count),
             "In-place Rotate must yield same face count as fresh build.");
-        var refSet = new HashSet<Face2d>(sceneRef.VisibleFacets(0), new Face2dUnOrientedEquality(AOP.binaryPrecision));
-        foreach (var f in sceneFast.VisibleFacets(0))
+        var refSet = new HashSet<Face2d>(sceneRef.pieces[0].visibleFacets, new Face2dUnOrientedEquality(AOP.binaryPrecision));
+        foreach (var f in sceneFast.pieces[0].visibleFacets)
             Assert.That(refSet.Contains(f), Is.True,
                 $"Fast-path rotated face {f} not in reference build.");
     }
