@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using D4BB.Comb;
 using D4BB.Geometry;
@@ -21,10 +22,14 @@ namespace D4BB.Transforms
         public bool showGridDivisions = true;
         public bool enable4dOcclusion = true;
         public bool cullBackFaces = true;
-        public bool stepMode = false;
-        public int stepIndex = 0;
-        public int maxSteps = 0;
-        public readonly List<CellBoundary> cells = new();
+        // Occluded (cut) cells, grouped per piece — the single source of truth. Grouping lets an
+        // incremental Translate/Rotate replace just the affected pieces' cells in place. Consumers
+        // that need a flat view over every cell use AllCells (a computed view, not stored state).
+        public List<CellBoundary>[] cellsByPiece { get; private set; } = System.Array.Empty<List<CellBoundary>>();
+        public IEnumerable<CellBoundary> AllCells => cellsByPiece.SelectMany(c => c);
+        // Per-piece projected AABB (union over the piece's occluder cells). The dependency signal for
+        // incremental updates: a piece overlapping the moved piece (before or after) may need re-cutting.
+        private ScreenBounds[] pieceBounds = System.Array.Empty<ScreenBounds>();
         public HashSet<Face2d>[] visibleFacets { get; private set; } = System.Array.Empty<HashSet<Face2d>>();
         public HashSet<IPolyhedron>[] visibleEdges { get; private set; } = System.Array.Empty<HashSet<IPolyhedron>>();
 
@@ -68,33 +73,38 @@ namespace D4BB.Transforms
         {
             numPieces = pieceOrigins?.Length ?? 0;
             pieceTopologies = ComputeAllTopologies(pieceOrigins, showGridDivisions);
-            RebuildCellsFromTopologies();
-            ApplyCameraOcclusion();
+            cellsByPiece = new List<CellBoundary>[numPieces];
+            pieceBounds = new ScreenBounds[numPieces];
+            RebuildAllPieces();
             RefreshVisibleCache();
         }
 
         public void UpdateCamera()
         {
-            // Must rebuild before re-occluding: ApplyCameraOcclusion mutates pbc.d2faces
-            // destructively, so calling it twice on the same cells erodes d2faces. The
-            // rebuild is cheap because pieceTopologies is cached (no IBC recomputation).
-            // Also keeps Face2dBC.points in sync with the current camera so HalfSpace.side
-            // checks against DefiningHalfSpaces use a consistent projection.
-            RebuildCellsFromTopologies();
-            ApplyCameraOcclusion();
+            // Rebuild every piece's cells from cached topology and re-occlude. Cheap relative to a full
+            // Update because pieceTopologies is cached (no IBC recomputation). A fresh build is required
+            // because CutOut destructively mutates faces — reusing last frame's cut cells would erode
+            // d2faces. Keeps Face2dBC.points in sync with the current camera too.
+            RebuildAllPieces();
             RefreshVisibleCache();
         }
 
+        // Incremental piece move. Only the moved piece is reprojected, and only pieces whose projected
+        // AABB overlaps the moved piece (before or after the move) are re-occluded — see
+        // ReoccludeAfterPieceChange. Currently unused by the game (the drag path still goes through the
+        // full UpdateCamera); wired up in a later session.
         public void Translate(int pieceIndex, IntegerSignedAxis axis)
         {
+            var prev = pieceBounds[pieceIndex];
             TranslateTopology(pieceIndex, axis);
-            UpdateCamera();
+            ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
         public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
         {
+            var prev = pieceBounds[pieceIndex];
             RotateTopology(pieceIndex, v, w, center);
-            UpdateCamera();
+            ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
         // Topology-only mutation, no cell rebuild / occlusion / cache refresh. Lets a caller
@@ -196,46 +206,99 @@ namespace D4BB.Transforms
 
         // ── fast rebuild from precomputed topology (skips IntegerBoundaryComplex) ─
 
-        private void RebuildCellsFromTopologies()
+        // Rebuild every piece's cut cells from cached topology + current camera, with occlusion.
+        // Fills cellsByPiece and pieceBounds. Shared by Update and UpdateCamera.
+        private void RebuildAllPieces()
         {
-            cells.Clear();
-            for (int i = 0; i < pieceTopologies.Length; i++)
-                RebuildCellsFromPieceTopology(pieceTopologies[i], i);
-
-            // // Cross-piece deduplication: shared 2-faces between pieces cancel.
-            // var claimedCells = new HashSet<IntegerCell>();
-            // foreach (var cb in cells)
-            // {
-            //     var toRemove = new List<Face2dBC>();
-            //     foreach (var kvp in cb.pbc.i2p)
-            //         if (!claimedCells.Add(kvp.Key))
-            //             toRemove.Add(kvp.Value);
-            //     foreach (var facet in toRemove)
-            //         cb.pbc.RemoveFace(facet);
-            // }
+            var occluders = ComputeOccluders();   // (re)fills pieceBounds
+            SortFarToNear(occluders);
+            for (int p = 0; p < numPieces; p++)
+                cellsByPiece[p] = BuildOccludedPieceCells(p, occluders);
         }
 
+        // Incremental re-occlusion after piece `p` moved. Reprojects only `p` (the moved piece) and
+        // re-occludes only the pieces whose projected AABB overlaps `p` before or after the move.
+        // The before-overlap term restores a piece that `p` used to occlude but no longer does; the
+        // after-overlap term cuts a piece `p` now occludes. Pieces touching neither keep their cut
+        // cells untouched. Equivalent to a full RebuildAllPieces because a cell's cut result depends
+        // only on the strictly-nearer cells overlapping it (cut order is irrelevant — see
+        // OccludePieceCells) and a move of `p` only changes overlap relationships that involve `p`.
+        private void ReoccludeAfterPieceChange(int p, ScreenBounds prevBoundsOfP)
+        {
+            var occluders = ComputeOccluders();   // refreshes pieceBounds for all pieces
+            SortFarToNear(occluders);
+            var newBoundsOfP = pieceBounds[p];
+
+            var affected = new List<int> { p };
+            for (int q = 0; q < numPieces; q++)
+            {
+                if (q == p) continue;
+                if (pieceBounds[q].Overlaps(prevBoundsOfP) || pieceBounds[q].Overlaps(newBoundsOfP))
+                    affected.Add(q);
+            }
+            foreach (var q in affected)
+                cellsByPiece[q] = BuildOccludedPieceCells(q, occluders);
+            RefreshVisibleCache(affected);
+        }
+
+        // Build piece `p`'s cells fresh from topology, then (if enabled) cut them against the scene's
+        // occluders. The fresh build is mandatory: CutOut destructively edits faces, so a piece must
+        // start from a clean projection every time it is re-occluded.
+        private List<CellBoundary> BuildOccludedPieceCells(int p, List<Occluder> occludersFarToNear)
+        {
+            var pieceCells = BuildCellsFromPieceTopology(pieceTopologies[p], p, cullBackFaces);
+            if (enable4dOcclusion) OccludePieceCells(p, pieceCells, occludersFarToNear);
+            return pieceCells;
+        }
+
+        // Painter's-algorithm occlusion restricted to occludee == piece `p`. Equivalent to the global
+        // far→near sweep (near cell cuts every already-seen farther cell), but only piece `p`'s cells
+        // are enqueued as occludees; all cells still act as occluders (their half-spaces depend only on
+        // the integer cell + camera, never on whether they were themselves cut). This restriction is
+        // exact because CutOut's neighbor-Replace side effects stay within a single piece (there are no
+        // cross-piece neighbor links), so cutting `p` is independent of how other pieces get cut.
+        private void OccludePieceCells(int p, List<CellBoundary> pieceCells, List<Occluder> occludersFarToNear)
+        {
+            var cellByRef = new Dictionary<OrientedIntegerCell, CellBoundary>(ByRefCellComparer.I);
+            foreach (var cb in pieceCells) cellByRef[cb.cell] = cb;
+
+            // p-cells seen so far in the far→near sweep, i.e. candidates farther than the current
+            // occluder. Insertion order is far→near, matching the global loop's `back` list.
+            var seen = new List<(CellBoundary cb, double depth, ScreenBounds bounds)>();
+            foreach (var occ in occludersFarToNear)
+            {
+                HalfSpace[] hs = null;
+                foreach (var (cb, depth, bounds) in seen)
+                    if (depth != occ.depth && bounds.Overlaps(occ.bounds))
+                    {
+                        hs ??= occ.HalfSpaces(camera);
+                        cb.pbc.CutOut(hs);
+                    }
+                // Enqueue this occluder as an occludee only after it has cut the farther ones, so it
+                // never cuts itself. Only p's own cells become occludees here.
+                if (occ.pieceIndex == p && cellByRef.TryGetValue(occ.cell, out var pcb))
+                    seen.Add((pcb, occ.depth, occ.bounds));
+            }
+        }
+
+        // Pure per-piece builder — returns piece `pieceIndex`'s un-occluded ("clean") cells with
+        // neighbor links wired up. Does not touch cellsByPiece; the caller decides what to do with the
+        // result (BuildOccludedPieceCells cuts it and stores it; ComputePieceBoundaryEdges runs
+        // BoundaryEdges() locally without participating in occlusion). A fresh build is produced on
+        // every call because CutOut later destructively modifies these faces by severing neighbor
+        // links — reusing objects from a previous frame would leave stale topology.
+        //
         // Each front-facing 3-cell c3 plays TWO independent roles in the scene:
         //   (a) Owner of visible 2-faces: each f2 is rendered exactly once, owned by some c3.
-        //   (b) Occluder: c3's halfspaces cut other cells' faces in ApplyCameraOcclusion.
+        //   (b) Occluder: c3's halfspaces cut other cells' faces during occlusion (OccludePieceCells).
         //
         // These roles must NOT be conflated. A c3 may legitimately own zero f2's — when all
         // its f2's are 2-corners shared with other-hyperplane c3's that won the dedup race —
-        // and still be required as an occluder. Coupling the roles (only adding c3 to `cells`
-        // if it owns at least one f2) caused Box3D_NoDuplicateFaceFragmentsInSameCell: the
-        // diagonal-corner cell of the 3DBox hole had no owned f2's, so its halfspaces were
-        // missing from occlusion, and the diagonal-corner quadrant of the inner-hole wall
-        // survived the cut.
-        //
-        // Fresh Face2dBC objects are created on every rebuild because CutOut (called in
-        // ApplyCameraOcclusion) destructively modifies them by severing neighbor links.
-        // Reusing objects from a previous frame would leave stale topology.
-        private void RebuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex)
-            => cells.AddRange(BuildCellsFromPieceTopology(topo, pieceIndex, cullBackFaces));
-
-        // Pure builder — does not touch this.cells. Caller decides what to do with the result
-        // (RebuildCellsFromPieceTopology appends to this.cells; ComputePieceBoundaryEdges runs
-        // BoundaryEdges() locally without participating in occlusion).
+        // and still be required as an occluder. Coupling the roles (only adding c3 if it owns at
+        // least one f2) caused Box3D_NoDuplicateFaceFragmentsInSameCell: the diagonal-corner cell of
+        // the 3DBox hole had no owned f2's, so its halfspaces were missing from occlusion, and the
+        // diagonal-corner quadrant of the inner-hole wall survived the cut. (ComputeOccluders mirrors
+        // this occluder set exactly, including the interior-division owner cells below.)
         private List<CellBoundary> BuildCellsFromPieceTopology(PieceTopology topo, int pieceIndex, bool cullBackFacesArg)
         {
             // Role (b): every front-facing c3 must contribute halfspaces, regardless of f2 ownership.
@@ -400,42 +463,59 @@ namespace D4BB.Transforms
 
         // ── camera occlusion ──────────────────────────────────────────────────
 
-        private void ApplyCameraOcclusion()
+        // Cut-independent occluder descriptor: an occluder's half-spaces depend only on its integer
+        // cell + camera (DefiningHalfSpaces), never on whether the occluder's own faces were cut. So
+        // an occluder can be rebuilt from topology alone — the key that lets occlusion be recomputed
+        // for a subset of pieces. depth + bounds drive the painter's-algorithm ordering and the cheap
+        // overlap reject. HalfSpaces is computed lazily (only when this occluder actually cuts
+        // something) and cached for reuse across the per-piece occlusion passes of one rebuild.
+        private sealed class Occluder
         {
-            if (!enable4dOcclusion) return;
-
-            var viewNormal = camera.viewNormal.x;
-            SortCellsFarToNear(viewNormal);
-
-            var back = new List<CellBoundary>();
-            maxSteps = cells.Count;
-            int i = 0;
-            foreach (var nearCell in cells)
-            {
-                if (stepMode && i >= stepIndex)
-                {
-                    nearCell.pbc.d2faces.Clear();
-                }
-                else
-                {
-                    var nearDepth = Depth(nearCell.cell, viewNormal);
-                    var halfSpaces = DefiningHalfSpaces(nearCell.cell, camera);
-                    foreach (var farCell in back)
-                        if (Depth(farCell.cell, viewNormal) != nearDepth)
-                            farCell.pbc.CutOut(halfSpaces);
-                    back.Add(nearCell);
-                }
-                i++;
-            }
+            public readonly OrientedIntegerCell cell;
+            public readonly int pieceIndex;
+            public readonly double depth;
+            public readonly ScreenBounds bounds;
+            private HalfSpace[] halfSpaces;
+            public Occluder(OrientedIntegerCell cell, int pieceIndex, double depth, ScreenBounds bounds)
+            { this.cell = cell; this.pieceIndex = pieceIndex; this.depth = depth; this.bounds = bounds; }
+            public HalfSpace[] HalfSpaces(ICamera4d cam) => halfSpaces ??= DefiningHalfSpaces(cell, cam);
         }
 
-        // Painter's-algorithm depth ordering: cells with larger depth (deeper into the
-        // viewNormal direction, i.e. farther from the camera) come first; smaller-depth
-        // (nearer) cells come last so each near cell can cut all already-processed far cells
-        // in `back`. Equal-depth cells coexist (skipped from cutting each other below).
-        private void SortCellsFarToNear(double[] viewNormal)
+        // Build the occluder set for the whole scene and (re)fill pieceBounds. This must mirror the
+        // occluder cells that BuildCellsFromPieceTopology adds — the front-facing distinct c3 from the
+        // coplanar boundary faces, plus the interior-division owner cells when grid divisions are on
+        // (those can own zero boundary 2-faces yet are still required as occluders; see the Box3D note
+        // on BuildCellsFromPieceTopology). Cheap: only a facing test + an 8-vertex projection per c3,
+        // no face construction.
+        private List<Occluder> ComputeOccluders()
         {
-            cells.Sort((a, b) => Depth(b.cell, viewNormal).CompareTo(Depth(a.cell, viewNormal)));
+            var viewNormal = camera.viewNormal.x;
+            for (int p = 0; p < numPieces; p++) pieceBounds[p] = ScreenBounds.Empty();
+            var result = new List<Occluder>();
+            for (int p = 0; p < numPieces; p++)
+            {
+                var topo = pieceTopologies[p];
+                var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
+                void Add(OrientedIntegerCell c3)
+                {
+                    if (!seen.Add(c3)) return;
+                    if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) return;
+                    var b = ProjectedBounds(c3, camera);
+                    result.Add(new Occluder(c3, p, Depth(c3, viewNormal), b));
+                    pieceBounds[p].Encapsulate(b);
+                }
+                foreach (var (c3, _) in topo.coplanarBoundaryFaces) Add(c3);
+                if (showGridDivisions && topo.interiorDivisionFaces != null)
+                    foreach (var (owner, _) in topo.interiorDivisionFaces) Add(owner);
+            }
+            return result;
+        }
+
+        // Painter's-algorithm depth ordering: larger depth (deeper into the viewNormal direction,
+        // i.e. farther from the camera) first, so each occludee is cut by everything strictly nearer.
+        private static void SortFarToNear(List<Occluder> occluders)
+        {
+            occluders.Sort((a, b) => b.depth.CompareTo(a.depth));
         }
         private static double Depth(IntegerCell cell, double[] viewNormal)
         {
@@ -445,22 +525,40 @@ namespace D4BB.Transforms
             return sum;
         }
 
+        // Projected 3D AABB of a 3-cell (its 8 vertices through the camera). Cut-independent. Used as
+        // the conservative occlusion-overlap gate and the piece-level dependency signal.
+        public static ScreenBounds ProjectedBounds(OrientedIntegerCell cell, ICamera4d cam)
+        {
+            var b = ScreenBounds.Empty();
+            foreach (var v in cell.Vertices())
+                b.Encapsulate(cam.Proj3d(new Point4d(v)).x);
+            return b;
+        }
+
         // ── visible cache ─────────────────────────────────────────────────────
 
         private void RefreshVisibleCache()
         {
             visibleFacets = new HashSet<Face2d>[numPieces];
             visibleEdges = new HashSet<IPolyhedron>[numPieces];
-            for (int i = 0; i < numPieces; i++)
+            for (int i = 0; i < numPieces; i++) RefreshVisibleCacheForPiece(i);
+        }
+        // Affected-only refresh for the incremental path: pieces not in `pieces` keep their cached sets.
+        private void RefreshVisibleCache(IEnumerable<int> pieces)
+        {
+            foreach (var i in pieces) RefreshVisibleCacheForPiece(i);
+        }
+        private void RefreshVisibleCacheForPiece(int i)
+        {
+            var facets = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
+            var edges = new HashSet<IPolyhedron>();
+            foreach (var cb in cellsByPiece[i])
             {
-                visibleFacets[i] = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
-                visibleEdges[i] = new HashSet<IPolyhedron>();
+                foreach (var facet in cb.pbc.d2faces) facets.Add(facet);
+                foreach (var edge in cb.pbc.BoundaryEdges()) edges.Add(edge);
             }
-            foreach (var cb in cells)
-            {
-                foreach (var facet in cb.pbc.d2faces) visibleFacets[cb.pieceIndex].Add(facet);
-                foreach (var edge in cb.pbc.BoundaryEdges()) visibleEdges[cb.pieceIndex].Add(edge);
-            }
+            visibleFacets[i] = facets;
+            visibleEdges[i] = edges;
         }
 
         // ── helpers ───────────────────────────────────────────────────────────

@@ -31,7 +31,7 @@ public class Scene4dHashTests {
         var scene = BuildSingleHypercubeScene();
         var facets = scene.VisibleFacets(0);
         TestContext.Progress.WriteLine($"visible facets: {facets.Count}");
-        TestContext.Progress.WriteLine($"cells: {scene.cells.Count}");
+        TestContext.Progress.WriteLine($"cells: {scene.AllCells.Count()}");
         foreach (var f in facets) TestContext.Progress.WriteLine($"  {FaceKey(f)}");
         Assert.That(facets.Count, Is.GreaterThan(0));
     }
@@ -147,7 +147,7 @@ public class Scene4dHashTests {
     // get rendered twice or "claimed" inconsistently.
     [Test] public void Cavalier_SingleHypercube_pbc_d2faces_Match_i2p() {
         var scene = BuildSingleHypercubeScene();
-        foreach (var cb in scene.cells) {
+        foreach (var cb in scene.AllCells) {
             var d2 = cb.pbc.d2faces.ToList();
             var i2p = cb.pbc.i2p;
             // every d2 entry's integerCell is unique
@@ -584,17 +584,18 @@ public class Scene4dHashTests {
         // For every visible face, if every vertex lies inside the union of *other-piece*
         // closer cells, the face fragment is hidden — should have been cut by occlusion.
         var problems = new List<string>();
-        for (int p = 0; p < scene.cells.Count; p++) {
-            var cellP = scene.cells[p];
+        var allCells = scene.AllCells.ToList();
+        for (int p = 0; p < allCells.Count; p++) {
+            var cellP = allCells[p];
             var depthP = DepthOf(cellP.cell);
             var closerHs = new List<HalfSpace[]>();
-            for (int q = 0; q < scene.cells.Count; q++) {
+            for (int q = 0; q < allCells.Count; q++) {
                 if (q == p) continue;
                 // Only other-piece cells count as occluders here. Same-piece sibling
                 // cells legitimately share boundaries with this face.
-                if (scene.cells[q].pieceIndex == cellP.pieceIndex) continue;
-                if (DepthOf(scene.cells[q].cell) >= depthP) continue;
-                closerHs.Add(Scene4d.DefiningHalfSpaces((OrientedIntegerCell)scene.cells[q].cell, camera));
+                if (allCells[q].pieceIndex == cellP.pieceIndex) continue;
+                if (DepthOf(allCells[q].cell) >= depthP) continue;
+                closerHs.Add(Scene4d.DefiningHalfSpaces((OrientedIntegerCell)allCells[q].cell, camera));
             }
             if (closerHs.Count == 0) continue;
 
@@ -655,7 +656,7 @@ public class Scene4dHashTests {
         var scene = new Scene4d(origins, camera);
 
         var problems = new List<string>();
-        foreach (var cb in scene.cells) {
+        foreach (var cb in scene.AllCells) {
             var dups = cb.pbc.d2faces.GroupBy(f => f.integerCell.ToString()).Where(g => g.Count() > 1);
             foreach (var g in dups) {
                 problems.Add($"cell {cb.cell}: {g.Count()} fragments share integerCell {g.Key}");
