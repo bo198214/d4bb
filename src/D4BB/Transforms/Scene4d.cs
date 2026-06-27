@@ -85,12 +85,28 @@ namespace D4BB.Transforms
             RefreshVisibleCache();
         }
 
-        // Mutates topology in place — every OrientedIntegerCell in the tuple arrays gets
-        // Translate/Rotate called exactly once. The same c3 reference appears in up to 6
-        // boundary tuples (one per facet) and possibly also in interior tuples; only the
-        // first occurrence is mutated. f2 instances are unique per tuple (Facets() builds
-        // fresh OrientedIntegerCells), so they need no dedup.
         public void Translate(int pieceIndex, IntegerSignedAxis axis)
+        {
+            TranslateTopology(pieceIndex, axis);
+            UpdateCamera();
+        }
+
+        public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
+        {
+            RotateTopology(pieceIndex, v, w, center);
+            UpdateCamera();
+        }
+
+        // Topology-only mutation, no cell rebuild / occlusion / cache refresh. Lets a caller
+        // mirror several committed moves into pieceTopologies and then run a single UpdateCamera
+        // (RebuildCells + Occlusion + RefreshVisibleCache, all without the expensive IBC) — used
+        // by the drag path so multi-step drags occlude once, not per micro-step.
+        //
+        // Mutates in place — every OrientedIntegerCell in the tuple arrays gets Translate/Rotate
+        // called exactly once. The same c3 reference appears in up to 6 boundary tuples (one per
+        // facet) and possibly also in interior tuples; only the first occurrence is mutated. f2
+        // instances are unique per tuple (Facets() builds fresh OrientedIntegerCells), no dedup.
+        public void TranslateTopology(int pieceIndex, IntegerSignedAxis axis)
         {
             var topo = pieceTopologies[pieceIndex];
             var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
@@ -105,12 +121,9 @@ namespace D4BB.Transforms
                     if (seen.Add(c3)) c3.Translate(axis);
                     f2.Translate(axis);
                 }
-            RebuildCellsFromTopologies();
-            ApplyCameraOcclusion();
-            RefreshVisibleCache();
         }
 
-        public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
+        public void RotateTopology(int pieceIndex, int v, int w, IntegerCenter center)
         {
             var topo = pieceTopologies[pieceIndex];
             var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
@@ -125,9 +138,6 @@ namespace D4BB.Transforms
                     if (seen.Add(c3)) c3.Rotate(center, v, w);
                     f2.Rotate(center, v, w);
                 }
-            RebuildCellsFromTopologies();
-            ApplyCameraOcclusion();
-            RefreshVisibleCache();
         }
 
         // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
