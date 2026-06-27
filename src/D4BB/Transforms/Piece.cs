@@ -14,16 +14,31 @@ namespace D4BB.Transforms
         public int GetHashCode(OrientedIntegerCell c) => RuntimeHelpers.GetHashCode(c);
     }
 
-    // One render piece in a Scene4d: its combinatorial boundary topology plus the per-piece render
-    // state derived from it. Replaces the former parallel arrays (pieceTopologies[] / cellsByPiece[] /
-    // pieceBounds[]) that were coupled only by array index.
+    // A single movable piece. The unified per-piece object (the former game-state `Compound` and the
+    // render-side topology/cells were merged here): it carries the authoritative game state (`origins`,
+    // `colorSlot`) AND the render state (boundary topology, occluded cells, visible facets/edges). A
+    // single Translate/Rotate keeps all of them consistent, so there is no cross-layer lockstep.
+    //
+    // The render fields are only populated when a Scene4d processes the piece (builds its topology then
+    // occludes); a piece used purely as game state (e.g. a GameLevel piece not yet bound to a Scene4d,
+    // or the 3D path which renders via Scene3d) leaves `coplanarBoundaryFaces` null, and Translate/Rotate
+    // then mutate only the game state.
     public class Piece
     {
-        // ── topology (the IBC boundary, computed once; mutated in place by Translate/Rotate) ──
+        // ── game state (authoritative) ──
+        // The piece's elementary-cell origins (one int[] per unit tesseract). The single source of truth
+        // for the piece's position; PieceOrigins, win-detection and overlap checks all read this.
+        public int[][] origins;
+        // Stable identity slot used to pick a piece color from a palette sized at level load. Survives
+        // Combine so a piece's color does not change when a neighbour merges into it. -1 = unassigned.
+        public int colorSlot = -1;
+        // Lattice center (in half-integer "twice" coords); the default rotation pivot.
+        private IntegerCenter center;
+
+        // ── topology (the IBC boundary, computed once by Scene4d; mutated in place by Translate/Rotate) ──
         // The (3-cell, 2-face) boundary pairs of the piece, computed once via IntegerBoundaryComplex.
         // A Translate/Rotate only mutates the origins/spans of these cells in place, so the face
-        // *selection* stays valid and the expensive IBC rebuild is avoided. Origins are not stored
-        // here — the single source of truth is gameLevel.compounds[i].origins.
+        // *selection* stays valid and the expensive IBC rebuild is avoided. Null until a Scene4d builds it.
         public (OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces;
         // Interior 2-faces between two coplanar boundary 3-cells of the same piece (the "Grid-Division"
         // faces — the 2D subdivision that lives one dimension deeper than coplanar grid edges). Filtered
@@ -43,19 +58,24 @@ namespace D4BB.Transforms
         public HashSet<Face2d> visibleFacets = new();
         public HashSet<IPolyhedron> visibleEdges = new();
 
-        public Piece((OrientedIntegerCell c3, OrientedIntegerCell f2)[] coplanarBoundaryFaces,
-                     (OrientedIntegerCell c3, OrientedIntegerCell f2)[] interiorDivisionFaces)
+        public Piece(int[][] origins, int colorSlot = -1)
         {
-            this.coplanarBoundaryFaces = coplanarBoundaryFaces;
-            this.interiorDivisionFaces = interiorDivisionFaces;
+            this.origins = IntegerOps.Clone(origins);
+            this.colorSlot = colorSlot;
+            RecomputeCenter();
         }
 
-        // In-place topology mutation. Every OrientedIntegerCell in the tuple arrays gets Translate/Rotate
-        // called exactly once: the same c3 reference appears in up to 6 boundary tuples (one per facet)
-        // and possibly also in interior tuples, so it is deduped by reference; f2 instances are unique
-        // per tuple (Facets() builds fresh OrientedIntegerCells), so no dedup is needed for them.
+        private void RecomputeCenter() => center = new IntegerCenter(origins, asCubes: true);
+
+        // Move the piece by one lattice step: origins + center, and the topology cells in place (if a
+        // Scene4d has built them). The same c3 reference appears in up to 6 boundary tuples (one per
+        // facet) and possibly also in interior tuples, so it is deduped by reference; f2 instances are
+        // unique per tuple (Facets() builds fresh OrientedIntegerCells), so no dedup is needed for them.
         public void Translate(IntegerSignedAxis axis)
         {
+            IntegerOps.Translate(origins, axis);
+            center.Translate(axis);
+            if (coplanarBoundaryFaces == null) return;
             var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
             foreach (var (c3, f2) in coplanarBoundaryFaces)
             {
@@ -70,20 +90,43 @@ namespace D4BB.Transforms
                 }
         }
 
-        public void Rotate(int v, int w, IntegerCenter center)
+        // 90° rotation in the (v,w) plane around `pivot`: origins + topology cells (if built); the center
+        // is recomputed because an arbitrary pivot (not the centroid) moves it.
+        public void Rotate(int v, int w, IntegerCenter pivot)
         {
+            foreach (var o in origins)
+                IntegerOps.RotateAsCenters(o, pivot, v, w);
+            RecomputeCenter();
+            if (coplanarBoundaryFaces == null) return;
             var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
             foreach (var (c3, f2) in coplanarBoundaryFaces)
             {
-                if (seen.Add(c3)) c3.Rotate(center, v, w);
-                f2.Rotate(center, v, w);
+                if (seen.Add(c3)) c3.Rotate(pivot, v, w);
+                f2.Rotate(pivot, v, w);
             }
             if (interiorDivisionFaces != null)
                 foreach (var (c3, f2) in interiorDivisionFaces)
                 {
-                    if (seen.Add(c3)) c3.Rotate(center, v, w);
-                    f2.Rotate(center, v, w);
+                    if (seen.Add(c3)) c3.Rotate(pivot, v, w);
+                    f2.Rotate(pivot, v, w);
                 }
+        }
+
+        // Absorb other pieces' cells into this one (used by the combine move). Only the game state is
+        // merged here; the caller rebuilds the topology/render of the enlarged piece afterwards. The
+        // surviving colorSlot is the smallest among the merged set so the merged piece keeps a stable
+        // color identity.
+        public void Combine(IEnumerable<Piece> others)
+        {
+            var all = new List<int[]>(origins);
+            foreach (var other in others)
+            {
+                all.AddRange(other.origins);
+                if (other.colorSlot >= 0 && (colorSlot < 0 || other.colorSlot < colorSlot))
+                    colorSlot = other.colorSlot;
+            }
+            origins = all.ToArray();
+            RecomputeCenter();
         }
     }
 }

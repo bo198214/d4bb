@@ -11,7 +11,7 @@ public class GameTests
     public void Compound_TranslateRoundTrip()
     {
         var origins = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
-        var c = new Compound(origins);
+        var c = new Piece(origins);
         var before = IntegerOps.Clone(c.origins);
         c.Translate(IntegerSignedAxis.PD1);
         c.Translate(IntegerSignedAxis.MD1);
@@ -25,18 +25,19 @@ public class GameTests
             new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 },
             new int[] { 0,1,0,0 }, new int[] { 1,1,0,0 }
         };
-        var c = new Compound(origins);
+        var c = new Piece(origins);
         var before = IntegerOps.Clone(c.origins);
-        c.Rotate(0, 1); // rotate XY
-        c.Rotate(1, 0); // counter-rotate XY
+        var pivot = new IntegerCenter(c.origins, asCubes: true);
+        c.Rotate(0, 1, pivot); // rotate XY
+        c.Rotate(1, 0, pivot); // counter-rotate XY
         Assert.That(IntegerOps.SetEqual(c.origins, before), Is.True);
     }
 
     [Test]
     public void Compound_Combine()
     {
-        var c0 = new Compound(new int[][] { new int[] { 0,0,0,0 } });
-        var c1 = new Compound(new int[][] { new int[] { 1,0,0,0 } });
+        var c0 = new Piece(new int[][] { new int[] { 0,0,0,0 } });
+        var c1 = new Piece(new int[][] { new int[] { 1,0,0,0 } });
         c0.Combine(new[] { c1 });
         Assert.That(c0.origins.Length, Is.EqualTo(2));
         Assert.That(IntegerOps.SetEqual(c0.origins,
@@ -58,7 +59,7 @@ public class GameTests
         level.SelectPiece(0);
         bool moved = level.TranslateSelected(IntegerSignedAxis.PD1);
         Assert.That(moved, Is.False);
-        Assert.That(IntegerOps.SetEqual(level.compounds[0].origins,
+        Assert.That(IntegerOps.SetEqual(level.pieces[0].origins,
             new int[][] { new int[] { 0,0,0,0 } }), Is.True);
     }
 
@@ -144,7 +145,7 @@ public class GameTests
         Assert.That(level.status, Is.EqualTo(GameStatus.Pending));
         level.SelectPiece(0);
         level.CombineSelected();
-        Assert.That(level.compounds.Count, Is.EqualTo(1));
+        Assert.That(level.pieces.Count, Is.EqualTo(1));
         Assert.That(level.status, Is.EqualTo(GameStatus.Reached));
     }
 

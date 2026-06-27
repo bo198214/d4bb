@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using D4BB.Comb;
+using D4BB.Transforms;
 
 namespace D4BB.Game
 {
@@ -9,14 +10,14 @@ namespace D4BB.Game
 
     public class GameLevel
     {
-        public List<Compound> compounds = new();
+        public List<Piece> pieces = new();
         public int selectedIndex = 0;
         public int[][] goal;
         public GameStatus status = GameStatus.None;
         public Objective Objective { get; private set; }
         public MoveBlockReason LastBlockReason { get; private set; } = MoveBlockReason.None;
 
-        public int[][][] PieceOrigins => compounds.Select(c => c.origins).ToArray();
+        public int[][][] PieceOrigins => pieces.Select(c => c.origins).ToArray();
 
         public event Action OnChanged;
         public event Action<int, IntegerSignedAxis> OnTranslate;
@@ -29,16 +30,16 @@ namespace D4BB.Game
             Objective = obj;
             goal = IntegerOps.Clone(obj.goal);
             for (int i = 0; i < obj.pieces.Length; i++)
-                compounds.Add(new Compound(obj.pieces[i]) { colorSlot = i });
+                pieces.Add(new Piece(obj.pieces[i]) { colorSlot = i });
             PropagateStatus();
         }
 
-        public Compound Selected => selectedIndex >= 0 && selectedIndex < compounds.Count
-            ? compounds[selectedIndex] : null;
+        public Piece Selected => selectedIndex >= 0 && selectedIndex < pieces.Count
+            ? pieces[selectedIndex] : null;
 
         public void SelectPiece(int index)
         {
-            if (index < 0 || index >= compounds.Count) return;
+            if (index < 0 || index >= pieces.Count) return;
             selectedIndex = index;
         }
 
@@ -77,15 +78,13 @@ namespace D4BB.Game
                 ? new IntegerCenter(pivotOrigin)
                 : new IntegerCenter(c.origins, asCubes: true);
 
-            // 1. Apply rotation to origins
-            foreach (var o in c.origins)
-                IntegerOps.RotateAsCenters(o, pivot, v, w);
+            // 1. Apply rotation (origins + topology) via the unified Piece move.
+            c.Rotate(v, w, pivot);
 
-            // 2. Boundary check
+            // 2. Boundary check (revert with the inverse (w,v) rotation if blocked)
             if (!IsInsideBoundary(c.origins))
             {
-                foreach (var o in c.origins)
-                    IntegerOps.RotateAsCenters(o, pivot, w, v);
+                c.Rotate(w, v, pivot);
                 LastBlockReason = MoveBlockReason.OutOfBoundary;
                 return false;
             }
@@ -93,9 +92,7 @@ namespace D4BB.Game
             // 3. Check for collisions
             if (IsOverlapping())
             {
-                // Revert if blocked
-                foreach (var o in c.origins)
-                    IntegerOps.RotateAsCenters(o, pivot, w, v);
+                c.Rotate(w, v, pivot);
                 LastBlockReason = MoveBlockReason.Overlap;
                 return false;
             }
@@ -111,14 +108,14 @@ namespace D4BB.Game
         public void CombineSelected()
         {
             var c0 = Selected;
-            if (c0 == null || compounds.Count == 1) return;
+            if (c0 == null || pieces.Count == 1) return;
             var bordering = FindAdjacent(c0);
             if (bordering.Count == 0) return;
             c0.Combine(bordering);
             foreach (var c in bordering)
-                compounds.Remove(c);
+                pieces.Remove(c);
             // Keep selectedIndex pointing to c0 (still in list)
-            selectedIndex = compounds.IndexOf(c0);
+            selectedIndex = pieces.IndexOf(c0);
             PropagateStatus();
             OnCombine?.Invoke(selectedIndex);
             OnChanged?.Invoke();
@@ -126,9 +123,9 @@ namespace D4BB.Game
 
         public void Reset()
         {
-            compounds.Clear();
+            pieces.Clear();
             for (int i = 0; i < Objective.pieces.Length; i++)
-                compounds.Add(new Compound(Objective.pieces[i]) { colorSlot = i });
+                pieces.Add(new Piece(Objective.pieces[i]) { colorSlot = i });
             selectedIndex = 0;
             PropagateStatus();
             OnReset?.Invoke();
@@ -137,14 +134,14 @@ namespace D4BB.Game
 
         public void CyclePiece()
         {
-            if (compounds.Count == 0) return;
-            selectedIndex = (selectedIndex + 1) % compounds.Count;
+            if (pieces.Count == 0) return;
+            selectedIndex = (selectedIndex + 1) % pieces.Count;
             OnChanged?.Invoke();
         }
 
         private bool IsOverlapping()
         {
-            return IntegerOps.Intersecting(compounds.Select(c => c.origins).ToArray());
+            return IntegerOps.Intersecting(pieces.Select(c => c.origins).ToArray());
         }
 
         private bool IsInsideBoundary(int[][] origins)
@@ -163,10 +160,10 @@ namespace D4BB.Game
             return true;
         }
 
-        private List<Compound> FindAdjacent(Compound c0)
+        private List<Piece> FindAdjacent(Piece c0)
         {
-            var result = new List<Compound>();
-            foreach (var c in compounds)
+            var result = new List<Piece>();
+            foreach (var c in pieces)
                 if (c != c0 && IntegerOps.D3adjacent(c.origins, c0.origins))
                     result.Add(c);
             return result;
@@ -183,11 +180,11 @@ namespace D4BB.Game
             // is reached only when the single remaining compound is congruent with the
             // goal (same cell origins — no translation or rotation).
             bool absolute = Objective != null && Objective.mode == GoalMode.Absolute;
-            if (compounds.Count == 1)
+            if (pieces.Count == 1)
             {
                 bool reached = absolute
-                    ? IntegerOps.SetEqual(goal, compounds[0].origins)
-                    : IntegerOps.MotionEqual(goal, compounds[0].origins);
+                    ? IntegerOps.SetEqual(goal, pieces[0].origins)
+                    : IntegerOps.MotionEqual(goal, pieces[0].origins);
                 status = reached ? GameStatus.Reached : GameStatus.Missed;
                 return;
             }

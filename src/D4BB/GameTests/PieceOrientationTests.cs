@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using D4BB.Comb;
 using D4BB.Geometry;
+using D4BB.Transforms;
 
 namespace D4BB.Game
 {
@@ -24,8 +25,8 @@ namespace D4BB.Game
         [Test]
         public void SingleTesseract_AlreadyOptimal()
         {
-            var piece = new Compound(new int[][] { new int[] { 0, 0, 0, 0 } });
-            var res = PieceOrientation.BestViewRotation(piece, new Camera4dParallel());
+            var piece = new Piece(new int[][] { new int[] { 0, 0, 0, 0 } });
+            var res = PieceOrientation.BestViewRotation(piece.origins, new Camera4dParallel());
             // The front-facing facets of one tesseract tile the cavalier shadow without overlap.
             Assert.That(res.baselineOverlapPairs, Is.EqualTo(0));
             Assert.That(res.overlapPairs, Is.EqualTo(0));
@@ -36,23 +37,23 @@ namespace D4BB.Game
         public void Result_NeverWorseThanBaseline()
         {
             // An L-shaped tetromino-like piece in 4D.
-            var piece = new Compound(new int[][] {
+            var piece = new Piece(new int[][] {
                 new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 },
                 new int[] { 2,0,0,0 }, new int[] { 2,1,0,0 },
             });
-            var res = PieceOrientation.BestViewRotation(piece, new Camera4dParallel());
+            var res = PieceOrientation.BestViewRotation(piece.origins, new Camera4dParallel());
             Assert.That(res.overlapPairs, Is.LessThanOrEqualTo(res.baselineOverlapPairs));
         }
 
         [Test]
         public void ReportedCount_MatchesReturnedOrigins()
         {
-            var piece = new Compound(new int[][] {
+            var piece = new Piece(new int[][] {
                 new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 },
                 new int[] { 0,1,0,0 }, new int[] { 0,0,1,0 },
             });
             var cam = new Camera4dParallel();
-            var res = PieceOrientation.BestViewRotation(piece, cam);
+            var res = PieceOrientation.BestViewRotation(piece.origins, cam);
 
             Assert.That(res.baselineOverlapPairs,
                 Is.EqualTo(PieceOrientation.CountOverlappingFrontCellPairs(piece.origins, cam)));
@@ -63,10 +64,10 @@ namespace D4BB.Game
         [Test]
         public void RotationPath_ReproducesReturnedOrigins()
         {
-            var piece = new Compound(new int[][] {
+            var piece = new Piece(new int[][] {
                 new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 }, new int[] { 1,1,0,0 },
             });
-            var res = PieceOrientation.BestViewRotation(piece, new Camera4dParallel());
+            var res = PieceOrientation.BestViewRotation(piece.origins, new Camera4dParallel());
             var applied = ApplyPath(piece.origins, res.rotationPath);
             // Equal up to translation (the piece pivots about its own centroid each step).
             Assert.That(IntegerOps.MotionEqual(applied, res.origins), Is.True,

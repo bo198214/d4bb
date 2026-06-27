@@ -16,7 +16,7 @@ namespace D4BB.Transforms
         // The scene's pieces — each bundles its topology, its occluded (cut) cells, and its projected
         // AABB. The single per-piece source of truth (replaced the old parallel pieceTopologies[] /
         // cellsByPiece[] / pieceBounds[] arrays). The array index is the level's piece index, matching
-        // GameLevel.compounds. Consumers that need a flat view over every cell use AllCells (a computed
+        // GameLevel.pieces. Consumers that need a flat view over every cell use AllCells (a computed
         // view, not stored state).
         public Piece[] pieces { get; private set; } = System.Array.Empty<Piece>();
         public IEnumerable<CellBoundary> AllCells => pieces.SelectMany(p => p.cells);
@@ -111,7 +111,10 @@ namespace D4BB.Transforms
                 }
             }
 
-            return new Piece(coplanarBoundaryFaces.ToArray(), interiorDivisionFaces?.ToArray());
+            return new Piece(origins) {
+                coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray(),
+                interiorDivisionFaces = interiorDivisionFaces?.ToArray()
+            };
         }
 
         // ── fast rebuild from precomputed topology (skips IntegerBoundaryComplex) ─

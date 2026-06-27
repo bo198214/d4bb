@@ -5,7 +5,7 @@ namespace D4BB.Game
 {
     /// <summary>
     /// Game-facing camera wrapper around <see cref="PieceProjectionOverlap"/>: finds a discrete lattice
-    /// rotation of a piece (Compound) whose parallel 3D projection through a live
+    /// rotation of a piece whose parallel 3D projection through a live
     /// <c>Camera4dParallel</c> shows as few mutually overlapping 3-cells as possible — an "auto-orient
     /// for clearest view" helper.
     ///
@@ -16,8 +16,8 @@ namespace D4BB.Game
     /// </summary>
     public static class PieceOrientation
     {
-        public static PieceProjectionOverlap.Result BestViewRotation(Compound piece, Camera4dParallel cam)
-            => PieceProjectionOverlap.BestRotation(piece.origins, ProjectionOf(cam));
+        public static PieceProjectionOverlap.Result BestViewRotation(int[][] origins, Camera4dParallel cam)
+            => PieceProjectionOverlap.BestRotation(origins, ProjectionOf(cam));
 
         public static int CountOverlappingFrontCellPairs(int[][] origins, Camera4dParallel cam)
             => PieceProjectionOverlap.CountOverlappingFrontCellPairs(origins, ProjectionOf(cam));
