@@ -21,6 +21,15 @@ namespace D4BB.Transforms
         public Piece[] pieces { get; private set; } = System.Array.Empty<Piece>();
         public IEnumerable<CellBoundary> AllCells => pieces.SelectMany(p => p.cells);
 
+        // When non-null, this Scene4d is *bound* to an externally-owned piece list (the game's
+        // GameLevel.pieces): it shares those Piece objects rather than creating its own, so a move
+        // applied to a piece by the owner (piece.Translate/Rotate) is the *same* mutation the scene
+        // renders — no cross-layer lockstep. Update() then only (re)computes each shared piece's
+        // topology + re-occludes. Null ⇒ standalone (owns its pieces, built from int[][][] origins —
+        // used by tests and the static goal scene).
+        private List<Piece> boundPieces;
+
+        // Standalone scene: owns its pieces, built from the given origins.
         public Scene4d(int[][][] origins, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridDivisions = true, bool enable4dOcclusion = true)
         {
             this.camera = camera;
@@ -31,14 +40,42 @@ namespace D4BB.Transforms
             Update(origins);
         }
 
+        // Bound scene: shares the caller's piece objects (e.g. GameLevel.pieces). Topology + render
+        // state are (re)built into those shared pieces.
+        public Scene4d(List<Piece> pieces, ICamera4d camera, bool showIntraCoplanarEdges = false, bool cullBackFaces = true, bool showGridDivisions = true, bool enable4dOcclusion = true)
+        {
+            this.camera = camera;
+            this.showIntraCoplanarEdges = showIntraCoplanarEdges;
+            this.showGridDivisions = showGridDivisions;
+            this.cullBackFaces = cullBackFaces;
+            this.enable4dOcclusion = enable4dOcclusion;
+            boundPieces = pieces;
+            UpdateBound();
+        }
+
         // ── public API ────────────────────────────────────────────────────────
 
+        // Full rebuild. For a bound scene the origins argument is redundant (the shared pieces already
+        // carry the up-to-date origins), so it is ignored and the scene resyncs from boundPieces — this
+        // lets every existing `scene4d.Update(gameLevel.PieceOrigins)` call site keep working unchanged
+        // after binding. A standalone scene (re)creates its own pieces from the origins.
         public void Update(int[][][] pieceOrigins)
         {
+            if (boundPieces != null) { UpdateBound(); return; }
             int n = pieceOrigins?.Length ?? 0;
             pieces = new Piece[n];
             for (int i = 0; i < n; i++)
-                pieces[i] = ComputePiece(pieceOrigins[i], showGridDivisions);
+                pieces[i] = ComputePiece(pieceOrigins[i]);
+            RebuildAllPieces();
+            RefreshVisibleCache();
+        }
+
+        // Resync the working array from the shared list (count may have changed, e.g. after a combine)
+        // and (re)fill each shared piece's topology, then occlude.
+        private void UpdateBound()
+        {
+            pieces = boundPieces.ToArray();
+            foreach (var p in pieces) FillTopology(p);
             RebuildAllPieces();
             RefreshVisibleCache();
         }
@@ -81,13 +118,25 @@ namespace D4BB.Transforms
         // Note: the same f2 may appear with multiple c3's (from different hyperplanes). Dedup
         // happens later in BuildPieceCells, after backface culling, so that a backface-
         // culled c3 cannot block f2 from being claimed by a front-facing c3'.
-        private static Piece ComputePiece(int[][] origins, bool showGridDivisions)
+        private Piece ComputePiece(int[][] origins)
         {
-            var ibc = new IntegerBoundaryComplex(origins);
+            var piece = new Piece(origins);
+            FillTopology(piece);
+            return piece;
+        }
+
+        // (Re)compute the boundary topology of `piece` from its current origins (the expensive IBC step),
+        // writing coplanarBoundaryFaces / interiorDivisionFaces in place. Called for every piece on a
+        // full Update — for a standalone scene's freshly-created pieces, and for a bound scene's shared
+        // pieces (which is how a shared piece gains its topology so a later piece.Translate/Rotate keeps
+        // origins and topology consistent in one move).
+        private void FillTopology(Piece piece)
+        {
+            var ibc = new IntegerBoundaryComplex(piece.origins);
             var coplanarBoundaryFaces = new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>();
             // Only allocate interior-collection plumbing when the toggle is on; saves work
             // and allocations on the common path. The toggle is propagated from Scene4d via Update,
-            // which re-runs ComputePiece with the new flag, so the cache stays in sync.
+            // which re-runs FillTopology with the new flag, so the cache stays in sync.
             var interiorDivisionFaces = showGridDivisions
                 ? new List<(OrientedIntegerCell c3, OrientedIntegerCell f2)>() : null;
             // Track interior f2s already collected (from the other coplanar parent's iteration)
@@ -111,10 +160,8 @@ namespace D4BB.Transforms
                 }
             }
 
-            return new Piece(origins) {
-                coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray(),
-                interiorDivisionFaces = interiorDivisionFaces?.ToArray()
-            };
+            piece.coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray();
+            piece.interiorDivisionFaces = interiorDivisionFaces?.ToArray();
         }
 
         // ── fast rebuild from precomputed topology (skips IntegerBoundaryComplex) ─

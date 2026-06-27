@@ -181,5 +181,35 @@ public class Scene4dIncrementalTests {
         for (int i = 0; i < scene.pieces.Length; i++)
             Assert.That(VisibleGeom(scene, i), Is.EqualTo(before[i]), $"round trip changed piece {i}");
     }
+
+    // ── bound scene (shared pieces) ──────────────────────────────────────────────
+
+    // A Scene4d bound to an externally-owned piece list shares the SAME Piece objects, so a single move
+    // applied by the owner (piece.Translate, as GameLevel.TranslateSelected does) is exactly what the
+    // scene renders — there is no second, scene-side mutation (the former double-update). The bound
+    // scene must match a standalone scene built from the same origins, before and after such a move.
+    [Test] public void BoundScene_SharesPieces_SingleMoveSuffices() {
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0} },
+            new int[][] { new int[] {-1,-1,0,2} },
+        };
+        var shared = new List<Piece> { new Piece(origins[0]), new Piece(origins[1]) };
+        var bound = new Scene4d(shared, new Camera4dParallel());
+
+        // The bound scene's working array IS the shared pieces (same references).
+        Assert.That(bound.pieces[0], Is.SameAs(shared[0]));
+        Assert.That(bound.pieces[1], Is.SameAs(shared[1]));
+
+        var standalone = new Scene4d(origins, new Camera4dParallel());
+        AssertSameGeom(bound, standalone, "bound vs standalone (initial)");
+
+        // Move the shared piece ONCE via the piece itself (the owner's move), then only re-occlude.
+        shared[1].Translate(IntegerSignedAxis.PD1);
+        bound.UpdateCamera();
+
+        var reference = new Scene4d(origins, new Camera4dParallel());
+        reference.pieces[1].Translate(IntegerSignedAxis.PD1); reference.UpdateCamera();
+        AssertSameGeom(bound, reference, "bound after single shared move");
+    }
 }
 }
