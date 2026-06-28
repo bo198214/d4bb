@@ -43,7 +43,7 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
   new objects; an untouched piece keeps the same object (reference identity = the renderer's dirty signal).
 - **(E) Unity mesh** — `Scene4dView` (Assets) reads `piece.facetsMesh/edgesMesh`, uploads them into a Unity
   `Mesh`, and runs per-piece decoration (colors / symbol UVs, in `Game`). Only the changed pieces are
-  uploaded: the move methods return the affected set (`RefreshAffectedFaceMeshes`); full rebuilds upload all
+  uploaded: the move methods return the affected set (`RefreshAffectedMeshes`); full rebuilds upload all
   (`RefreshAllMeshes`). Decoration triggered without a geometry change (selection ring, day/night, color
   mode) re-decorates without rebuilding `*GenericMesh`.
 
@@ -74,7 +74,7 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
 | Level load / level change | `new Scene4d(gameLevel.pieces,…)` / `Update` | #4 full (IBC) |
 | Toggle: occlusion / grid-divisions / cut-edges | `Game` → `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
 | Camera zoom / scene rotate | `PerspectiveControl` → `scene4d.UpdateCamera()` | #2 (no IBC) |
-| **Drag** snap (per batch of steps) | `gameLevel.TranslateSelected` ×N (#1 on shared piece) → `RefreshSnapFacetMesh` → `scene4d.ReoccludePiece(i)` → `RefreshAffectedFaceMeshes(affected)` | #1 ×N + #3 (no IBC); only moved + overlapping pieces' meshes uploaded |
+| **Drag** snap (per batch of steps) | `gameLevel.TranslateSelected` ×N (#1 on shared piece) → `RefreshSnapFacetMesh` → `scene4d.ReoccludePiece(i)` → `RefreshAffectedMeshes(affected)` | #1 ×N + #3 (no IBC); only moved + overlapping pieces' meshes uploaded |
 | Drag end (commit) | `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
 | Non-drag move (keyboard/button) animation | `OnTranslate/OnRotate` (see below) | #1 ×2 + #2, then #4 at animation end |
 | Combine / Reset | `gameLevel` mutates `pieces` list → `scene4d.Update` | #4 full (IBC) |
