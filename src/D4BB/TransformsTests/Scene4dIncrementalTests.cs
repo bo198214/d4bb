@@ -212,6 +212,60 @@ public class Scene4dIncrementalTests {
         AssertSameGeom(bound, reference, "bound after single shared move");
     }
 
+    // ── per-piece mesh ownership + dirty signal ─────────────────────────────────
+
+    // Scene4d builds each piece's FacetsGenericMesh/EdgesGenericMesh and rebuilds them only for the
+    // affected pieces on an incremental move. An untouched piece must keep the SAME mesh objects
+    // (reference identity is the renderer's dirty signal); an affected piece gets fresh objects. And
+    // the set returned by the move method must be exactly the set of pieces whose meshes changed.
+    [Test] public void IncrementalMove_OnlyAffectedPieces_GetNewMeshObjects() {
+        // Three pieces spread far apart along w so none of their projections overlap.
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0} },
+            new int[][] { new int[] {0,0,0,10} },
+            new int[][] { new int[] {0,0,0,20} },
+        };
+        var scene = new Scene4d(origins, new Camera4dParallel());
+        for (int i = 0; i < scene.pieces.Length; i++) {
+            Assert.That(scene.pieces[i].facetsMesh, Is.Not.Null, $"piece {i} facetsMesh built");
+            Assert.That(scene.pieces[i].edgesMesh, Is.Not.Null, $"piece {i} edgesMesh built");
+        }
+
+        var beforeF = scene.pieces.Select(p => p.facetsMesh).ToArray();
+        var beforeE = scene.pieces.Select(p => p.edgesMesh).ToArray();
+
+        // Move piece 0 along x; it overlaps nobody, so only piece 0 is affected.
+        var affected = scene.Translate(0, IntegerSignedAxis.PD1);
+        Assert.That(affected, Is.EquivalentTo(new[] { 0 }), "non-overlapping move affects only the moved piece");
+
+        // Exactly the affected pieces get new mesh objects; the rest keep their references.
+        for (int i = 0; i < scene.pieces.Length; i++) {
+            bool changed = affected.Contains(i);
+            Assert.That(!ReferenceEquals(scene.pieces[i].facetsMesh, beforeF[i]), Is.EqualTo(changed),
+                $"piece {i} facetsMesh identity (changed={changed})");
+            Assert.That(!ReferenceEquals(scene.pieces[i].edgesMesh, beforeE[i]), Is.EqualTo(changed),
+                $"piece {i} edgesMesh identity (changed={changed})");
+        }
+    }
+
+    // When the move makes pieces overlap, the affected set (and thus the rebuilt-mesh set) must include
+    // the overlapping neighbour, not just the moved piece.
+    [Test] public void IncrementalMove_OverlappingNeighbour_IsRebuilt() {
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0} },
+            new int[][] { new int[] {-1,-1,0,2} }, // overlaps piece 0 in projection (piece 1 farther)
+        };
+        var scene = new Scene4d(origins, new Camera4dParallel());
+        var beforeF = scene.pieces.Select(p => p.facetsMesh).ToArray();
+
+        var affected = scene.Translate(1, IntegerSignedAxis.PD1);
+        Assert.That(affected, Does.Contain(1), "moved piece is affected");
+        Assert.That(affected, Does.Contain(0), "overlapping neighbour is affected");
+
+        foreach (var i in affected)
+            Assert.That(scene.pieces[i].facetsMesh, Is.Not.SameAs(beforeF[i]), $"piece {i} mesh rebuilt");
+    }
+
     // The wired drag pattern: the owner moves the piece in place (piece.Translate, possibly several
     // steps in one snap), then a single ReoccludePiece does the incremental re-occlusion. Must equal a
     // full UpdateCamera for the same end state, for single- and multi-step batches.

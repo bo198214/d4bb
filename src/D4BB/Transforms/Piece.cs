@@ -57,6 +57,15 @@ namespace D4BB.Transforms
         // what the renderer reads to build the Unity mesh. (Re)filled by Scene4d.RefreshVisibleCache.
         public HashSet<Face2d> visibleFacets = new();
         public HashSet<IPolyhedron> visibleEdges = new();
+        // The renderable geometry (triangulated facet mesh + volumetric edge mesh), built from
+        // visibleFacets/visibleEdges by Scene4d.RefreshVisibleCacheForPiece. A *new* instance is
+        // assigned on every rebuild, so reference identity doubles as a per-piece dirty signal: a
+        // piece untouched by an incremental move keeps the same object, and the Unity-side renderer
+        // (Scene4dView) can skip re-uploading it. These are Unity-free (D4BB.Transforms) — the Unity
+        // Mesh upload + per-vertex decoration stay on the Assets side. Null until a Scene4d processes
+        // the piece (a piece used purely as game state never gets meshes).
+        public FacetsGenericMesh facetsMesh;
+        public EdgesGenericMesh edgesMesh;
 
         public Piece(int[][] origins, int colorSlot = -1)
         {

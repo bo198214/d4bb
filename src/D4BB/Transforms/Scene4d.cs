@@ -95,18 +95,21 @@ namespace D4BB.Transforms
         // lives on Scene4d, not on Piece. Only the moved piece is reprojected. These combine the in-place
         // topology mutation with the incremental re-occlusion; the batched drag path instead mutates the
         // shared piece itself (via gameLevel) and then calls ReoccludePiece (re-occlusion only).
-        public void Translate(int pieceIndex, IntegerSignedAxis axis)
+        // Returns the indices of the pieces whose render data (cells / visible cache / mesh) was
+        // rebuilt — the moved piece plus every piece whose projected AABB overlapped it before or
+        // after the move. The renderer uploads exactly these; all other pieces keep their meshes.
+        public IReadOnlyList<int> Translate(int pieceIndex, IntegerSignedAxis axis)
         {
             var prev = pieces[pieceIndex].bounds;
             pieces[pieceIndex].Translate(axis);
-            ReoccludeAfterPieceChange(pieceIndex, prev);
+            return ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
-        public void Rotate(int pieceIndex, int v, int w, IntegerCenter center)
+        public IReadOnlyList<int> Rotate(int pieceIndex, int v, int w, IntegerCenter center)
         {
             var prev = pieces[pieceIndex].bounds;
             pieces[pieceIndex].Rotate(v, w, center);
-            ReoccludeAfterPieceChange(pieceIndex, prev);
+            return ReoccludeAfterPieceChange(pieceIndex, prev);
         }
 
         // Incremental re-occlusion when the caller has *already* moved the (shared) piece in place — the
@@ -116,7 +119,7 @@ namespace D4BB.Transforms
         // `prev` for the overlap dependency check. Only the moved piece + the pieces whose AABB overlaps
         // it (before or after) are reprojected/re-occluded; the rest keep their cut cells. Byte-identical
         // to a full UpdateCamera for the same end state (see Scene4dIncrementalTests), just cheaper.
-        public void ReoccludePiece(int pieceIndex)
+        public IReadOnlyList<int> ReoccludePiece(int pieceIndex)
             => ReoccludeAfterPieceChange(pieceIndex, pieces[pieceIndex].bounds);
 
         // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
@@ -192,7 +195,7 @@ namespace D4BB.Transforms
         // cells untouched. Equivalent to a full RebuildAllPieces because a cell's cut result depends
         // only on the strictly-nearer cells overlapping it (cut order is irrelevant — see
         // OccludePieceCells) and a move of `p` only changes overlap relationships that involve `p`.
-        private void ReoccludeAfterPieceChange(int p, ScreenBounds prevBoundsOfP)
+        private IReadOnlyList<int> ReoccludeAfterPieceChange(int p, ScreenBounds prevBoundsOfP)
         {
             var occluders = ComputeOccluders();   // refreshes every piece's bounds
             SortFarToNear(occluders);
@@ -208,6 +211,7 @@ namespace D4BB.Transforms
             foreach (var q in affected)
                 pieces[q].cells = BuildOccludedPieceCells(q, occluders);
             RefreshVisibleCache(affected);
+            return affected;
         }
 
         // Build piece `p`'s cells fresh from topology, then (if enabled) cut them against the scene's
@@ -525,6 +529,11 @@ namespace D4BB.Transforms
             }
             pieces[i].visibleFacets = facets;
             pieces[i].visibleEdges = edges;
+            // Build the renderable geometry here too, so a piece carries its own up-to-date mesh and an
+            // unchanged piece keeps the same object (reference-identity dirty signal). A fresh instance
+            // is assigned every rebuild. Unity-free; the Unity upload + decoration happen in Scene4dView.
+            pieces[i].facetsMesh = new FacetsGenericMesh(facets);
+            pieces[i].edgesMesh = new EdgesGenericMesh(edges);
         }
 
         // ── helpers ───────────────────────────────────────────────────────────

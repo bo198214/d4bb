@@ -12,7 +12,7 @@ One unified per-piece object, [`Piece`](Piece.cs), carries **game state + render
 |---|---|---|
 | game state | `origins` (the unit-cell list), `colorSlot`, `center` | the owner (`GameLevel`) via `Piece.Translate/Rotate/Combine` |
 | topology (cache) | `coplanarBoundaryFaces`, `interiorDivisionFaces` | `Scene4d.FillTopology` (IBC); mutated in place by `Piece.Translate/Rotate` |
-| render | `cells`, `bounds`, `visibleFacets`, `visibleEdges` | `Scene4d` (occlusion + visible cache) |
+| render | `cells`, `bounds`, `visibleFacets`, `visibleEdges`, `facetsMesh`, `edgesMesh` | `Scene4d` (occlusion + visible cache + mesh) |
 
 **Binding (shared objects).** `GameLevel.pieces` and `Scene4d.pieces` are the **same `Piece` instances**
 — the play `Scene4d` is constructed with `new Scene4d(gameLevel.pieces, …)` (the `List<Piece>` ctor). So a
@@ -23,8 +23,8 @@ renders; there is **no separate scene-side mirror** (the former double-update is
 ## The pipeline, in stages
 
 ```
-origins ──(A)── topology ──(B)── projected cells ──(C)── occluded cells ── visible cache ──(D/E)── Unity mesh
-          IBC            camera             CutOut                          (Scene4dView)
+origins ──(A)── topology ──(B)── projected cells ──(C)── occluded cells ── visible cache ──(D)── *GenericMesh ──(E)── Unity mesh
+          IBC            camera             CutOut                                       (Scene4d)        (Scene4dView)
 ```
 
 - **(A) Topology** — `Scene4d.FillTopology(piece)`: runs `IntegerBoundaryComplex` on `piece.origins`,
@@ -37,9 +37,15 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
   overlapping occluder (`CutOut`). Occluder half-spaces depend only on the integer cell + camera, never on
   whether the occluder itself was cut. (See `ScreenBounds`, `ComputeOccluders`.)
 - **visible cache** — `RefreshVisibleCacheForPiece`: collects `piece.visibleFacets` / `visibleEdges` from
-  the cut cells. This is what the renderer reads.
-- **(D/E) Mesh** — `Scene4dView` (Assets) builds a `FacetsGenericMesh` / `EdgesGenericMesh` from
-  `piece.visibleFacets/visibleEdges` (triangulate + fill a Unity `Mesh`), per piece.
+  the cut cells, then **(D)** builds the per-piece `piece.facetsMesh` / `edgesMesh` (`FacetsGenericMesh` /
+  `EdgesGenericMesh`, both Unity-free, in `D4BB.Transforms`) — triangulation + volumetric-edge geometry. A
+  *new* mesh object is assigned every rebuild, so for an incremental move only the **affected** pieces get
+  new objects; an untouched piece keeps the same object (reference identity = the renderer's dirty signal).
+- **(E) Unity mesh** — `Scene4dView` (Assets) reads `piece.facetsMesh/edgesMesh`, uploads them into a Unity
+  `Mesh`, and runs per-piece decoration (colors / symbol UVs, in `Game`). Only the changed pieces are
+  uploaded: the move methods return the affected set (`RefreshAffectedFaceMeshes`); full rebuilds upload all
+  (`RefreshAllMeshes`). Decoration triggered without a geometry change (selection ring, day/night, color
+  mode) re-decorates without rebuilding `*GenericMesh`.
 
 ## The four recompute granularities (cheapest → most expensive)
 
@@ -68,7 +74,7 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
 | Level load / level change | `new Scene4d(gameLevel.pieces,…)` / `Update` | #4 full (IBC) |
 | Toggle: occlusion / grid-divisions / cut-edges | `Game` → `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
 | Camera zoom / scene rotate | `PerspectiveControl` → `scene4d.UpdateCamera()` | #2 (no IBC) |
-| **Drag** snap (per batch of steps) | `gameLevel.TranslateSelected` ×N (#1 on shared piece) → `RefreshSnapFacetMesh` → `scene4d.ReoccludePiece(i)` | #1 ×N + #3 (no IBC, only moved + overlapping pieces) |
+| **Drag** snap (per batch of steps) | `gameLevel.TranslateSelected` ×N (#1 on shared piece) → `RefreshSnapFacetMesh` → `scene4d.ReoccludePiece(i)` → `RefreshAffectedFaceMeshes(affected)` | #1 ×N + #3 (no IBC); only moved + overlapping pieces' meshes uploaded |
 | Drag end (commit) | `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
 | Non-drag move (keyboard/button) animation | `OnTranslate/OnRotate` (see below) | #1 ×2 + #2, then #4 at animation end |
 | Combine / Reset | `gameLevel` mutates `pieces` list → `scene4d.Update` | #4 full (IBC) |
