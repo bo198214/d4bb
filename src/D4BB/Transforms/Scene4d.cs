@@ -92,10 +92,9 @@ namespace D4BB.Transforms
 
         // Incremental piece move — a scene-level operation (it re-occludes every piece whose projected
         // AABB overlaps the moved piece before or after the move; see ReoccludeAfterPieceChange), so it
-        // lives on Scene4d, not on Piece. Only the moved piece is reprojected. The piece's own in-place
-        // topology mutation goes through pieces[pieceIndex].Translate/Rotate (callers that only want the
-        // topology mutation — e.g. the batched drag path — call that directly). Currently unused by the
-        // game (the drag path still goes through the full UpdateCamera); wired up later.
+        // lives on Scene4d, not on Piece. Only the moved piece is reprojected. These combine the in-place
+        // topology mutation with the incremental re-occlusion; the batched drag path instead mutates the
+        // shared piece itself (via gameLevel) and then calls ReoccludePiece (re-occlusion only).
         public void Translate(int pieceIndex, IntegerSignedAxis axis)
         {
             var prev = pieces[pieceIndex].bounds;
@@ -109,6 +108,16 @@ namespace D4BB.Transforms
             pieces[pieceIndex].Rotate(v, w, center);
             ReoccludeAfterPieceChange(pieceIndex, prev);
         }
+
+        // Incremental re-occlusion when the caller has *already* moved the (shared) piece in place — the
+        // drag path, where gameLevel.TranslateSelected/RotateSelected mutated the shared piece's topology
+        // (possibly several steps) before this single refresh. piece.Translate/Rotate never touch
+        // `bounds`, so pieces[pieceIndex].bounds still holds the pre-move projected AABB — the correct
+        // `prev` for the overlap dependency check. Only the moved piece + the pieces whose AABB overlaps
+        // it (before or after) are reprojected/re-occluded; the rest keep their cut cells. Byte-identical
+        // to a full UpdateCamera for the same end state (see Scene4dIncrementalTests), just cheaper.
+        public void ReoccludePiece(int pieceIndex)
+            => ReoccludeAfterPieceChange(pieceIndex, pieces[pieceIndex].bounds);
 
         // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
 

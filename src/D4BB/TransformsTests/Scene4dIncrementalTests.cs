@@ -211,5 +211,36 @@ public class Scene4dIncrementalTests {
         reference.pieces[1].Translate(IntegerSignedAxis.PD1); reference.UpdateCamera();
         AssertSameGeom(bound, reference, "bound after single shared move");
     }
+
+    // The wired drag pattern: the owner moves the piece in place (piece.Translate, possibly several
+    // steps in one snap), then a single ReoccludePiece does the incremental re-occlusion. Must equal a
+    // full UpdateCamera for the same end state, for single- and multi-step batches.
+    [Test] public void ReoccludePiece_AfterInPlaceMove_MatchesUpdateCamera() {
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0} },
+            new int[][] { new int[] {-1,-1,0,2} },
+        };
+        var inc = new Scene4d(origins, new Camera4dParallel());
+        var reference = new Scene4d(origins, new Camera4dParallel());
+
+        // (steps-per-snap, axis) — single steps and a 2-step batch (a snap dragging two fields at once).
+        var snaps = new[] {
+            (1, IntegerSignedAxis.PD1),
+            (2, IntegerSignedAxis.PD1),   // batch: two in-place steps, then ONE ReoccludePiece
+            (1, IntegerSignedAxis.PD2),
+            (3, IntegerSignedAxis.MD1),
+        };
+        int step = 0;
+        foreach (var (count, axis) in snaps) {
+            for (int s = 0; s < count; s++) {
+                inc.pieces[1].Translate(axis);          // in-place topology shift only (no occlusion)
+                reference.pieces[1].Translate(axis);
+            }
+            inc.ReoccludePiece(1);                       // one incremental re-occlusion after the batch
+            reference.UpdateCamera();                    // full re-occlusion
+            AssertSameGeom(inc, reference, $"reocclude snap {step} (x{count} {axis.Human()})");
+            step++;
+        }
+    }
 }
 }
