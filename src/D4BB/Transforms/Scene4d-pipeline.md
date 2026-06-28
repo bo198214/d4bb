@@ -42,10 +42,16 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
   *new* mesh object is assigned every rebuild, so for an incremental move only the **affected** pieces get
   new objects; an untouched piece keeps the same object (reference identity = the renderer's dirty signal).
 - **(E) Unity mesh** — `Scene4dView` (Assets) reads `piece.facetsMesh/edgesMesh`, uploads them into a Unity
-  `Mesh`, and runs per-piece decoration (colors / symbol UVs, in `Game`). Only the changed pieces are
-  uploaded: the move methods return the affected set (`RefreshAffectedMeshes`); full rebuilds upload all
-  (`RefreshAllMeshes`). Decoration triggered without a geometry change (selection ring, day/night, color
-  mode) re-decorates without rebuilding `*GenericMesh`.
+  `Mesh` (`SetInMesh`), and runs per-piece decoration (colors / symbol UVs, in `Game`). Only the changed
+  pieces are uploaded: the move methods return the affected set (`RefreshAffectedMeshes`); full rebuilds
+  upload all (`RefreshAllMeshes`).
+- **Decoration-only changes** (vertex data, not geometry) skip (D)+(E)'s upload entirely:
+  `Scene4dView.RedecorateAllMeshes` re-runs just the per-piece decorator on the *existing* meshes. Used by
+  `Game.ApplyPendingDisplayChanges` for **color mode**, **face shader**, **spectrum/hueStart** (only
+  `mesh.colors` / symbol UV3 change). **Day/night** is even lighter — a pure material-reference swap, no
+  re-decoration (colors are day/night-independent). The selection ring goes through `RebakeSymbolUVsAllPieces`
+  (symbol UV3 only). Changes that *do* alter geometry — **grid divisions**, **cut edges**, occlusion /
+  backface toggles — still need a full `Scene4d.Update` + `RefreshAllMeshes`.
 
 ## The four recompute granularities (cheapest → most expensive)
 
