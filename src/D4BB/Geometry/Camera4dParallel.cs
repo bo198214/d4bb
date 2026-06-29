@@ -126,6 +126,22 @@ public class Camera4dParallel : ICamera4d
         nx[2] = co * n2 - si * n3;
         nx[3] = si * n2 + co * n3;
     }
+    public void RotateBasis(UnityEngine.Matrix4x4 m) {
+        for (int k = 0; k < 4; k++) {
+            var x = v[k].x;
+            double x0 = x[0], x1 = x[1], x2 = x[2], x3 = x[3];
+            x[0] = m.m00 * x0 + m.m01 * x1 + m.m02 * x2 + m.m03 * x3;
+            x[1] = m.m10 * x0 + m.m11 * x1 + m.m12 * x2 + m.m13 * x3;
+            x[2] = m.m20 * x0 + m.m21 * x1 + m.m22 * x2 + m.m23 * x3;
+            x[3] = m.m30 * x0 + m.m31 * x1 + m.m32 * x2 + m.m33 * x3;
+        }
+        var nx = imageNormal.x;
+        double n0 = nx[0], n1 = nx[1], n2 = nx[2], n3 = nx[3];
+        nx[0] = m.m00 * n0 + m.m01 * n1 + m.m02 * n2 + m.m03 * n3;
+        nx[1] = m.m10 * n0 + m.m11 * n1 + m.m12 * n2 + m.m13 * n3;
+        nx[2] = m.m20 * n0 + m.m21 * n1 + m.m22 * n2 + m.m23 * n3;
+        nx[3] = m.m30 * n0 + m.m31 * n1 + m.m32 * n2 + m.m33 * n3;
+    }
     // Orthographic isometric: e0->x, e1 in xy-plane.
     // v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.
     // True orthographic isometric: v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.
