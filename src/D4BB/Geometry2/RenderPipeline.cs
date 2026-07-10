@@ -16,8 +16,17 @@ namespace D4BB.Geometry2 {
 
         /// Runs the pipeline and returns the processed cells in back-to-front order,
         /// each containing only the still-visible polygon fragments (when applyCutOut).
+        ///
+        /// Synthetic BSP-cap faces (faceId -1, created by CellSplit when a cell straddles
+        /// a splitter) are internal geometry: they bound the fragment so that
+        /// DefiningHalfSpaces describes the fragment's projected volume, but they are NOT
+        /// part of the cell's visible surface — rendered they would show as internal glass
+        /// walls that appear/disappear with the splitter choice. They are therefore
+        /// stripped from the output right after each fragment's halfspaces were used;
+        /// pass debugKeepCapFaces=true to inspect them.
         public static List<CellRender3d> Process(PolyhedralComplex4d complex, ICamera4d camera,
-                                                 bool useBsp, bool applyCutOut, bool backfaceCulling) {
+                                                 bool useBsp, bool applyCutOut, bool backfaceCulling,
+                                                 bool debugKeepCapFaces = false) {
             var processedCells = new List<CellRender3d>();
 
             // Free-floating 2-faces (no 3-cell parent): wrap each as a single-face CellRender3d
@@ -50,6 +59,9 @@ namespace D4BB.Geometry2 {
                         foreach (var farCell in processedCells)
                             farCell.CutOut(halfSpaces);
                     }
+                    // The caps have served their purpose (DefiningHalfSpaces above closed
+                    // the fragment's volume); drop them before the cell reaches consumers.
+                    if (!debugKeepCapFaces) StripCapFaces(cell3d);
                     processedCells.Add(cell3d);
                 }
             } else {
@@ -68,6 +80,15 @@ namespace D4BB.Geometry2 {
                 }
             }
             return processedCells;
+        }
+
+        static void StripCapFaces(CellRender3d cell) {
+            if (cell.faceIds == null) return;
+            for (int k = cell.faceIds.Count - 1; k >= 0; k--) {
+                if (cell.faceIds[k] >= 0) continue;
+                cell.faces.RemoveAt(k);
+                cell.faceIds.RemoveAt(k);
+            }
         }
     }
 }

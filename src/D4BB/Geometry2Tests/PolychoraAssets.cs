@@ -13,6 +13,8 @@ namespace D4BB.Geometry2Tests {
 
         static readonly string[] CandidateDirs = {
             Path.Combine("Assets", "_Tesserian", "Common", "Resources", "polychora"),
+            // Surface knots (pure 2-complexes, e.g. klein-bottle.json) live with the demo.
+            Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "surface-knots"),
             // Legacy probe path, kept for older checkouts/layouts.
             Path.Combine("Assets", "tesserian", "Resources", "polychora"),
         };
