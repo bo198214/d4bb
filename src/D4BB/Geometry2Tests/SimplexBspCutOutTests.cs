@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using D4BB.Geometry;
@@ -18,20 +16,10 @@ namespace D4BB.Geometry2Tests {
     /// the rendering controller can disable CutOut via applyCutOut=false.
     public class SimplexBspCutOutTests {
 
-        static PolyhedralComplex4d LoadPenJson() {
-            var assemblyDir = Path.GetDirectoryName(typeof(SimplexBspCutOutTests).Assembly.Location);
-            var d = new DirectoryInfo(assemblyDir);
-            while (d != null) {
-                var p = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", "pen.json");
-                if (File.Exists(p)) return PolyhedralComplex4dJson.FromJson(File.ReadAllText(p));
-                d = d.Parent;
-            }
-            return null;
-        }
+        static PolyhedralComplex4d LoadPenJson() => PolychoraAssets.Load("pen.json");
 
         [Test] public void Simplex_BspBuild_NoStraddleSplits() {
             var c = LoadPenJson();
-            if (c == null) { Assert.Ignore("pen.json not found"); return; }
             var bsp = Bsp4d.Build(c);
             // Walk the tree and count fragments — should equal the 5 source cells (no fragmentation).
             int totalFragments = 0;
@@ -51,7 +39,6 @@ namespace D4BB.Geometry2Tests {
             // boundary cell is back-facing (its outward 4D-normal aligns with viewNormal);
             // BSP back-to-front yields the other 4 (or all 5 without backface culling).
             var c = LoadPenJson();
-            if (c == null) { Assert.Ignore("pen.json not found"); return; }
             var bsp = Bsp4d.Build(c);
             var cam = new Camera4dParallel();
             int withCull = bsp.BackToFront(cam, cullBackfaces: true).Count();
@@ -69,19 +56,13 @@ namespace D4BB.Geometry2Tests {
             //
             // Documents the actual behavior so future CutOut changes don't silently regress.
             var c = LoadPenJson();
-            if (c == null) { Assert.Ignore("pen.json not found"); return; }
-            var bsp = Bsp4d.Build(c);
             var cam = new Camera4dParallel();
-            var processed = new List<CellRender3d>();
-            var faceCountsBefore = new List<int>();
-            foreach (var fragment in bsp.BackToFront(cam, cullBackfaces: true)) {
-                var cell3d = CellRender3d.FromFragment(fragment, cam);
-                faceCountsBefore.Add(cell3d.faces.Count);
-                var halfSpaces = cell3d.DefiningHalfSpaces();
-                foreach (var farCell in processed)
-                    farCell.CutOut(halfSpaces);
-                processed.Add(cell3d);
-            }
+            // The production pipeline (same code path ComplexFrame drives per frame).
+            var processed = RenderPipeline.Process(c, cam, useBsp: true, applyCutOut: true, backfaceCulling: true);
+            // Pre-cut face counts, reconstructed from an identical (deterministic) BSP build.
+            var faceCountsBefore = Bsp4d.Build(c).BackToFront(cam, cullBackfaces: true)
+                .Select(fragment => fragment.faces.Count).ToList();
+            Assert.That(processed.Count, Is.EqualTo(faceCountsBefore.Count), "cell count matches BSP yield");
             // Each cell should still have at least 1 face after CutOut (not entirely culled).
             for (int i = 0; i < processed.Count; i++) {
                 Assert.That(processed[i].faces.Count, Is.GreaterThan(0),

@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using D4BB.Comb;
@@ -79,17 +78,7 @@ namespace D4BB.Geometry2Tests {
             // These files store face vertices as sorted sets, not cyclic orderings.
             // The parser must reconstruct cyclic order from the edge graph; otherwise
             // squares like [1,3,5,12] would map to non-existent edges (3,5)/(12,1).
-            var assemblyDir = Path.GetDirectoryName(typeof(PolyhedralComplex4dJsonTests).Assembly.Location);
-            var d = new DirectoryInfo(assemblyDir);
-            string path = null;
-            while (d != null) {
-                var p = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", fileName);
-                if (File.Exists(p)) { path = p; break; }
-                d = d.Parent;
-            }
-            if (path == null) { Assert.Ignore($"{fileName} not found"); return; }
-
-            var c = PolyhedralComplex4dJson.FromJson(File.ReadAllText(path));
+            var c = PolychoraAssets.Load(fileName);
             Assert.That(c.cells.Count, Is.GreaterThan(0));
             // Each face's edgeIds must form a closed cycle of valid edges (already enforced
             // during parse — this just asserts shape sanity).
@@ -104,21 +93,7 @@ namespace D4BB.Geometry2Tests {
         }
 
         [Test] public void ExistingPenJson_LoadsAndExercisesBsp() {
-            // Locate Assets/tesserian/Resources/polychora/pen.json relative to the repo root.
-            // Walk up from the test assembly to find a directory containing "Assets/tesserian".
-            var assemblyDir = Path.GetDirectoryName(typeof(PolyhedralComplex4dJsonTests).Assembly.Location);
-            var d = new DirectoryInfo(assemblyDir);
-            string penPath = null;
-            while (d != null) {
-                var candidate = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", "pen.json");
-                if (File.Exists(candidate)) { penPath = candidate; break; }
-                d = d.Parent;
-            }
-            if (penPath == null) {
-                Assert.Ignore("pen.json not found in containing repo; skipping live-file test");
-                return;
-            }
-            var c = PolyhedralComplex4dJson.FromJson(File.ReadAllText(penPath));
+            var c = PolychoraAssets.Load("pen.json");
             // Pentachoron: 5 vertices, 10 edges, 10 triangular faces, 5 tetrahedral cells, 5 normals.
             Assert.That(c.vertices.Count, Is.EqualTo(5));
             Assert.That(c.edges.Count, Is.EqualTo(10));

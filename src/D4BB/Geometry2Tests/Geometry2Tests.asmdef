@@ -1,6 +1,6 @@
 {
     "name": "Geometry2Tests",
-    "references": [ "General", "Comb", "Geometry", "Geometry2" ],
+    "references": [ "General", "Comb", "Geometry", "Geometry2", "Transforms" ],
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll"

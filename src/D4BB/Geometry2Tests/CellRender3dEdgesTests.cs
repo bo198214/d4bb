@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using D4BB.Geometry;
@@ -126,17 +125,7 @@ namespace D4BB.Geometry2Tests {
             // both correctness and that the fast path is actually exercised — if the
             // Quantize hash drifts vs. ProjectComplexEdges, this test will produce cuts
             // and fail the Count assertion.
-            var assemblyDir = Path.GetDirectoryName(typeof(CellRender3dEdgesTests).Assembly.Location);
-            var d = new System.IO.DirectoryInfo(assemblyDir);
-            string jsonPath = null;
-            while (d != null) {
-                var p = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", "klein-bottle.json");
-                if (File.Exists(p)) { jsonPath = p; break; }
-                d = d.Parent;
-            }
-            if (jsonPath == null) { Assert.Ignore("klein-bottle.json not found in containing repo"); return; }
-
-            var c = PolyhedralComplex4dJson.FromJson(File.ReadAllText(jsonPath));
+            var c = PolychoraAssets.Load("klein-bottle.json");
             Assert.That(c.cells.Count, Is.EqualTo(0), "klein-bottle is a pure 2-complex");
             var cam = new Camera4dParallel();
             // Mirror ComplexFrame's free-floating-face path: wrap each face as a single-face CellRender3d.

@@ -22,14 +22,18 @@ namespace D4BB.Geometry2Tests {
                 name: "L",
                 description: "L-shaped 3-tesseract piece (cells [0,-1,0,0], [-1,-1,0,0], [0,0,0,0])");
 
-            // Locate Assets/tesserian/Resources/polychora/ relative to the test assembly.
+            // Locate the polychora asset directory relative to the test assembly.
             var dir = new DirectoryInfo(Path.GetDirectoryName(typeof(PolychoraGenerators).Assembly.Location));
             string outPath = null;
-            while (dir != null) {
-                var candidate = Path.Combine(dir.FullName, "Assets", "tesserian", "Resources", "polychora");
-                if (Directory.Exists(candidate)) {
-                    outPath = Path.Combine(candidate, "L.json");
-                    break;
+            while (dir != null && outPath == null) {
+                foreach (var rel in new[] {
+                        Path.Combine("Assets", "_Tesserian", "Common", "Resources", "polychora"),
+                        Path.Combine("Assets", "tesserian", "Resources", "polychora") }) {
+                    var candidate = Path.Combine(dir.FullName, rel);
+                    if (Directory.Exists(candidate)) {
+                        outPath = Path.Combine(candidate, "L.json");
+                        break;
+                    }
                 }
                 dir = dir.Parent;
             }

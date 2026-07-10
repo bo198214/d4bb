@@ -126,6 +126,9 @@ public class Camera4dParallel : ICamera4d
         nx[2] = co * n2 - si * n3;
         nx[3] = si * n2 + co * n3;
     }
+#if UNITY_5_3_OR_NEWER
+    // Unity-only convenience overload; the package must stay compilable with plain
+    // `dotnet test` (no UnityEngine reference), so this is compiled out there.
     public void RotateBasis(UnityEngine.Matrix4x4 m) {
         for (int k = 0; k < 4; k++) {
             var x = v[k].x;
@@ -142,6 +145,7 @@ public class Camera4dParallel : ICamera4d
         nx[2] = m.m20 * n0 + m.m21 * n1 + m.m22 * n2 + m.m23 * n3;
         nx[3] = m.m30 * n0 + m.m31 * n1 + m.m32 * n2 + m.m33 * n3;
     }
+#endif
     // Orthographic isometric: e0->x, e1 in xy-plane.
     // v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.
     // True orthographic isometric: v[3]=(1,1,1,1)/2, all 4 axes project with equal length sqrt(3)/2.

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using D4BB.Geometry;
@@ -20,22 +19,7 @@ namespace D4BB.Geometry2Tests {
 
         // ── helpers ────────────────────────────────────────────────────────────
 
-        static PolyhedralComplex4d LoadPolychoron(string fileName) {
-            var assemblyDir = Path.GetDirectoryName(typeof(FrontCellsNonOverlappingTests).Assembly.Location);
-            var d = new DirectoryInfo(assemblyDir);
-            while (d != null) {
-                var p = Path.Combine(d.FullName, "Assets", "tesserian", "Resources", "polychora", fileName);
-                if (File.Exists(p)) {
-                    try { return PolyhedralComplex4dJson.FromJson(File.ReadAllText(p)); }
-                    catch (System.FormatException ex) {
-                        Assert.Ignore($"{fileName}: malformed JSON ({ex.Message}) — skipping");
-                        return null;
-                    }
-                }
-                d = d.Parent;
-            }
-            return null;
-        }
+        static PolyhedralComplex4d LoadPolychoron(string fileName) => PolychoraAssets.Load(fileName);
 
         /// Project each front-facing cell of `complex` to 3D using `cam`.
         /// A cell is front-facing iff `cam.IsFacedBy(anyVertex, cell.normal)` is true; cells
@@ -84,26 +68,12 @@ namespace D4BB.Geometry2Tests {
         }
 
         /// Apply the same per-frame XY/ZW double-rotation that ComplexFrame uses, so the
-        /// test matches what RotatingComplex actually shows at runtime. Mutates `complex`
-        /// vertices and cell normals in place; calls InvalidateCaches.
-        static void Rotate(PolyhedralComplex4d complex, double angle1, double angle2) {
-            double c1 = System.Math.Cos(angle1), s1 = System.Math.Sin(angle1);
-            double c2 = System.Math.Cos(angle2), s2 = System.Math.Sin(angle2);
-            void Rot(Point p) {
-                double x = p.x[0], y = p.x[1], z = p.x[2], w = p.x[3];
-                p.x[0] = c1 * x - s1 * y;
-                p.x[1] = s1 * x + c1 * y;
-                p.x[2] = c2 * z - s2 * w;
-                p.x[3] = s2 * z + c2 * w;
-            }
-            foreach (var v in complex.vertices) Rot(v);
-            foreach (var cell in complex.cells) if (cell.normal != null) Rot(cell.normal);
-            complex.InvalidateCaches();
-        }
+        /// test matches what RotatingComplex actually shows at runtime.
+        static void Rotate(PolyhedralComplex4d complex, double angle1, double angle2)
+            => TestGeom.RotateComplex(complex, angle1, angle2);
 
         static void AssertFrontProjectionsTile(string fileName, double angle1 = 0, double angle2 = 0) {
             var c = LoadPolychoron(fileName);
-            if (c == null) { Assert.Ignore($"{fileName} not found"); return; }
             if (angle1 != 0 || angle2 != 0) Rotate(c, angle1, angle2);
             var cam = new Camera4dParallel();
             var fronts = FrontFacingProjections(c, cam);
@@ -186,7 +156,6 @@ namespace D4BB.Geometry2Tests {
 
         static void AssertFilterMatchesDefinition(string fileName) {
             var c = LoadPolychoron(fileName);
-            if (c == null) { Assert.Ignore($"{fileName} not found"); return; }
             var cam = new Camera4dParallel();
             var visibleCellIds = FrontFacingCellIds(c, cam);
             var actual = new HashSet<int>(c.VisibleNonCoplanarEdgeIds(visibleCellIds));
@@ -206,7 +175,6 @@ namespace D4BB.Geometry2Tests {
         // front-facing set.)
         static void AssertFilterDropsSomething(string fileName) {
             var c = LoadPolychoron(fileName);
-            if (c == null) { Assert.Ignore($"{fileName} not found"); return; }
             var cam = new Camera4dParallel();
             var visibleCellIds = FrontFacingCellIds(c, cam);
             int total = c.NonCoplanarEdgeIds().Count();
