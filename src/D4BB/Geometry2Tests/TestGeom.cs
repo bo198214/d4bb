@@ -170,5 +170,21 @@ namespace D4BB.Geometry2Tests {
             foreach (var cell in complex.cells) if (cell.normal != null) Rot(cell.normal);
             complex.InvalidateCaches();
         }
+
+        /// Rotate the complex's vertices and cell normals in the coordinate plane spanned
+        /// by axes i and j (0..3) by `angle`, about the origin. Covers the rotation
+        /// families the XY/ZW double-rotation cannot reach (e.g. XZ — the L-Sequence
+        /// plane). Mutates in place; calls InvalidateCaches.
+        public static void RotateComplexInPlane(PolyhedralComplex4d complex, int i, int j, double angle) {
+            double c = System.Math.Cos(angle), s = System.Math.Sin(angle);
+            void Rot(Point p) {
+                double a = p.x[i], b = p.x[j];
+                p.x[i] = c * a - s * b;
+                p.x[j] = s * a + c * b;
+            }
+            foreach (var v in complex.vertices) Rot(v);
+            foreach (var cell in complex.cells) if (cell.normal != null) Rot(cell.normal);
+            complex.InvalidateCaches();
+        }
     }
 }

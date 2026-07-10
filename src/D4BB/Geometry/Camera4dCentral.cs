@@ -10,6 +10,7 @@ public interface ICamera4d {
     // Equivalent to rotating the world by -ph around c — useful as an O(1)
     // alternative to rotating every vertex per frame.
     void rotate(double ph, Point a, Point b, Point c);
+    double dist(double x, double y, double z, double w);
 }
 public class Camera4dCentral : ICamera4d {
     public Point4d eye {get; set; }
@@ -19,7 +20,10 @@ public class Camera4dCentral : ICamera4d {
 	public Point4d viewNormal { get { return v[3]; } }
 	protected readonly Point4d initialEye = new Point4d(3,3,3,-2);
 	protected readonly Point4d[] initialV = new Point4d[] {new(1,0,0,0),new(0,1,0,0),new(0,0,1,0),new(0,0,0,1)};
-
+	public double dist(double x, double y, double z, double w) {
+        var n = viewNormal.x;
+        return n[0]*x + n[1]*y + n[2]*z + n[3]*w;
+    }
 	public Camera4dCentral(Point4d initialEye, Point4d[] initialV) {
         eye = initialEye;
         v = initialV;

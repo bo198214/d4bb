@@ -66,6 +66,33 @@ namespace D4BB.Geometry2Tests {
             Assert.That(TestGeom.CoverageMismatches(shifted, expected), Is.Not.Empty, "extra not flagged");
         }
 
+        // Non-vacuity pin for the XZ plane sweep (the L-Sequence rotation family): CutOut
+        // must actually remove projected face AREA at a substantial share of angles —
+        // otherwise the sweep's parity would be trivially green. Area, not face count:
+        // a clip can leave exactly one outer fragment and the count unchanged (this
+        // masked real engagement before).
+        [Test] public void L3_XzSweep_CutOutRemovesArea() {
+            var cells = PolycubeFigures.ByName("L3");
+            int engaged = 0;
+            for (int deg = 0; deg < 360; deg += 10) {
+                var complex = IntegerComplex4dBuilder.Boundary(PolycubeFigures.AsIntegerCells(cells));
+                TestGeom.RotateComplexInPlane(complex, 0, 2, deg * System.Math.PI / 180.0);
+                var cam = new Camera4dParallel();
+                double AreaOf(List<CellRender3d> processed) {
+                    double sum = 0;
+                    foreach (var cell in processed)
+                        for (int k = 0; k < cell.faces.Count; k++)
+                            if (cell.faceIds[k] >= 0) sum += TestGeom.Area(cell.faces[k]);
+                    return sum;
+                }
+                double uncut = AreaOf(RenderPipeline.Process(complex, cam, true, false, true));
+                double cut = AreaOf(RenderPipeline.Process(complex, cam, true, true, true));
+                if (uncut - cut > 1e-6) engaged++;
+            }
+            Assert.That(engaged, Is.GreaterThanOrEqualTo(10),
+                $"CutOut removed area at only {engaged}/36 XZ angles — expected ~18; sweep parity would be near-vacuous");
+        }
+
         // Structural pin: a lattice cube's supporting hyperplane (xᵢ = k) can never strictly
         // separate the vertices of another lattice cube, so Bsp4d over a polycube figure
         // NEVER splits a cell — no synthetic cap faces exist, in any pose (STRADDLE is

@@ -39,9 +39,16 @@ namespace D4BB.Geometry2Tests {
     /// becomes depth-degenerate), so backface culling and depth ordering are unambiguous on
     /// both sides. Convex figures ("single", "bar2", "block221") double as harness sanity
     /// checks; the non-convex figures (L3 — the L.json piece — Lw3, T4, S4, rnd*) are the
-    /// configurations the BSP+CutOut path exists for. With this angle grid, CutOut actually
-    /// engages (changes faces) in 13–76% of the cases per non-convex figure — measured, so
-    /// the parity is not vacuous.
+    /// configurations the BSP+CutOut path exists for.
+    ///
+    /// Besides the XY×ZW double-rotation grid (RotatingComplex's auto-rotation family),
+    /// SINGLE-PLANE sweeps cover all 6 coordinate planes in 10° steps — XY×ZW combinations
+    /// cannot reach e.g. an XZ rotation, and the XZ sweep of the L is exactly the
+    /// L-Sequence view where occlusion visibly must happen (verified non-vacuous: CutOut
+    /// removes ~1.1–1.5 units² of projected face area at 18 of 36 XZ angles; measured by
+    /// AREA, not by face count — a clip can leave the face count unchanged).
+    /// OcclusionSoundnessTests checks the same sweeps against a Scene4d-independent
+    /// invariant, so the two pipelines can't simply agree on a shared mistake.
     public class Scene4dParityTests {
 
         public enum PoseMode { CameraRot, ComplexRot }
@@ -107,6 +114,48 @@ namespace D4BB.Geometry2Tests {
                 scene4dCam.RotateBasisZW(-a2);
             }
 
+            AssertParity(figureName, $"{mode} (a1={a1:F2}, a2={a2:F2})", cells, complex, scene4dCam, geometry2Cam);
+        }
+
+        // ── single-plane sweeps ────────────────────────────────────────────────
+        // The XY×ZW grid cannot represent rotations like XZ (the L-Sequence plane).
+        // Sweep every coordinate plane in 10° steps: complex rotated like the game rotates
+        // it, Scene4d posed via the inversely rotated camera basis (v'ₖ = Rᵀvₖ).
+
+        static readonly (string name, int i, int j)[] Planes = {
+            ("XY", 0, 1), ("XZ", 0, 2), ("XW", 0, 3), ("YZ", 1, 2), ("YW", 1, 3), ("ZW", 2, 3),
+        };
+        static readonly string[] SweepFigures = { "L3", "Lw3", "T4", "rnd7" };
+
+        static System.Collections.IEnumerable PlaneSweepCases() {
+            foreach (var figure in SweepFigures)
+                foreach (var (planeName, _, _) in Planes)
+                    for (int deg = 0; deg < 360; deg += 10)
+                        yield return new TestCaseData(figure, planeName, deg)
+                            .SetName($"{figure}_{planeName}_deg={deg:D3}");
+        }
+
+        [Test, TestCaseSource(nameof(PlaneSweepCases))]
+        public void VisibleGeometry_MatchesScene4d_PlaneSweep(string figureName, string planeName, int deg) {
+            var (_, i, j) = System.Array.Find(Planes, p => p.name == planeName);
+            double angle = deg * System.Math.PI / 180.0;
+            var cells = PolycubeFigures.ByName(figureName);
+            var complex = IntegerComplex4dBuilder.Boundary(PolycubeFigures.AsIntegerCells(cells));
+            TestGeom.RotateComplexInPlane(complex, i, j, angle);
+
+            var geometry2Cam = new Camera4dParallel();
+            var scene4dCam = new Camera4dParallel();
+            var ei = new Point4d(i == 0 ? 1 : 0, i == 1 ? 1 : 0, i == 2 ? 1 : 0, i == 3 ? 1 : 0);
+            var ej = new Point4d(j == 0 ? 1 : 0, j == 1 ? 1 : 0, j == 2 ? 1 : 0, j == 3 ? 1 : 0);
+            scene4dCam.rotate(-angle, ei, ej, null);
+
+            AssertParity(figureName, $"{planeName} deg={deg}", cells, complex, scene4dCam, geometry2Cam);
+        }
+
+        // ── shared comparison core ─────────────────────────────────────────────
+
+        static void AssertParity(string figureName, string caseDesc, int[][] cells,
+                                 PolyhedralComplex4d complex, Camera4dParallel scene4dCam, ICamera4d geometry2Cam) {
             var expected = TestGeom.Prepare(Scene4dVisiblePolygons(cells, scene4dCam));   // ground truth
             var actual = TestGeom.Prepare(Geometry2VisiblePolygons(complex, geometry2Cam));
 
@@ -119,7 +168,7 @@ namespace D4BB.Geometry2Tests {
             var extra = TestGeom.CoverageMismatches(actual, expected);
 
             Assert.That(missing.Count + extra.Count, Is.EqualTo(0),
-                $"{figureName} {mode} (a1={a1:F2}, a2={a2:F2}): " +
+                $"{figureName} {caseDesc}: " +
                 $"{expected.Count} Scene4d polys vs {actual.Count} Geometry2 polys\n" +
                 Describe("MISSING in Geometry2 (visible area lost)", missing) +
                 Describe("EXTRA in Geometry2 (occluded area not cut)", extra));
