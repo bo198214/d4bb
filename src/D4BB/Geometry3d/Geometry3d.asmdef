@@ -1,0 +1,10 @@
+{
+    "name": "Geometry3d",
+    "rootNamespace": "D4BB.Geometry3d",
+    "references": [
+        "Geometry",
+        "General",
+        "Comb",
+        "Geometry2"
+    ]
+}

@@ -1,0 +1,14 @@
+{
+    "name": "Geometry3dTests",
+    "references": [ "General", "Comb", "Geometry", "Geometry2", "Geometry3d", "Transforms" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ]
+}
