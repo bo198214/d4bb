@@ -125,7 +125,7 @@ namespace D4BB.Geometry2Tests {
         static readonly (string name, int i, int j)[] Planes = {
             ("XY", 0, 1), ("XZ", 0, 2), ("XW", 0, 3), ("YZ", 1, 2), ("YW", 1, 3), ("ZW", 2, 3),
         };
-        static readonly string[] SweepFigures = { "L3", "Lw3", "T4", "rnd7" };
+        static readonly string[] SweepFigures = { "L3", "Lw3", "T4", "rnd7", "box3d" };
 
         static System.Collections.IEnumerable PlaneSweepCases() {
             foreach (var figure in SweepFigures)

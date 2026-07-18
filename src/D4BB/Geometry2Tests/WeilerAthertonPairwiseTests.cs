@@ -22,7 +22,7 @@ namespace D4BB.Geometry2Tests {
             ("XY", 0, 1), ("XZ", 0, 2), ("XW", 0, 3), ("YZ", 1, 2), ("YW", 1, 3), ("ZW", 2, 3),
         };
         // All non-convex figures; convex ones are covered by ConvexFigures_FixedAngles.
-        static readonly string[] Figures = { "L3", "Lw3", "T4", "S4", "rnd5", "rnd7" };
+        static readonly string[] Figures = { "L3", "Lw3", "T4", "S4", "rnd5", "rnd7", "box3d" };
 
         static System.Collections.IEnumerable SweepCases() {
             foreach (var figure in Figures)

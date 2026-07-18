@@ -14,7 +14,10 @@ namespace D4BB.Geometry2Tests {
         /// cases; everything else is non-convex — the configurations the BSP+CutOut path
         /// exists for. "L3" is exactly the L.json piece (PolychoraGenerators.Generate_L_3Tesseracts),
         /// the canonical known-bad case. "Lw3" bends into the w-axis, "rnd*" are seeded
-        /// random polycubes for broader coverage.
+        /// random polycubes for broader coverage. "box3d" is a solid 3x3x3 xyz-block (w=0)
+        /// with its center cell removed — a fully enclosed interior cavity whose boundary
+        /// faces must never be visible from outside, the case a purely "L/T/S-shaped
+        /// non-convex outline" figure cannot exercise.
         public static readonly (string name, int[][] cells)[] All = {
             ("single",   new[] { new[] { 0, 0, 0, 0 } }),
             ("bar2",     new[] { new[] { 0, 0, 0, 0 }, new[] { 1, 0, 0, 0 } }),
@@ -26,6 +29,17 @@ namespace D4BB.Geometry2Tests {
                                  new[] { 2, 0, 0, 0 }, new[] { 1, 1, 0, 0 } }),
             ("S4",       new[] { new[] { 0, 0, 0, 0 }, new[] { 1, 0, 0, 0 },
                                  new[] { 1, 1, 0, 0 }, new[] { 2, 1, 0, 0 } }),
+            ("box3d",    new[] { new[] { 0, 0, 0, 0 }, new[] { 1, 0, 0, 0 }, new[] { 2, 0, 0, 0 },
+                                 new[] { 0, 1, 0, 0 }, new[] { 1, 1, 0, 0 }, new[] { 2, 1, 0, 0 },
+                                 new[] { 0, 2, 0, 0 }, new[] { 1, 2, 0, 0 }, new[] { 2, 2, 0, 0 },
+                                 
+                                 new[] { 0, 0, 1, 0 }, new[] { 1, 0, 1, 0 }, new[] { 2, 0, 1, 0 },
+                                 new[] { 0, 1, 1, 0 },                       new[] { 2, 1, 1, 0 },
+                                 new[] { 0, 2, 1, 0 }, new[] { 1, 2, 1, 0 }, new[] { 2, 2, 1, 0 },
+                                 
+                                 new[] { 0, 0, 2, 0 }, new[] { 1, 0, 2, 0 }, new[] { 2, 0, 2, 0 },
+                                 new[] { 0, 1, 2, 0 }, new[] { 1, 1, 2, 0 }, new[] { 2, 1, 2, 0 },
+                                 new[] { 0, 2, 2, 0 }, new[] { 1, 2, 2, 0 }, new[] { 2, 2, 2, 0 } }),
             ("rnd5",     RandomPolycube(42, 5)),
             ("rnd7",     RandomPolycube(7, 7)),
         };
