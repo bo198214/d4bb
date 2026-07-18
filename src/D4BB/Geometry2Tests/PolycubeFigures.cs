@@ -14,10 +14,13 @@ namespace D4BB.Geometry2Tests {
         /// cases; everything else is non-convex — the configurations the BSP+CutOut path
         /// exists for. "L3" is exactly the L.json piece (PolychoraGenerators.Generate_L_3Tesseracts),
         /// the canonical known-bad case. "Lw3" bends into the w-axis, "rnd*" are seeded
-        /// random polycubes for broader coverage. "box3d" is a solid 3x3x3 xyz-block (w=0)
-        /// with its center cell removed — a fully enclosed interior cavity whose boundary
-        /// faces must never be visible from outside, the case a purely "L/T/S-shaped
-        /// non-convex outline" figure cannot exercise.
+        /// random polycubes for broader coverage. "box3d" is a solid 3x3x3 xyz-block, but
+        /// only ONE cell thick in w — a genuine 3D box merely embedded in 4D — with its
+        /// center cell removed. The cavity is fully enclosed in xyz but NOT in w (the slab
+        /// has no depth to hide it behind), so at generic 4D viewing angles the cavity's
+        /// inner faces are legitimately visible through the see-through gap in the w
+        /// direction — the opposite stress case from a fully hidden cavity: CutOut must
+        /// show this geometry, not remove it.
         public static readonly (string name, int[][] cells)[] All = {
             ("single",   new[] { new[] { 0, 0, 0, 0 } }),
             ("bar2",     new[] { new[] { 0, 0, 0, 0 }, new[] { 1, 0, 0, 0 } }),
