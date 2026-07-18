@@ -183,5 +183,18 @@ public class Camera4dParallel : ICamera4d
         };
         imageNormal = new Point4d(0, 0, 0, 1);
     }
+    // Direction/length parametrization for the environment-configurable cavalier projection:
+    // azimuth sweeps from +z toward +x around the world y-axis, elevation tilts from the
+    // xz-plane toward +y, and length is the magnitude of wDir — i.e. the length the projected
+    // image of the (unit) world w-axis has in the 3D scene.
+    public static Point3d WDirFromSpherical(double azimuthDeg, double elevationDeg, double length) {
+        double az = azimuthDeg * Math.PI / 180.0;
+        double el = elevationDeg * Math.PI / 180.0;
+        double cosEl = Math.Cos(el);
+        return new Point3d(length * cosEl * Math.Sin(az), length * Math.Sin(el), length * cosEl * Math.Cos(az));
+    }
+    public void SetCavalier(double azimuthDeg, double elevationDeg, double length) {
+        SetCavalier(WDirFromSpherical(azimuthDeg, elevationDeg, length));
+    }
 }
 }
