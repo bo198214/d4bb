@@ -72,8 +72,10 @@ namespace D4BB.Geometry2Tests {
             Assert.That(v2, Is.EquivalentTo(v1));
         }
 
-        [Test, TestCase("tes.json"), TestCase("hap.json"), TestCase("rico.json"),
-                       TestCase("tip.json"), TestCase("tappy.json"), TestCase("dappat.json")]
+        // File names are the Bowers acronyms (aligned 2026-07-19; srip/gippid/prip were
+        // formerly mislabeled hap/tappy/dappat).
+        [Test, TestCase("tes.json"), TestCase("srip.json"), TestCase("rico.json"),
+                       TestCase("tip.json"), TestCase("gippid.json"), TestCase("prip.json")]
         public void NonTriangleFaceFile_LoadsViaCycleReconstruction(string fileName) {
             // These files store face vertices as sorted sets, not cyclic orderings.
             // The parser must reconstruct cyclic order from the edge graph; otherwise

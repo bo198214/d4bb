@@ -32,7 +32,10 @@ namespace D4BB.Geometry2 {
             var cell = complex.cells[cellId];
             var fragment = new CellFragment {
                 sourceCellId = cellId,
-                normal = cell.normal,
+                // Clone: the fragment must own its normal. A cached object-space BSP outlives
+                // the frame, and ComplexFrame.ApplyRotation mutates cell.normal in place —
+                // a shared reference would silently mix object and world space.
+                normal = cell.normal?.clone(),
                 faces = new List<List<Point>>(),
                 faceIds = new List<int>(cell.faceIds.Length),
                 supportingHyperplane = complex.CellHyperplane(cellId)

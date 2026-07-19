@@ -24,9 +24,17 @@ namespace D4BB.Geometry2 {
         /// walls that appear/disappear with the splitter choice. They are therefore
         /// stripped from the output right after each fragment's halfspaces were used;
         /// pass debugKeepCapFaces=true to inspect them.
+        /// cachedBsp/cachedBspCamera: pass a BSP built once in OBJECT space together with a
+        /// camera adapter that maps object space to the current world pose (RotatedCamera)
+        /// to skip the per-frame Bsp4d.Build — the tree structure is rotation-invariant,
+        /// only traversal order and projection depend on the view. The free-floating-face
+        /// block still uses `complex` (current/world vertices) with `camera`; both paths
+        /// must therefore describe the same world pose. When cachedBsp is null the BSP is
+        /// built from `complex` as before.
         public static List<CellRender3d> Process(PolyhedralComplex4d complex, ICamera4d camera,
                                                  bool useBsp, bool applyCutOut, bool backfaceCulling,
-                                                 bool debugKeepCapFaces = false) {
+                                                 bool debugKeepCapFaces = false,
+                                                 Bsp4d cachedBsp = null, ICamera4d cachedBspCamera = null) {
             var processedCells = new List<CellRender3d>();
 
             // Free-floating 2-faces (no 3-cell parent): wrap each as a single-face CellRender3d
@@ -51,9 +59,10 @@ namespace D4BB.Geometry2 {
                 // BSP back-to-front order. Optionally CutOut clips each farther cell against
                 // the 3D-halfspaces of every nearer cell (exact HSR). Without CutOut, faces
                 // overdraw — fine for translucent materials, debug-friendly to compare orders.
-                var bsp = Bsp4d.Build(complex);
-                foreach (var fragment in bsp.BackToFront(camera, cullBackfaces: backfaceCulling)) {
-                    var cell3d = CellRender3d.FromFragment(fragment, camera);
+                var bsp = cachedBsp ?? Bsp4d.Build(complex);
+                var bspCamera = cachedBsp != null && cachedBspCamera != null ? cachedBspCamera : camera;
+                foreach (var fragment in bsp.BackToFront(bspCamera, cullBackfaces: backfaceCulling)) {
+                    var cell3d = CellRender3d.FromFragment(fragment, bspCamera);
                     if (applyCutOut) {
                         var halfSpaces = cell3d.DefiningHalfSpaces();
                         foreach (var farCell in processedCells)
