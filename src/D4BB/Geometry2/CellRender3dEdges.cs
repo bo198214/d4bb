@@ -24,8 +24,21 @@ namespace D4BB.Geometry2 {
         /// True iff the segment is coplanar-embedded (= an original edge with `IsCoplanarEdge`,
         /// or a cut edge lying in a coplanar-embedded face's plane).
         public bool isCoplanar;
-        public EdgeSegment3d(Point a, Point b, bool isOriginal, bool isCoplanar) {
+        /// For cut segments: the source-face id of the polygon whose boundary produced the
+        /// segment (-1 for synthetic/cap polygons). Lets the seam classification distinguish
+        /// two fragments of the SAME face (internal seam) from boundaries of different faces
+        /// that happen to lie on one 3D line.
+        public int sourceFaceId;
+        /// For cut segments: the source-cell id of the CellRender3d whose polygon produced
+        /// the segment. Needed together with sourceFaceId: BSP-split fragment siblings share
+        /// BOTH ids (their abutting boundary is an internal seam), while the two renderings
+        /// of a face shared by two front-facing cells share only the face id (their identical
+        /// clipped boundary is a REAL visible cut that must not be suppressed).
+        public int sourceCellId;
+        public EdgeSegment3d(Point a, Point b, bool isOriginal, bool isCoplanar,
+                             int sourceFaceId = -1, int sourceCellId = -1) {
             this.a = a; this.b = b; this.isOriginal = isOriginal; this.isCoplanar = isCoplanar;
+            this.sourceFaceId = sourceFaceId; this.sourceCellId = sourceCellId;
         }
     }
 
@@ -54,11 +67,13 @@ namespace D4BB.Geometry2 {
                 IList<CellRender3d> processedCells,
                 PolyhedralComplex4d complex,
                 ICamera4d camera,
-                double eps = 1e-4) {
+                double eps = 1e-4,
+                List<EdgeSegment3d> rawCutsOut = null) {
             var origEdges = ProjectComplexEdges(complex, camera);
             var index = BuildEdgeIndex(complex, origEdges, eps);
             ScanPolygonBoundaries(processedCells, complex, origEdges, index, eps,
                                   out var origByEdge, out var cuts);
+            rawCutsOut?.AddRange(cuts);
 
             // Pass 2: deduplicate originals via per-edge t-interval union.
             var result = new List<EdgeSegment3d>();
@@ -164,7 +179,9 @@ namespace D4BB.Geometry2 {
                             }
                             list.Add((a, b));
                         } else {
-                            cuts.Add(new EdgeSegment3d(a, b, isOriginal: false, isCoplanar: false));
+                            cuts.Add(new EdgeSegment3d(a, b, isOriginal: false, isCoplanar: false,
+                                                       sourceFaceId: srcFaceId,
+                                                       sourceCellId: cell.sourceCellId));
                         }
                     }
                 }
@@ -281,13 +298,29 @@ namespace D4BB.Geometry2 {
                 double tLo = ts[k], tHi = ts[k + 1];
                 if (tHi - tLo < eps) continue;
                 double tMid = (tLo + tHi) * 0.5;
-                int coverage = 0;
-                foreach (var (t0, t1) in intervals)
-                    if (t0 - eps <= tMid && tMid <= t1 + eps) coverage++;
-                if (coverage == 0) continue;
+                // Coverage per (source face, source cell): BSP-split fragment siblings share
+                // both ids — their abutting boundary is an internal seam (hide). Everything
+                // else on the line is a real visible cut: boundaries of different faces, and
+                // the double rendering of a face shared by two front-facing cells (same face,
+                // different cells — this is how the dent faces of the excavated polychora
+                // render, and the old face-blind coverage rule hid their cut edges entirely).
+                var perSource = new Dictionary<(int fid, int cid), int>();
+                for (int i = 0; i < intervals.Count; i++) {
+                    var (t0, t1) = intervals[i];
+                    if (t0 - eps <= tMid && tMid <= t1 + eps) {
+                        var key = (edges[i].sourceFaceId, edges[i].sourceCellId);
+                        perSource[key] = perSource.TryGetValue(key, out int c) ? c + 1 : 1;
+                    }
+                }
+                if (perSource.Count == 0) continue;
                 var a = refA.clone().add(dir.clone().multiply(tLo));
                 var b = refA.clone().add(dir.clone().multiply(tHi));
-                result.Add(new EdgeSegment3d(a, b, isOriginal: false, isCoplanar: coverage >= 2));
+                (int fid, int cid) solo = (-1, -1);
+                bool anySolo = false;
+                foreach (var kv in perSource)
+                    if (kv.Value == 1) { anySolo = true; solo = kv.Key; break; }
+                result.Add(new EdgeSegment3d(a, b, isOriginal: false,
+                    isCoplanar: !anySolo, sourceFaceId: solo.fid, sourceCellId: solo.cid));
             }
         }
 

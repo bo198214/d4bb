@@ -44,6 +44,48 @@ namespace D4BB.Geometry2Tests {
                     segs.Count(s => !s.isOriginal && s.isCoplanar));
         }
 
+        /// Regression: on the excavated polychora the dent faces are shared between two
+        /// front-facing cells and therefore render twice; their identical clip boundaries
+        /// must be classified as VISIBLE cut edges, not suppressed as internal seams
+        /// (the face-blind coverage rule once hid every dent cut edge — "facet ends with
+        /// no drawn line").
+        [Test]
+        public void ExcavatedPolychora_DentCutEdges_AreVisible() {
+            foreach (var (file, a1, a2, minCuts) in new[] {
+                ("excavated-ex.json",  0.4, 0.7, 3),
+                ("excavated-ex.json",  1.1, 0.35, 3),
+                ("excavated-ico.json", 2.0, 1.3, 9),
+                ("excavated-ico.json", 2.8, 0.9, 9),
+            }) {
+                var complex = PolychoraAssets.Load(file);
+                TestGeom.RotateComplex(complex, a1, a2);
+                var cam = new Camera4dParallel();
+                var cells = RenderPipeline.Process(complex, cam,
+                    useBsp: true, applyCutOut: true, backfaceCulling: true);
+                var segs = CellRender3dEdges.ExtractFromPolygonBoundaries(cells, complex, cam);
+                int visibleCuts = segs.Count(s => !s.isOriginal && !s.isCoplanar);
+                Assert.That(visibleCuts, Is.GreaterThanOrEqualTo(minCuts),
+                    $"{file} a1={a1} a2={a2}: expected ≥{minCuts} visible cut edges, got {visibleCuts}");
+            }
+        }
+
+        [Test]
+        public void L_WeilerAtherton_ProducesCutEdges() {
+            foreach (var (a1, a2) in new[] { (0.4, 0.0), (0.4, 0.7), (1.1, 0.35) }) {
+                var complex = PolychoraAssets.Load("L.json");
+                TestGeom.RotateComplex(complex, a1, a2);
+                var cam = new Camera4dParallel();
+                var wa = RenderPipeline2.ProcessPairwise(complex, cam,
+                    applyCutOut: true, backfaceCulling: true);
+                var cells = wa.Select(c => c.ToCellRender3d()).ToList();
+                var segs = CellRender3dEdges.ExtractFromPolygonBoundaries(cells, complex, cam);
+                TestContext.Out.WriteLine(
+                    $"WA a1={a1:F2} a2={a2:F2}  orig={segs.Count(s => s.isOriginal)}" +
+                    $" cut={segs.Count(s => !s.isOriginal && !s.isCoplanar)}" +
+                    $" cutCopl={segs.Count(s => !s.isOriginal && s.isCoplanar)}");
+            }
+        }
+
         [Test]
         public void L_SelfOccludingPoses_ProduceCutEdges_AndCachedMatches() {
             int posesWithCuts = 0;
