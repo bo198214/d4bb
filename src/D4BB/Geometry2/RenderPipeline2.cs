@@ -91,11 +91,12 @@ namespace D4BB.Geometry2 {
         ///     of H_A — this is EXACT, not a heuristic;
         ///   • two cells in the same hyperplane can never overlap in projection (the
         ///     projection restricted to a hyperplane is affine-injective) — skip;
-        ///   • if A and B mutually straddle each other's hyperplanes the pair cannot be
-        ///     ordered this way and this method throws (fail fast). This cannot occur for
-        ///     integer polycube complexes (cell hyperplanes are lattice-aligned, cells span
-        ///     unit intervals) nor for cells of a convex polychoron; for such geometry use
-        ///     the BSP variant.
+        ///   • if A and B mutually straddle each other's hyperplanes, neither cell's OWN
+        ///     hyperplane separates the pair — but two disjoint convex cells always have SOME
+        ///     separating hyperplane, so a genuine one is computed with GJK
+        ///     (<see cref="ConvexSeparation"/>) and orders the pair the same way. Only cells that
+        ///     truly overlap in 4D (a real degeneracy, not this straddle case) remain undecidable
+        ///     and throw (fail fast); for translucent back-to-front blending still use the BSP variant.
         ///
         /// The returned list carries NO meaningful depth order: with exact HSR none is
         /// needed for opaque rendering. Translucent back-to-front blending still requires
@@ -179,10 +180,26 @@ namespace D4BB.Geometry2 {
                     b.supportingHyperplane.origin(), b.supportingHyperplane.normal);
                 return (sideA == CellSide.POSITIVE) == camPositive ? 0 : 1;
             }
+            // Neither cell's OWN supporting hyperplane separates the pair (both mutually straddle) —
+            // but two disjoint convex cells always have SOME separating hyperplane. Compute one with
+            // GJK instead of giving up; its normal orders the pair exactly like a supporting
+            // hyperplane does (one cell entirely on each side, camera-facing side is nearer).
+            var vertsA = new List<Point>(a.AllVertices());
+            var vertsB = new List<Point>(b.AllVertices());
+            if (ConvexSeparation.TrySeparatingHyperplane(vertsA, vertsB, out var sepNormal, out var sepPoint)) {
+                var hs = new HalfSpace(sepPoint, sepNormal);
+                var sideBsep = Bsp4d.Classify(b, hs);
+                if (sideBsep == CellSide.POSITIVE || sideBsep == CellSide.NEGATIVE) {
+                    bool camPositive = camera.IsFacedBy(hs.origin(), hs.normal);
+                    return (sideBsep == CellSide.POSITIVE) == camPositive ? 1 : 0;
+                }
+            }
+            // No separating hyperplane found ⇒ the cells actually overlap in 4D (a real degeneracy,
+            // not the old straddle limitation). Fail fast.
             throw new System.Exception(
                 "6021837445 pairwise occlusion order undecidable: cells " + a.sourceCellId +
-                " and " + b.sourceCellId + " mutually straddle each other's supporting " +
-                "hyperplanes; use the BSP pipeline for this geometry");
+                " and " + b.sourceCellId + " overlap in 4D (no separating hyperplane found); " +
+                "use the BSP pipeline for this geometry");
         }
 
         /// True iff some halfspace of `hull` has all `otherVerts` on its outside or
