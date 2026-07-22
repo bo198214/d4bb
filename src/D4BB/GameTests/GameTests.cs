@@ -85,10 +85,11 @@ public class GameTests
     }
 
     [Test]
-    public void GameLevel_Absolute_TranslatedShapeIsMissed()
+    public void GameLevel_Absolute_TranslatedShapeIsNotReached()
     {
         // Goal lives at x=0..1; the single compound is the same shape but shifted to
-        // x=2..3. Absolute mode must reject it — congruence required.
+        // x=2..3. Absolute mode must reject it — congruence required. It stays Pending:
+        // absolute mode never reports Missed, the player can always translate back.
         var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
         var obj = new Objective("shifted", goal,
             new int[][][] {
@@ -96,7 +97,34 @@ public class GameTests
             }) { mode = GoalMode.Absolute };
         Assert.That(obj.mode, Is.EqualTo(GoalMode.Absolute));
         var level = new GameLevel(obj);
-        Assert.That(level.status, Is.EqualTo(GameStatus.Missed));
+        Assert.That(level.status, Is.EqualTo(GameStatus.Pending));
+    }
+
+    [Test]
+    public void GameLevel_Absolute_SeparatePiecesFillingGoalAreReached()
+    {
+        // Two uncombined pieces that together cover exactly the goal cells.
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var obj = new Objective("split", goal,
+            new int[][][] {
+                new int[][] { new int[] { 0,0,0,0 } },
+                new int[][] { new int[] { 1,0,0,0 } },
+            }) { mode = GoalMode.Absolute };
+        var level = new GameLevel(obj);
+        Assert.That(level.pieces.Count, Is.EqualTo(2));
+        Assert.That(level.status, Is.EqualTo(GameStatus.Reached));
+    }
+
+    [Test]
+    public void GameLevel_Absolute_PartiallyFilledGoalIsPending()
+    {
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var obj = new Objective("partial", goal,
+            new int[][][] {
+                new int[][] { new int[] { 0,0,0,0 } },
+            }) { mode = GoalMode.Absolute };
+        var level = new GameLevel(obj);
+        Assert.That(level.status, Is.EqualTo(GameStatus.Pending));
     }
 
     [Test]

@@ -11,9 +11,9 @@ namespace D4BB.Game
     /// <list type="bullet">
     /// <item><b>Shape</b> (default): the compound must match the goal only up to
     /// translation/rotation (the classic "build this shape anywhere" rule).</item>
-    /// <item><b>Absolute</b>: the single remaining compound must be
-    /// <i>congruent</i> with the goal — exactly the same cell origins, no
-    /// translation or rotation allowed.</item>
+    /// <item><b>Absolute</b>: the pieces must occupy exactly the goal's cell
+    /// origins — no translation or rotation allowed. The pieces need not be
+    /// combined into one compound; the arrangement alone decides.</item>
     /// </list>
     /// </summary>
     public enum GoalMode { Absolute, Shape }

@@ -176,29 +176,29 @@ namespace D4BB.Game
                 status = GameStatus.None;
                 return;
             }
-            // Shape (default): equality modulo translation/rotation. Absolute: the goal
-            // is reached only when the single remaining compound is congruent with the
-            // goal (same cell origins — no translation or rotation).
-            bool absolute = Objective != null && Objective.mode == GoalMode.Absolute;
+            // Shape (default): equality modulo translation/rotation, and only once the
+            // pieces have been combined into a single compound. Absolute: the pieces just
+            // have to occupy exactly the goal cells — combining them is not required.
+            // Absolute knows no Missed: every non-matching arrangement is still Pending.
+            // (A Missed rule would have to derive the goal's compounds and detect that
+            // fewer pieces remain than that decomposition allows — deliberately not done.)
+            if (Objective != null && Objective.mode == GoalMode.Absolute)
+            {
+                var occupied = pieces.SelectMany(p => p.origins).ToArray();
+                status = IntegerOps.SetEqual(goal, occupied) ? GameStatus.Reached : GameStatus.Pending;
+                return;
+            }
             if (pieces.Count == 1)
             {
-                bool reached = absolute
-                    ? IntegerOps.SetEqual(goal, pieces[0].origins)
-                    : IntegerOps.MotionEqual(goal, pieces[0].origins);
-                status = reached ? GameStatus.Reached : GameStatus.Missed;
+                status = IntegerOps.MotionEqual(goal, pieces[0].origins)
+                    ? GameStatus.Reached : GameStatus.Missed;
                 return;
             }
             var sel = Selected;
-            if (sel != null)
+            if (sel != null && !IntegerOps.MotionContained(sel.origins, goal))
             {
-                bool contained = absolute
-                    ? IntegerOps.SetContained(sel.origins, goal)
-                    : IntegerOps.MotionContained(sel.origins, goal);
-                if (!contained)
-                {
-                    status = GameStatus.Missed;
-                    return;
-                }
+                status = GameStatus.Missed;
+                return;
             }
             if (status != GameStatus.Pending)
                 status = GameStatus.Pending;
