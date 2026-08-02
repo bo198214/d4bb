@@ -11,10 +11,10 @@ namespace D4BB.Geometry2Tests {
     /// must produce the same visible geometry as the battle-tested Scene4d pipeline (the
     /// shipping game's renderer, which handles grid pieces with correct 4D occlusion).
     ///
-    /// Ground truth: the cells are translates of one convex body (the unit tesseract), and
-    /// for translates of a convex body the depth order along the view normal is consistent
-    /// wherever projections overlap — so Scene4d's scalar far-to-near sort is exact for
-    /// polycube figures under ANY camera orientation, not just the axis-aligned default.
+    /// Ground truth: Scene4d's painter occlusion is provably exact for lattice polycube
+    /// scenes under ANY camera orientation — occluder set = all front-facing boundary
+    /// cells, depth key = parent-tesseract center. Full proof: OCCLUSION-PROOF.md next to
+    /// Scene4d (Transforms).
     ///
     /// Two pose modes cover both ways the 4D pose can vary at runtime:
     ///   CameraRot:  both pipelines view the identity-pose figure through the same rotated
@@ -86,11 +86,15 @@ namespace D4BB.Geometry2Tests {
 
         static System.Collections.IEnumerable ParityCases() {
             foreach (PoseMode mode in System.Enum.GetValues(typeof(PoseMode)))
-                foreach (var (name, _) in PolycubeFigures.All)
+                foreach (var (name, _) in PolycubeFigures.All) {
+                    // Large figures are covered by the (sharper) single-plane sweeps only —
+                    // 100 grid angles × 2 modes at ~0.4 s/case is too slow for normal runs.
+                    if (PolycubeFigures.IsLarge(name)) continue;
                     foreach (var a1 in Angles)
                         foreach (var a2 in Angles)
                             yield return new TestCaseData(name, a1, a2, mode)
                                 .SetName($"{name}_{mode}_a1={a1:F2}_a2={a2:F2}");
+                }
         }
 
         [Test, TestCaseSource(nameof(ParityCases))]
@@ -125,14 +129,16 @@ namespace D4BB.Geometry2Tests {
         static readonly (string name, int i, int j)[] Planes = {
             ("XY", 0, 1), ("XZ", 0, 2), ("XW", 0, 3), ("YZ", 1, 2), ("YW", 1, 3), ("ZW", 2, 3),
         };
-        static readonly string[] SweepFigures = { "L3", "Lw3", "T4", "rnd7", "box3d" };
+        static readonly string[] SweepFigures = { "L3", "Lw3", "T4", "rnd7", "box3d", "tunnel1d", "tunnel2d" };
 
         static System.Collections.IEnumerable PlaneSweepCases() {
-            foreach (var figure in SweepFigures)
+            foreach (var figure in SweepFigures) {
+                int step = PolycubeFigures.IsLarge(figure) ? 30 : 10;   // thin coverage for large figures
                 foreach (var (planeName, _, _) in Planes)
-                    for (int deg = 0; deg < 360; deg += 10)
+                    for (int deg = 0; deg < 360; deg += step)
                         yield return new TestCaseData(figure, planeName, deg)
                             .SetName($"{figure}_{planeName}_deg={deg:D3}");
+            }
         }
 
         [Test, TestCaseSource(nameof(PlaneSweepCases))]

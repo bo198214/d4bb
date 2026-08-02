@@ -172,6 +172,7 @@ namespace D4BB.Transforms
                 }
             }
 
+            piece.boundaryCells = ibc.cells.ToArray();
             piece.coplanarBoundaryFaces = coplanarBoundaryFaces.ToArray();
             piece.interiorDivisionFaces = interiorDivisionFaces?.ToArray();
         }
@@ -265,13 +266,18 @@ namespace D4BB.Transforms
         //   (a) Owner of visible 2-faces: each f2 is rendered exactly once, owned by some c3.
         //   (b) Occluder: c3's halfspaces cut other cells' faces during occlusion (OccludePieceCells).
         //
-        // These roles must NOT be conflated. A c3 may legitimately own zero f2's — when all
-        // its f2's are 2-corners shared with other-hyperplane c3's that won the dedup race —
-        // and still be required as an occluder. Coupling the roles (only adding c3 if it owns at
-        // least one f2) caused Box3D_NoDuplicateFaceFragmentsInSameCell: the diagonal-corner cell of
-        // the 3DBox hole had no owned f2's, so its halfspaces were missing from occlusion, and the
-        // diagonal-corner quadrant of the inner-hole wall survived the cut. (ComputeOccluders mirrors
-        // this occluder set exactly, including the interior-division owner cells below.)
+        // These roles must NOT be conflated, and role (b) therefore draws from piece.boundaryCells —
+        // the FULL boundary-cell list — never from the f2 pair list. Two bugs from coupling them:
+        //   - Box3D_NoDuplicateFaceFragmentsInSameCell: a c3 may own zero f2's (all its f2's are
+        //     2-corners claimed by other-hyperplane c3's in the dedup race) yet must still occlude —
+        //     only adding c3 when it owned a face left the diagonal-corner quadrant of the inner-hole
+        //     wall uncut.
+        //   - The tunnel-level bug (2026-08): a wall-center cell with ALL six f2's coplanar-interior
+        //     appears in NO (c3,f2) pair at all, so even the decoupled version that iterated the pair
+        //     list missed it — everything behind such a cell survived the cut (visible inner tunnel
+        //     walls in the tunnel-1d/tunnel-2d levels).
+        // (ComputeOccluders iterates the same boundaryCells with the same facing filter, so the
+        // scene-wide occluder set and the per-piece cells match exactly.)
         private List<CellBoundary> BuildPieceCells(Piece piece, int pieceIndex, bool cullBackFacesArg)
         {
             // Role (b): every front-facing c3 must contribute halfspaces, regardless of f2 ownership.
@@ -300,6 +306,13 @@ namespace D4BB.Transforms
                 return f;
             }
 
+            // Role (b), decided up front from the full boundary-cell list (see the method note):
+            // with culling on, every FRONT-facing boundary cell occludes; with culling off, every
+            // boundary cell does (averted cells' faces render then, so they must also be cut).
+            foreach (var c3 in piece.boundaryCells)
+                if (!cullBackFacesArg || Facing(c3))
+                    occluderCells.Add(c3);
+
             // f2-dedup ownership decides each face's winding (it follows the owner cell's
             // outward orientation). A surface 2-face is shared by a camera-facing and a
             // camera-averted 3-cell; the front owner produces the front-wound copy a
@@ -314,7 +327,6 @@ namespace D4BB.Transforms
                 bool facing = Facing(c3);
                 if (cullBackFacesArg && !facing)
                     continue;
-                occluderCells.Add(c3);
                 if (!facing) continue; // defer ownership to pass 2
                 if (faceOf.ContainsKey(f2)) continue; // already claimed by an earlier facing c3
 
@@ -372,7 +384,7 @@ namespace D4BB.Transforms
                 {
                     if (cullBackFacesArg && !camera.IsFacedBy(new Point(owner_c3.origin), new Point(owner_c3.Normal())))
                         continue; // owner backface-culled → drop the division face with it
-                    occluderCells.Add(owner_c3); // ensure owner has a PBC
+                    // owner is a boundary cell, so it already has a PBC from the role-(b) seeding above
                     var pf = new Face2dBC(f2, camera) { isCoplanarInterior = true };
                     if (!ownedFacesOf.ContainsKey(owner_c3)) ownedFacesOf[owner_c3] = new();
                     ownedFacesOf[owner_c3].Add(pf);
@@ -453,12 +465,14 @@ namespace D4BB.Transforms
             public HalfSpace[] HalfSpaces(ICamera4d cam) => halfSpaces ??= DefiningHalfSpaces(cell, cam);
         }
 
-        // Build the occluder set for the whole scene and (re)fill each piece's bounds. This must mirror
-        // the occluder cells that BuildPieceCells adds — the front-facing distinct c3 from
-        // the coplanar boundary faces, plus the interior-division owner cells when grid divisions are on
-        // (those can own zero boundary 2-faces yet are still required as occluders; see the Box3D note
-        // on BuildPieceCells). Cheap: only a facing test + an 8-vertex projection per c3,
-        // no face construction.
+        // Build the occluder set for the whole scene and (re)fill each piece's bounds. Iterates the FULL
+        // boundary-cell list, not the coplanar-boundary pair list: a wall-center cell (all six 2-faces
+        // coplanar-interior) appears in no pair yet still occludes what lies behind it — deriving the
+        // occluders from the pairs silently dropped such cells (the tunnel-level bug; see the
+        // Piece.boundaryCells note). Must stay a superset of the cells BuildPieceCells renders, so every
+        // rendered cell is also enqueued as an occludee in OccludePieceCells (both now iterate
+        // boundaryCells with the same facing filter, so they match exactly). Cheap: only a facing test +
+        // an 8-vertex projection per c3, no face construction.
         private List<Occluder> ComputeOccluders()
         {
             var viewNormal = camera.viewNormal.x;
@@ -467,18 +481,13 @@ namespace D4BB.Transforms
             {
                 var piece = pieces[p];
                 piece.bounds = ScreenBounds.Empty();
-                var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
-                void Add(OrientedIntegerCell c3)
+                foreach (var c3 in piece.boundaryCells)
                 {
-                    if (!seen.Add(c3)) return;
-                    if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) return;
+                    if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) continue;
                     var b = ProjectedBounds(c3, camera);
                     result.Add(new Occluder(c3, p, Depth(c3, viewNormal), b));
                     piece.bounds.Encapsulate(b);
                 }
-                foreach (var (c3, _) in piece.coplanarBoundaryFaces) Add(c3);
-                if (showGridDivisions && piece.interiorDivisionFaces != null)
-                    foreach (var (owner, _) in piece.interiorDivisionFaces) Add(owner);
             }
             return result;
         }
@@ -489,11 +498,22 @@ namespace D4BB.Transforms
         {
             occluders.Sort((a, b) => b.depth.CompareTo(a.depth));
         }
-        private static double Depth(IntegerCell cell, double[] viewNormal)
+        // The depth key is the view depth of the cell's PARENT TESSERACT center (cell center −
+        // ½·outward normal), NOT the 3-cell's own center. This is what makes the scalar sort
+        // provably exact (see OCCLUSION-PROOF.md): the depth-order theorem is a statement about
+        // the solid unit tesseracts — interior-disjoint integer translates of one convex body —
+        // and the pointwise front/back order of two tesseracts equals the order of their center
+        // depths wherever their shadows overlap. Cell-center depths deviate from the parent depth
+        // by an orientation-dependent −½·|v·n| and can order two cells AGAINST their parents'
+        // true occlusion order when the parent depths differ by less than the deviation gap.
+        // Ties (equal parent depth) are provably shadow-disjoint (proof, Lemma 2), which is why
+        // OccludePieceCells' equal-depth skip is exact — it also covers the same-parent case.
+        private static double Depth(OrientedIntegerCell cell, double[] viewNormal)
         {
             var c = cell.Center();
+            var n = cell.Normal();
             double sum = 0;
-            for (int i = 0; i < viewNormal.Length; i++) sum += viewNormal[i] * c[i];
+            for (int i = 0; i < viewNormal.Length; i++) sum += viewNormal[i] * (c[i] - 0.5 * n[i]);
             return sum;
         }
 

@@ -14,9 +14,11 @@ namespace D4BB.Geometry2Tests {
     ///   projected volume of a strictly NEARER front-facing cell — such a sample is
     ///   occluded and should have been cut away.
     ///
-    /// Depth is the scalar viewNormal·center order, which is exact for translates of one
-    /// convex body (unit lattice cubes): wherever two projections overlap, the center
-    /// order IS the occlusion order.
+    /// Depth is the scalar viewNormal·(parent-tesseract center) order — cell centroid minus
+    /// ½·outward normal. The occlusion theorem (OCCLUSION-PROOF.md next to Scene4d) orders the
+    /// solid unit tesseracts (interior-disjoint integer translates of one convex body), not the
+    /// flat 3-cells: wherever two tesseracts' shadows overlap, their center order IS the
+    /// pointwise occlusion order, and equal parent depth implies disjoint shadows.
     ///
     /// Sweeps all 6 coordinate rotation planes in 10° steps (including the XZ family the
     /// XY×ZW grid can't reach — the L-Sequence view where the L visibly self-occludes at
@@ -26,7 +28,7 @@ namespace D4BB.Geometry2Tests {
         static readonly (string name, int i, int j)[] Planes = {
             ("XY", 0, 1), ("XZ", 0, 2), ("XW", 0, 3), ("YZ", 1, 2), ("YW", 1, 3), ("ZW", 2, 3),
         };
-        static readonly string[] Figures = { "L3", "Lw3", "T4", "rnd7", "box3d" };
+        static readonly string[] Figures = { "L3", "Lw3", "T4", "rnd7", "box3d", "tunnel1d", "tunnel2d" };
 
         static System.Collections.IEnumerable SweepCases() {
             foreach (var figure in Figures)
@@ -40,7 +42,8 @@ namespace D4BB.Geometry2Tests {
             var cells = PolycubeFigures.ByName(figureName);
             var violations = new List<string>();
 
-            for (int deg = 0; deg < 360; deg += 10) {
+            int step = PolycubeFigures.IsLarge(figureName) ? 30 : 10;   // thin coverage for large figures
+            for (int deg = 0; deg < 360; deg += step) {
                 double angle = deg * System.Math.PI / 180.0;
                 var complex = IntegerComplex4dBuilder.Boundary(PolycubeFigures.AsIntegerCells(cells));
                 TestGeom.RotateComplexInPlane(complex, pi, pj, angle);
@@ -57,7 +60,11 @@ namespace D4BB.Geometry2Tests {
                     var r = CellRender3d.FromFragment(CellFragment.FromCell(complex, i), cam);
                     double depth = 0; int n = 0;
                     foreach (var vid in complex.CellVertexIds(i)) { depth += cam.viewNormal.sc(complex.vertices[vid]); n++; }
-                    fronts[i] = (depth / n, r.DefiningHalfSpaces());
+                    depth /= n;
+                    // parent-tesseract center = cell centroid − ½·outward normal (unit; rotated
+                    // along with the vertices) — the provable depth key, see the class doc.
+                    if (cell.normal != null) depth -= 0.5 * cam.viewNormal.sc(cell.normal);
+                    fronts[i] = (depth, r.DefiningHalfSpaces());
                 }
 
                 var processed = RenderPipeline.Process(complex, cam, useBsp: true, applyCutOut: true, backfaceCulling: true);

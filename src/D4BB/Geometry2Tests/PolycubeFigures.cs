@@ -45,12 +45,40 @@ namespace D4BB.Geometry2Tests {
                                  new[] { 0, 2, 2, 0 }, new[] { 1, 2, 2, 0 }, new[] { 2, 2, 2, 0 } }),
             ("rnd5",     RandomPolycube(42, 5)),
             ("rnd7",     RandomPolycube(7, 7)),
+            // The big pieces of the tunnel-1d / tunnel-2d levels (Assets/_Tesserian/Game/levels/):
+            // a 3x3x3x3 block with a through-tunnel. tunnel1d: 1x1x1 hole swept along w (open at
+            // w=0-/w=2+ only). tunnel2d: the z=1,w=1 slab removed — the cavity spans ALL of x,y,
+            // so it is open in the four x/y directions and closed in z and w. Both are genuinely
+            // 4D cavities (unlike box3d's w-thin slab): at generic angles parts of the inner tunnel
+            // walls are occluded by the surrounding block and parts are visible through the tunnel
+            // mouths — added because the shipping game shows suspected occlusion errors on these
+            // levels (2026-08).
+            ("tunnel1d", Block3333(except: (x, y, z, w) => x == 1 && y == 1 && z == 1)),
+            ("tunnel2d", Block3333(except: (x, y, z, w) => z == 1 && w == 1)),
         };
 
         public static int[][] ByName(string name) => All.First(f => f.name == name).cells;
 
+        /// Large figures (the 70+-cell tunnel blocks) are an order of magnitude more expensive
+        /// per case than the classic figures. Test suites use this to thin their angle coverage
+        /// for them (coarser sweep steps, exclusion from the dense XY×ZW grid) so normal test
+        /// runs stay fast — coverage-per-angle is unchanged, only the sampling density drops.
+        public static bool IsLarge(string name) => ByName(name).Length >= 30;
+
         public static IEnumerable<IntegerCell> AsIntegerCells(int[][] cells)
             => cells.Select(o => new IntegerCell(o));
+
+        /// 3x3x3x3 block minus the cells matching `except` (see the tunnel figures above).
+        public static int[][] Block3333(System.Func<int, int, int, int, bool> except) {
+            var cells = new List<int[]>();
+            for (int w = 0; w < 3; w++)
+                for (int z = 0; z < 3; z++)
+                    for (int y = 0; y < 3; y++)
+                        for (int x = 0; x < 3; x++)
+                            if (!except(x, y, z, w))
+                                cells.Add(new[] { x, y, z, w });
+            return cells.ToArray();
+        }
 
         /// Deterministic connected random polycube: grow from the origin by repeatedly
         /// attaching a unit tesseract at a random free face of a random existing cell.

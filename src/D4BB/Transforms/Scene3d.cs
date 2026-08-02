@@ -138,11 +138,16 @@ public class Scene3d
         }
     }
 
-    private static double Depth(IntegerCell cell, double[] viewNormal)
+    // Depth key = view depth of the cell's PARENT CUBE center (cell center − ½·outward normal),
+    // one dimension down from Scene4d.Depth — see OCCLUSION-PROOF.md next to Scene4d for why the
+    // parent-solid center (and not the 2-cell's own center) is the provably correct sort key and
+    // why the equal-depth skip below is exact.
+    private static double Depth(OrientedIntegerCell cell, double[] viewNormal)
     {
         var c = cell.Center();
+        var n = cell.Normal();
         double sum = 0;
-        for (int i = 0; i < viewNormal.Length; i++) sum += viewNormal[i] * c[i];
+        for (int i = 0; i < viewNormal.Length; i++) sum += viewNormal[i] * (c[i] - 0.5 * n[i]);
         return sum;
     }
 

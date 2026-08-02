@@ -16,11 +16,15 @@ namespace D4BB.Geometry2Tests {
         static readonly double[] Angles = { 0.0, 0.35, 1.1, 2.7 };
 
         static System.Collections.IEnumerable Cases() {
-            foreach (var (name, _) in PolycubeFigures.All)
+            foreach (var (name, _) in PolycubeFigures.All) {
+                // The cached-BSP adapter's correctness is figure-size-independent; skip the
+                // expensive large figures (they are occlusion stress cases, not adapter cases).
+                if (PolycubeFigures.IsLarge(name)) continue;
                 foreach (var a1 in Angles)
                     foreach (var a2 in Angles)
                         yield return new TestCaseData(name, a1, a2)
                             .SetName($"{name}_a1={a1:F2}_a2={a2:F2}");
+            }
         }
 
         [Test, TestCaseSource(nameof(Cases))]

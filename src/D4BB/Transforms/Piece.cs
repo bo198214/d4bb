@@ -36,6 +36,15 @@ namespace D4BB.Transforms
         private IntegerCenter center;
 
         // ── topology (the IBC boundary, computed once by Scene4d; mutated in place by Translate/Rotate) ──
+        // ALL boundary 3-cells of the piece (the full IntegerBoundaryComplex cell set). This — not the
+        // pair list below — is the source of the occluder role: a 3-cell whose six 2-faces are ALL
+        // coplanar-interior (the center cell of a flat >=3x3-cell wall, e.g. in the tunnel levels'
+        // 3x3x3x3 block) contributes no (c3,f2) pair at all, yet its projected volume still occludes
+        // whatever lies behind it. Deriving occluders from the pair list silently dropped such cells,
+        // so nothing behind a wall-center cell was ever cut (the 2026-08 tunnel-level bug — the same
+        // role conflation as the earlier Box3D ownerless-occluder bug, one level earlier in the chain).
+        // Shares instances with the pair lists' c3 entries. Null until a Scene4d builds it.
+        public OrientedIntegerCell[] boundaryCells;
         // The (3-cell, 2-face) boundary pairs of the piece, computed once via IntegerBoundaryComplex.
         // A Translate/Rotate only mutates the origins/spans of these cells in place, so the face
         // *selection* stays valid and the expensive IBC rebuild is avoided. Null until a Scene4d builds it.
@@ -86,6 +95,10 @@ namespace D4BB.Transforms
             center.Translate(axis);
             if (coplanarBoundaryFaces == null) return;
             var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
+            // boundaryCells first: it holds every c3 instance including wall-center cells that
+            // appear in NO pair (see the field note) — those must move with the piece too.
+            foreach (var c3 in boundaryCells)
+                if (seen.Add(c3)) c3.Translate(axis);
             foreach (var (c3, f2) in coplanarBoundaryFaces)
             {
                 if (seen.Add(c3)) c3.Translate(axis);
@@ -108,6 +121,8 @@ namespace D4BB.Transforms
             RecomputeCenter();
             if (coplanarBoundaryFaces == null) return;
             var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
+            foreach (var c3 in boundaryCells)
+                if (seen.Add(c3)) c3.Rotate(pivot, v, w);
             foreach (var (c3, f2) in coplanarBoundaryFaces)
             {
                 if (seen.Add(c3)) c3.Rotate(pivot, v, w);
