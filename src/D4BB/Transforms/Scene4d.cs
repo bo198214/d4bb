@@ -465,7 +465,18 @@ namespace D4BB.Transforms
             public HalfSpace[] HalfSpaces(ICamera4d cam) => halfSpaces ??= DefiningHalfSpaces(cell, cam);
         }
 
-        // Build the occluder set for the whole scene and (re)fill each piece's bounds. Iterates the FULL
+        // Build the occluder set for the whole scene and (re)fill each piece's bounds (each piece's
+        // bounds is the union of its occluders' bounds). The pure list construction lives in
+        // BuildOccluders; this wrapper adds the bounds side effect for the rebuild paths that rely on it.
+        private List<Occluder> ComputeOccluders()
+        {
+            var result = BuildOccluders();
+            for (int p = 0; p < pieces.Length; p++) pieces[p].bounds = ScreenBounds.Empty();
+            foreach (var occ in result) pieces[occ.pieceIndex].bounds.Encapsulate(occ.bounds);
+            return result;
+        }
+
+        // Pure occluder-list construction (no bounds write). Iterates the FULL
         // boundary-cell list, not the coplanar-boundary pair list: a wall-center cell (all six 2-faces
         // coplanar-interior) appears in no pair yet still occludes what lies behind it — deriving the
         // occluders from the pairs silently dropped such cells (the tunnel-level bug; see the
@@ -473,21 +484,45 @@ namespace D4BB.Transforms
         // rendered cell is also enqueued as an occludee in OccludePieceCells (both now iterate
         // boundaryCells with the same facing filter, so they match exactly). Cheap: only a facing test +
         // an 8-vertex projection per c3, no face construction.
-        private List<Occluder> ComputeOccluders()
+        private List<Occluder> BuildOccluders()
         {
             var viewNormal = camera.viewNormal.x;
             var result = new List<Occluder>();
             for (int p = 0; p < pieces.Length; p++)
             {
-                var piece = pieces[p];
-                piece.bounds = ScreenBounds.Empty();
-                foreach (var c3 in piece.boundaryCells)
+                foreach (var c3 in pieces[p].boundaryCells)
                 {
                     if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) continue;
-                    var b = ProjectedBounds(c3, camera);
-                    result.Add(new Occluder(c3, p, Depth(c3, viewNormal), b));
-                    piece.bounds.Encapsulate(b);
+                    result.Add(new Occluder(c3, p, Depth(c3, viewNormal), ProjectedBounds(c3, camera)));
                 }
+            }
+            return result;
+        }
+
+        // Pure batch computation of every piece's OCCLUDED facets mesh from cached topology + the
+        // current camera — occlusion is applied regardless of enable4dOcclusion, and NO scene state is
+        // touched (pieces[*].cells/bounds/meshes, the visible caches and the flags all stay as-is).
+        // Consumer: the occlusion-off collider path (Scene4dView.RefreshCollidersWithOcclusion) — the
+        // render meshes stay un-occluded there, but picking still needs occluded collider geometry so a
+        // raycast hits the visually front face. Replaces the former enable4dOcclusion toggle around two
+        // full Updates (each re-running IBC for every piece — the entire occlusion-off drag-release
+        // freeze); an application of the "pure methods over global-state toggle" rule.
+        // Byte-identical to pieces[*].facetsMesh of an occlusion-ON rebuild for the same state: same
+        // occluder order (BuildOccluders + SortFarToNear), same cut path (BuildPieceCells +
+        // OccludePieceCells), same facet-set + mesh construction as RefreshVisibleCacheForPiece.
+        public FacetsGenericMesh[] ComputeOccludedFacetsMeshes()
+        {
+            var occluders = BuildOccluders();
+            SortFarToNear(occluders);
+            var result = new FacetsGenericMesh[pieces.Length];
+            for (int p = 0; p < pieces.Length; p++)
+            {
+                var pieceCells = BuildPieceCells(pieces[p], p, cullBackFaces);
+                OccludePieceCells(p, pieceCells, occluders);
+                var facets = new HashSet<Face2d>(new Face2dUnOrientedEquality(AOP.binaryPrecision));
+                foreach (var cb in pieceCells)
+                    foreach (var facet in cb.pbc.d2faces) facets.Add(facet);
+                result[p] = new FacetsGenericMesh(facets);
             }
             return result;
         }

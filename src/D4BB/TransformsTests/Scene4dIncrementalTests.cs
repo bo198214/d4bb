@@ -266,6 +266,48 @@ public class Scene4dIncrementalTests {
             Assert.That(scene.pieces[i].facetsMesh, Is.Not.SameAs(beforeF[i]), $"piece {i} mesh rebuilt");
     }
 
+    // ── pure occluded facets meshes (occlusion-off collider/picking path) ───────
+
+    // ComputeOccludedFacetsMeshes must (a) return byte-identical meshes to the facetsMesh an
+    // occlusion-ON scene builds for the same state (same origins ⇒ same topology iteration ⇒ same
+    // occluder order ⇒ bit-identical cut fragments, per the header note), and (b) be PURE: an
+    // occlusion-OFF scene's flags, cells, meshes and visible geometry stay untouched — it replaced an
+    // enable4dOcclusion toggle around two full Updates, and this guards against that creeping back.
+    [Test] public void ComputeOccludedFacetsMeshes_MatchesOccludedRebuild_AndIsPure(
+            [Values(true, false)] bool cullBackFaces) {
+        var origins = new int[][][] {
+            new int[][] { new int[] {0,0,0,0} },
+            new int[][] { new int[] {-1,-1,0,2} },
+        };
+        var off = new Scene4d(origins, new Camera4dParallel(), cullBackFaces: cullBackFaces, enable4dOcclusion: false);
+        var on  = new Scene4d(origins, new Camera4dParallel(), cullBackFaces: cullBackFaces, enable4dOcclusion: true);
+
+        var cellsBefore = off.pieces.Select(p => p.cells).ToArray();
+        var facetsMeshBefore = off.pieces.Select(p => p.facetsMesh).ToArray();
+        var geomBefore = new List<List<string>>();
+        for (int i = 0; i < off.pieces.Length; i++) geomBefore.Add(VisibleGeom(off, i));
+
+        var occluded = off.ComputeOccludedFacetsMeshes();
+
+        // (a) parity with the occlusion-ON rebuild, per piece and byte-for-byte.
+        Assert.That(occluded.Length, Is.EqualTo(on.pieces.Length));
+        for (int i = 0; i < on.pieces.Length; i++) {
+            Assert.That(occluded[i].vertices,  Is.EqualTo(on.pieces[i].facetsMesh.vertices),  $"piece {i} vertices");
+            Assert.That(occluded[i].triangles, Is.EqualTo(on.pieces[i].facetsMesh.triangles), $"piece {i} triangles");
+            Assert.That(occluded[i].normals,   Is.EqualTo(on.pieces[i].facetsMesh.normals),   $"piece {i} normals");
+            Assert.That(occluded[i].uvs,       Is.EqualTo(on.pieces[i].facetsMesh.uvs),       $"piece {i} uvs");
+        }
+
+        // (b) purity: no flag flip, no cells/mesh replacement, unchanged visible geometry.
+        Assert.That(off.enable4dOcclusion, Is.False, "flag untouched");
+        Assert.That(off.cullBackFaces, Is.EqualTo(cullBackFaces), "cull flag untouched");
+        for (int i = 0; i < off.pieces.Length; i++) {
+            Assert.That(off.pieces[i].cells, Is.SameAs(cellsBefore[i]), $"piece {i} cells identity");
+            Assert.That(off.pieces[i].facetsMesh, Is.SameAs(facetsMeshBefore[i]), $"piece {i} facetsMesh identity");
+            Assert.That(VisibleGeom(off, i), Is.EqualTo(geomBefore[i]), $"piece {i} visible geometry");
+        }
+    }
+
     // The wired drag pattern: the owner moves the piece in place (piece.Translate, possibly several
     // steps in one snap), then a single ReoccludePiece does the incremental re-occlusion. Must equal a
     // full UpdateCamera for the same end state, for single- and multi-step batches.
