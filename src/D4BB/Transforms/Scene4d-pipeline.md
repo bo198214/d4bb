@@ -50,8 +50,10 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
   `Game.ApplyPendingDisplayChanges` for **color mode**, **face shader**, **spectrum/hueStart** (only
   `mesh.colors` / symbol UV3 change). **Day/night** is even lighter — a pure material-reference swap, no
   re-decoration (colors are day/night-independent). The selection ring goes through `RebakeSymbolUVsAllPieces`
-  (symbol UV3 only). Changes that *do* alter geometry — **grid divisions**, **cut edges**, occlusion /
-  backface toggles — still need a full `Scene4d.Update` + `RefreshAllMeshes`.
+  (symbol UV3 only). Changes that *do* alter geometry still rebuild + re-upload: **grid divisions** /
+  **cut edges** via a full `Scene4d.Update` + `RefreshAllMeshes`; the **occlusion / backface** toggles
+  need only `UpdateCamera()` + `RefreshAllMeshes` (the flags affect the rebuild from cached topology,
+  not the topology itself).
 
 ## The four recompute granularities (cheapest → most expensive)
 
@@ -78,10 +80,11 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
 | trigger | path | recompute |
 |---|---|---|
 | Level load / level change | `new Scene4d(gameLevel.pieces,…)` / `Update` | #4 full (IBC) |
-| Toggle: occlusion / grid-divisions / cut-edges | `Game` → `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
+| Toggle: grid-divisions / cut-edges | `Game` → `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
+| Toggle: occlusion / backface culling (GameMenu) | `scene4d.UpdateCamera()` | #2 (no IBC — the flags only affect the rebuild from cached topology) |
 | Camera zoom / scene rotate | `PerspectiveControl` → `scene4d.UpdateCamera()` | #2 (no IBC) |
 | **Drag** snap (per batch of steps) | `gameLevel.TranslateSelected` ×N (#1 on shared piece) → `RefreshSnapFacetMesh` → `scene4d.ReoccludePiece(i)` → `RefreshAffectedMeshes(affected)` | #1 ×N + #3 (no IBC); only moved + overlapping pieces' meshes uploaded |
-| Drag end (commit) | `scene4d.Update(PieceOrigins)` | #4 full (IBC) |
+| Drag end (commit) | `Scene4dView.RefreshAllMeshes()` only (restores the dragged piece's real edge mesh) | none — the incremental #3 path is byte-identical to a full rebuild (`Scene4dIncrementalTests`), so no scene4d work at drag end (2026-08-03; was #4, the entire release freeze) |
 | Non-drag move (keyboard/button) animation | `OnTranslate/OnRotate` (see below) | #1 ×2 + #2, then #4 at animation end |
 | Combine / Reset | `gameLevel` mutates `pieces` list → `scene4d.Update` | #4 full (IBC) |
 
@@ -89,7 +92,8 @@ origins ──(A)── topology ──(B)── projected cells ──(C)──
 piece's cached topology in place (#1, no IBC) — possibly several steps — then a single `ReoccludePiece(i)`
 (#3) re-projects only the dragged piece and re-occludes only the pieces it overlaps (camera is unchanged
 during a snap, so the others stay valid). Fast: IBC is skipped on every snap *and* only the affected
-pieces are re-occluded. The full IBC rebuild happens once at drag end (#4).
+pieces are re-occluded. Drag end does **no** scene4d work at all (the incremental path is byte-identical
+to a full rebuild); only the Unity meshes are refreshed.
 
 **Non-drag animated move.** `gameLevel.TranslateSelected/RotateSelected` already moved the *shared* piece
 to NEW. Because the animation interpolates from the OLD geometry, `OnTranslate/OnRotate` **temporarily
@@ -106,3 +110,54 @@ just *coordinate-shifted in place* (#1). Everything downstream (B/C) is a re-pro
 cells, cheap relative to IBC. On top of that, the drag re-occludes only the *overlapping* pieces (#3,
 `ReoccludePiece`) instead of all of them (#2) — so a snap touches just the dragged piece and whatever it
 overlaps.
+
+## `cullBackFaces` × `enable4dOcclusion`: the mixed mode is out of contract
+
+Only `cullBackFaces=true` is covered by the correctness suites (`Scene4dParityTests`,
+`Scene4dOcclusionSoundnessTests`, `Scene4dMultiPieceSoundnessTests`, `Scene4dIncrementalTests` pin it;
+`MarkStampingTests` runs culling-off but asserts only mark stamping), and the scalar-depth-sort proof
+(`OCCLUSION-PROOF.md`) is a statement about *front* surfaces of solids. **Occlusion ON + culling OFF**
+is not a supported view: the game layer forbids it outright — `Game.SetOcclusion4d` /
+`Game.SetBackfaceCulling` are the single enforcement point of the invariant "occlusion ⇒ culling"
+(occlusion ON drags culling ON, culling OFF drags occlusion OFF), and both the GameMenu toggles and the
+dev controller keys go through them. The mixed state remains constructible on a raw `Scene4d`
+(tests, e.g. `MarkStampingTests`, do). Findings of the 2026-08-03 analysis of that mode:
+
+Historical note: before the depth key moved from the 3-cell center to the **parent tesseract center**
+(the change that made the scalar sort provably exact), a cell's own backface was *deeper* than its
+front cells, so a tesseract cut its own backface and the mixed mode looked clean (backfaces simply
+vanished). The parent-center key gives front and back cells of one tesseract equal depth, the
+equal-depth skip then keeps the backface — which is what surfaced the artifacts below.
+
+- **Averted occluder cells never cut** (silent no-op). `DefiningHalfSpaces` derives its halfspace
+  normals from `ClockwiseFromOutsideVertices2d` windings; the 4D→3D projection restricted to a cell's
+  hyperplane is orientation-*reversing* exactly for camera-averted cells, so their six halfspace normals
+  all point inward and the hull-intersection test is empty. Verified empirically: a front-facing cell's
+  own projected center passes `StrictlyInside` of its own hull 4/4, an averted cell's 0/4. This
+  contradicts the role-(b) comment in `BuildPieceCells` ("with culling off, every boundary cell
+  [occludes]") — but it is geometrically **masked for complete pieces**: a solid's front cells alone
+  cover its full silhouette, so nothing that should be cut escapes. An under-/over-cut census
+  (occlusion-off oracle vs. nearer-front-hull model; box3d / tunnel1d / L3 with camera sweeps,
+  multi-piece stacked/touching/overlap configs) found **zero** violations, and the incremental
+  `ReoccludePiece` path stays byte-identical to a full rebuild in this mode too.
+- **The visible weirdness is mostly the mode's semantics, not miscuts.** The equal-parent-depth skip in
+  `OccludePieceCells` (`depth != occ.depth`) means a tesseract's own backface is *never* cut by its own
+  front cells — the skip is the correctness guard derived from the depth-order theorem (which orders
+  *distinct* solids and says nothing about a solid vs. itself; equal-depth distinct solids are provably
+  shadow-disjoint), and with culling off it is what makes backfaces visible at all. But sibling
+  tesseracts of the same piece (and other pieces) have *different* parent depths, so their front-cell
+  hulls — unit-cell-sized, grid-aligned, shear-offset parallelepipeds — **do** carve their occlusion
+  holes into a visible backface. On a flat multi-tesseract back wall this yields regular grid-patterned
+  jagged cuts that *look like* the piece's interior grid cells were doing the cutting. They are not:
+  interior shared 3-cells are cancelled in `IntegerBoundaryComplex.ConnectCell` (both oriented copies
+  are removed — `OrientedIntegerCell` hashes orientation-insensitively, so the two copies match) and
+  never render nor occlude; the cutters are the per-tesseract *parceling* of the outer boundary.
+  Verified empirically: a single-tesseract piece loses **zero** area in this mode (all cells share one
+  parent depth → every pair skips), a two-tesseract piece loses area on exactly the far tesseract's
+  backface cells.
+- **Exactly-coplanar faces are routed by an orientation test calibrated to front-wound faces**
+  (`Split()`'s `isContained` branch: co-oriented with the cutter ⇒ removed). Faces owned by averted
+  cells (ownership pass 2 in `BuildPieceCells`) are deliberately back-wound — noted there as "harmless
+  to a single-sided raycast", which considered picking, not this routing — so on exactly-coplanar
+  contact planes their keep/remove decision inverts relative to a front-wound twin. Did not manifest in
+  the census configs, but is unproven in general.
