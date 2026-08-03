@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using D4BB.Comb;
 using D4BB.Geometry;
@@ -114,26 +115,52 @@ namespace D4BB.Transforms
 
         // 90° rotation in the (v,w) plane around `pivot`: origins + topology cells (if built); the center
         // is recomputed because an arbitrary pivot (not the centroid) moves it.
+        //
+        // The topology cells rotate ORIENTATION-CORRECTLY via RotateAsFacetOf — the plain
+        // IntegerCell.Rotate only moves origin/span and would leave inverted/parity stale (wrong
+        // normals → wrong backface culling, winding, depth order and occluder halfspaces; that was
+        // the post-drag-rotation artifact bug once the EndDrag full rebuild stopped masking it).
+        // An f2's flags are relative to its generating parent c3, so its pre-rotation normal axis
+        // within that parent is captured BEFORE any cell moves (the shared c3 instances rotate
+        // first), and its new parity is derived from the parent's rotated span afterwards. For an
+        // interior division face the stored owner may be the *other* coplanar parent, which is fine:
+        // coplanar parents share their span, and the flip rule depends only on the removed axis.
         public void Rotate(int v, int w, IntegerCenter pivot)
         {
             foreach (var o in origins)
                 IntegerOps.RotateAsCenters(o, pivot, v, w);
             RecomputeCenter();
             if (coplanarBoundaryFaces == null) return;
-            var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
-            foreach (var c3 in boundaryCells)
-                if (seen.Add(c3)) c3.Rotate(pivot, v, w);
+
+            // Pass 1: capture each f2's normal axis within its parent c3, pre-rotation.
+            var f2Jobs = new List<(OrientedIntegerCell f2, OrientedIntegerCell c3, int b)>(
+                coplanarBoundaryFaces.Length + (interiorDivisionFaces?.Length ?? 0));
             foreach (var (c3, f2) in coplanarBoundaryFaces)
-            {
-                if (seen.Add(c3)) c3.Rotate(pivot, v, w);
-                f2.Rotate(pivot, v, w);
-            }
+                f2Jobs.Add((f2, c3, c3.span.Except(f2.span).First()));
             if (interiorDivisionFaces != null)
                 foreach (var (c3, f2) in interiorDivisionFaces)
-                {
-                    if (seen.Add(c3)) c3.Rotate(pivot, v, w);
-                    f2.Rotate(pivot, v, w);
-                }
+                    f2Jobs.Add((f2, c3, c3.span.Except(f2.span).First()));
+
+            // Pass 2: rotate every distinct c3. Their parent is the full-space unit tesseract
+            // (IBC generates boundary cells via cube.Facets()), which is unoriented — a plain
+            // full-span IntegerCell stands in for it (origin irrelevant: Parity only reads the span).
+            var fullSpaceParent = new IntegerCell(new int[origins[0].Length]);
+            var seen = new HashSet<OrientedIntegerCell>(ByRefCellComparer.I);
+            void RotateC3(OrientedIntegerCell c3)
+            {
+                if (!seen.Add(c3)) return;
+                c3.RotateAsFacetOf(pivot, v, w, c3.NormalAxis(), fullSpaceParent);
+            }
+            foreach (var c3 in boundaryCells) RotateC3(c3);
+            foreach (var (c3, _) in coplanarBoundaryFaces) RotateC3(c3);
+            if (interiorDivisionFaces != null)
+                foreach (var (c3, _) in interiorDivisionFaces) RotateC3(c3);
+
+            // Pass 3: rotate the f2s — their parent c3 has finished rotating by now (flags included),
+            // which RotateAsFacetOf needs: an f2's fresh parity is parent.Parity(b'), the virtual
+            // overload that chains the parent's own orientation.
+            foreach (var (f2, c3, b) in f2Jobs)
+                f2.RotateAsFacetOf(pivot, v, w, b, c3);
         }
 
         // Absorb other pieces' cells into this one (used by the combine move). Only the game state is

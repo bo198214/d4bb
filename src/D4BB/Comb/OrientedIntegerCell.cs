@@ -11,9 +11,11 @@ public class OrientedIntegerCell : IntegerCell {
     /// true:  normal points in the −axis direction.
     /// Reflected in <see cref="ToString"/> as "+" (false) or "−" (true), e.g.
     /// <c>[1,1,1,0]+[0,1,3]</c> vs <c>[1,1,1,0]-[0,1,2]</c>.
+    /// Mutable (not readonly) solely for <see cref="RotateAsFacetOf"/>, which transports the
+    /// orientation through an in-place 90° rotation; nothing else may write these.
     /// </summary>
-    public readonly bool inverted;
-    public readonly bool parity;
+    public bool inverted;
+    public bool parity;
 
     /* Normal is always along a single axis in the positive direction, except if inverted */
     public OrientedIntegerCell(int[] _origin, HashSet<int> _span, bool inverted, bool parity) :
@@ -21,6 +23,37 @@ public class OrientedIntegerCell : IntegerCell {
         this.inverted = inverted;
         this.parity = parity;
     }
+    /// <summary>
+    /// In-place 90° rotation in the (v,w) plane about <paramref name="o"/>, INCLUDING the
+    /// orientation flags — the base <see cref="IntegerCell.Rotate"/> only moves origin and span,
+    /// which leaves <see cref="inverted"/>/<see cref="parity"/> stale (that stale orientation was
+    /// the drag-rotation backface/winding bug once the EndDrag full topology rebuild was removed).
+    ///
+    /// The flags are parent-relative, so the caller supplies the parent context:
+    /// <paramref name="normalAxisInParentBefore"/> is this cell's missing axis within its parent's
+    /// span BEFORE the rotation (for a boundary 3-cell the parent is the full space), and
+    /// <paramref name="parentSpanAfter"/> is the parent's span AFTER the rotation (a 3-cell's own
+    /// rotated span for its 2-faces; the full space, unchanged, for 3-cells).
+    ///
+    /// Transport rules, from the rotation R: e_v ↦ e_w, e_w ↦ −e_v (the convention encoded in
+    /// IntegerCell.Rotate's span shift):
+    ///  - normal axis v becomes w keeping its sign; normal axis w becomes v FLIPPING its sign
+    ///    (hence inverted toggles exactly when the pre-rotation normal axis is w);
+    ///  - parity is not transported but re-derived exactly as fresh construction (Facets()) does:
+    ///    parity = parentAfter.Parity(b'). Parity is VIRTUAL — for a 2-face the parent is an
+    ///    OrientedIntegerCell whose own (already rotated) inverted/parity chain into the result,
+    ///    which is why the parent must have finished rotating first and is passed as a cell, not
+    ///    as a bare span.
+    /// Verified against fresh-IBC oracle builds in PieceRotateTopologyTests.
+    /// </summary>
+    public void RotateAsFacetOf(IntegerCenter o, int v, int w, int normalAxisInParentBefore, IntegerCell parentAfter) {
+        Rotate(o, v, w); // origin + span
+        int b = normalAxisInParentBefore;
+        int bNew = b == v ? w : b == w ? v : b;
+        if (b == w) inverted = !inverted;
+        parity = parentAfter.Parity(bNew);
+    }
+
     /* normal with respect to span */
     public int[] Normal(HashSet<int> superSpan) {
         Debug.Assert(span.Count+1==superSpan.Count,"0081763009 normal can only computed in d-1 subspace");
