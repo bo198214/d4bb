@@ -714,16 +714,25 @@ namespace D4BB.Comb
 
         public static int[][] Create4dCube(int d)
         {
-            int[][] res = new int[d * d * d * d][];
-            for (int i0 = 0; i0 < d; i0++)
+            return Create4dBox(new int[] { d, d, d, d });
+        }
+
+        /// <summary>All cells of the axis-aligned box with the given per-axis extents, ordered
+        /// row-major (index = ((i0*d1 + i1)*d2 + i2)*d3 + i3) — for equal extents identical to
+        /// <see cref="Create4dCube"/>.</summary>
+        public static int[][] Create4dBox(int[] d)
+        {
+            int[][] res = new int[d[0] * d[1] * d[2] * d[3]][];
+            int i = 0;
+            for (int i0 = 0; i0 < d[0]; i0++)
             {
-                for (int i1 = 0; i1 < d; i1++)
+                for (int i1 = 0; i1 < d[1]; i1++)
                 {
-                    for (int i2 = 0; i2 < d; i2++)
+                    for (int i2 = 0; i2 < d[2]; i2++)
                     {
-                        for (int i3 = 0; i3 < d; i3++)
+                        for (int i3 = 0; i3 < d[3]; i3++)
                         {
-                            res[d * d * d * i0 + d * d * i1 + d * i2 + i3] = new int[]
+                            res[i++] = new int[]
                             {
                                 i0,
                                 i1,
