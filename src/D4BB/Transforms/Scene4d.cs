@@ -122,6 +122,36 @@ namespace D4BB.Transforms
         public IReadOnlyList<int> ReoccludePiece(int pieceIndex)
             => ReoccludeAfterPieceChange(pieceIndex, pieces[pieceIndex].bounds);
 
+        // Incremental combine (bound scenes only): the owner (GameLevel.CombineSelected) has already
+        // merged the shared pieces — absorbed entries removed from the bound list, the surviving
+        // piece's origins grown, its cached topology stale. Resyncs the working array, recomputes
+        // ONLY the merged piece's topology (the one expensive IBC run), and re-occludes via the
+        // incremental path. Returns the affected indices (the renderer re-uploads exactly these).
+        //
+        // Why this equals a full Update: every other piece kept its topology unchanged, and a piece
+        // whose cut result involved any absorbed piece's (or the old selected piece's) occluder cells
+        // overlapped those cells' projected bounds. An absorbed piece's solid is a subset of the
+        // merged solid, and a projected solid's AABB is attained on its boundary cells, so those
+        // bounds are contained in the merged piece's NEW bounds — every such piece therefore lands in
+        // ReoccludePiece's affected set and is re-cut fresh from cached topology against the current
+        // occluders (byte-identical to a full rebuild). Pieces outside the affected set never
+        // interacted with the merged/absorbed pieces and keep their cells verbatim. The interface
+        // cells that vanish from the boundary (they become interior of the compound) occluded only
+        // regions that the compound's outer entry cells occlude too, so nothing is revealed by their
+        // disappearance. Verified against the full rebuild in Scene4dIncrementalTests.
+        public IReadOnlyList<int> RecombinePiece(int pieceIndex)
+        {
+            if (boundPieces == null)
+                throw new System.InvalidOperationException(
+                    "RecombinePiece is only meaningful on a bound scene (shared GameLevel pieces)");
+            pieces = boundPieces.ToArray();
+            FillTopology(pieces[pieceIndex]);
+            // pieces[pieceIndex].bounds still holds the pre-combine bounds of the surviving piece —
+            // a subset of its new bounds (see above), so ReoccludePiece's prev∪new overlap check
+            // reduces to the new bounds, which is exactly the affected region.
+            return ReoccludePiece(pieceIndex);
+        }
+
         // ── topology computation (runs IntegerBoundaryComplex once per piece) ─
 
         // A 2-face f2 is interior (coplanar with the same 3-cell on both sides) when the IBC

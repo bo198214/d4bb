@@ -308,6 +308,96 @@ public class Scene4dIncrementalTests {
         }
     }
 
+    // ── combine equivalence ─────────────────────────────────────────────────────
+
+    // The owner-side combine on a bound scene (GameLevel.CombineSelected: merge the shared pieces,
+    // remove the absorbed entries) followed by RecombinePiece must produce the same visible geometry
+    // as a full rebuild of the same scene — and pieces outside the affected set must keep their mesh
+    // objects (the renderer's dirty signal, same contract as incremental moves).
+    [Test] public void RecombinePiece_MatchesFullRebuild_AndKeepsFarMeshes() {
+        var shared = new List<Piece> {
+            new Piece(new int[][] { new int[] {0,0,0,0} }),
+            new Piece(new int[][] { new int[] {1,0,0,0} }),   // adjacent to piece 0 → merged
+            new Piece(new int[][] { new int[] {-1,-1,0,2} }), // overlaps the pair in projection, farther → re-cut
+            new Piece(new int[][] { new int[] {0,0,10,0} }),  // far away → untouched
+        };
+        var scene = new Scene4d(shared, new Camera4dParallel());
+        var farF = scene.pieces[3].facetsMesh;
+        var farE = scene.pieces[3].edgesMesh;
+
+        // Owner-side merge (what GameLevel.CombineSelected does): absorb piece 1 into piece 0.
+        shared[0].Combine(new[] { shared[1] });
+        shared.RemoveAt(1);
+
+        var affected = scene.RecombinePiece(0);
+
+        Assert.That(scene.pieces.Length, Is.EqualTo(3));
+        Assert.That(affected, Does.Contain(0), "merged piece is affected");
+        Assert.That(affected, Does.Contain(1), "overlapping piece behind the pair is re-cut");
+        Assert.That(affected, Has.No.Member(2), "far piece is not affected");
+        Assert.That(scene.pieces[2].facetsMesh, Is.SameAs(farF), "far piece keeps facetsMesh");
+        Assert.That(scene.pieces[2].edgesMesh, Is.SameAs(farE), "far piece keeps edgesMesh");
+
+        // Strict parity: incremental result vs a full rebuild of the SAME bound scene (same piece
+        // objects → identical topology iteration order → byte-identical fragments).
+        var incGeom = new List<List<string>>();
+        for (int i = 0; i < scene.pieces.Length; i++) incGeom.Add(VisibleGeom(scene, i));
+        scene.Update(null);   // bound scene: full UpdateBound (FillTopology all + full re-occlusion)
+        for (int i = 0; i < scene.pieces.Length; i++)
+            Assert.That(incGeom[i], Is.EqualTo(VisibleGeom(scene, i)),
+                $"piece {i}: incremental combine vs full rebuild");
+    }
+
+    // A piece behind the interface of the merged pair — the configuration where the interface cells'
+    // disappearance from the occluder set (they become interior of the compound) could wrongly
+    // reveal faces if the containment argument in RecombinePiece's doc were violated.
+    [Test] public void RecombinePiece_PieceBehindInterface_MatchesFullRebuild() {
+        var shared = new List<Piece> {
+            new Piece(new int[][] { new int[] {0,0,0,0} }),
+            new Piece(new int[][] { new int[] {1,0,0,0} }),
+            new Piece(new int[][] { new int[] {0,0,0,2}, new int[] {1,0,0,2} }), // bar behind both
+        };
+        var scene = new Scene4d(shared, new Camera4dParallel());
+
+        shared[0].Combine(new[] { shared[1] });
+        shared.RemoveAt(1);
+        scene.RecombinePiece(0);
+
+        var incGeom = new List<List<string>>();
+        for (int i = 0; i < scene.pieces.Length; i++) incGeom.Add(VisibleGeom(scene, i));
+        scene.Update(null);
+        for (int i = 0; i < scene.pieces.Length; i++)
+            Assert.That(incGeom[i], Is.EqualTo(VisibleGeom(scene, i)),
+                $"piece {i}: behind-interface combine vs full rebuild");
+    }
+
+    // Transitive combine (three in a row absorbed into one, as GameLevel's fixpoint loop produces)
+    // followed by ONE RecombinePiece — the exact call pattern of the game's combine move.
+    [Test] public void RecombinePiece_TransitiveMerge_MatchesFullRebuild() {
+        var shared = new List<Piece> {
+            new Piece(new int[][] { new int[] {0,0,0,0} }),
+            new Piece(new int[][] { new int[] {1,0,0,0} }),
+            new Piece(new int[][] { new int[] {2,0,0,0} }),
+            new Piece(new int[][] { new int[] {-1,-1,0,2} }), // overlapping observer piece
+        };
+        var scene = new Scene4d(shared, new Camera4dParallel());
+
+        // GameLevel's fixpoint: piece 1 first, then piece 2 (adjacent only after the first merge).
+        shared[0].Combine(new[] { shared[1] });
+        shared.RemoveAt(1);
+        shared[0].Combine(new[] { shared[1] });   // former piece 2
+        shared.RemoveAt(1);
+        scene.RecombinePiece(0);
+
+        Assert.That(scene.pieces.Length, Is.EqualTo(2));
+        var incGeom = new List<List<string>>();
+        for (int i = 0; i < scene.pieces.Length; i++) incGeom.Add(VisibleGeom(scene, i));
+        scene.Update(null);
+        for (int i = 0; i < scene.pieces.Length; i++)
+            Assert.That(incGeom[i], Is.EqualTo(VisibleGeom(scene, i)),
+                $"piece {i}: transitive combine vs full rebuild");
+    }
+
     // The wired drag pattern: the owner moves the piece in place (piece.Translate, possibly several
     // steps in one snap), then a single ReoccludePiece does the incremental re-occlusion. Must equal a
     // full UpdateCamera for the same end state, for single- and multi-step batches.
