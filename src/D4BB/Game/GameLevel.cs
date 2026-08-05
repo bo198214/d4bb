@@ -121,6 +121,18 @@ namespace D4BB.Game
             OnChanged?.Invoke();
         }
 
+        /// <summary>The level as it stands RIGHT NOW: goal, boundary and mode as authored, but the
+        /// pieces at their current origins (combines included — each remaining piece is one entry).
+        /// Round-trips through <see cref="Objective.ToJson"/>/<see cref="Objective.FromJson"/>, so an
+        /// export taken mid-solve resumes exactly there when played again.</summary>
+        public Objective CurrentObjective()
+        {
+            return new Objective(Objective.name, goal, PieceOrigins, Objective.boundary_min_max)
+            {
+                mode = Objective.mode
+            };
+        }
+
         public void Reset()
         {
             pieces.Clear();
