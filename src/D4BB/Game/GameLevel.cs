@@ -109,11 +109,24 @@ namespace D4BB.Game
         {
             var c0 = Selected;
             if (c0 == null || pieces.Count == 1) return;
-            var bordering = FindAdjacent(c0);
-            if (bordering.Count == 0) return;
-            c0.Combine(bordering);
-            foreach (var c in bordering)
-                pieces.Remove(c);
+            // A combine is transitive: absorbing the adjacent pieces can make further pieces
+            // adjacent to the grown compound, and those belong to the same move — everything
+            // connected to the selected piece through a chain of adjacencies merges at once.
+            // The fixpoint loop lives HERE so observers see a single OnCombine for the whole
+            // cascade. (The transitivity used to emerge from the view's OnCombine handler
+            // re-entrantly calling CombineSelected, which rebuilt the entire scene once per
+            // cascade step — the bulk of the combine hitch.)
+            bool merged = false;
+            while (true)
+            {
+                var bordering = FindAdjacent(c0);
+                if (bordering.Count == 0) break;
+                c0.Combine(bordering);
+                foreach (var c in bordering)
+                    pieces.Remove(c);
+                merged = true;
+            }
+            if (!merged) return;
             // Keep selectedIndex pointing to c0 (still in list)
             selectedIndex = pieces.IndexOf(c0);
             PropagateStatus();

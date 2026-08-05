@@ -178,6 +178,34 @@ public class GameTests
     }
 
     [Test]
+    public void GameLevel_Combine_IsTransitive_SingleEvent()
+    {
+        // Three unit pieces in a row: piece 2 is NOT adjacent to the selected piece 0, only to
+        // piece 1 — it must still be absorbed (a combine merges everything connected to the
+        // selected piece through a chain of adjacencies), and the whole cascade must surface as
+        // ONE OnCombine event.
+        var cells = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 }, new int[] { 2,0,0,0 } };
+        var obj = new Objective("row", cells,
+            new int[][][] {
+                new int[][] { cells[0] },
+                new int[][] { cells[1] },
+                new int[][] { cells[2] },
+            });
+        var level = new GameLevel(obj);
+        int combineEvents = 0;
+        level.OnCombine += (idx) => combineEvents++;
+
+        level.SelectPiece(0);
+        level.CombineSelected();
+
+        Assert.That(level.pieces.Count, Is.EqualTo(1));
+        Assert.That(level.pieces[0].origins.Length, Is.EqualTo(3));
+        Assert.That(combineEvents, Is.EqualTo(1));
+        Assert.That(level.selectedIndex, Is.EqualTo(0));
+        Assert.That(level.status, Is.EqualTo(GameStatus.Reached));
+    }
+
+    [Test]
     public void GameLevel_Values_Count()
     {
         var catalog = ObjectiveCatalog.Values();
