@@ -77,9 +77,11 @@ on one side of `H` and cannot meet both interiors. If `n·v > 0`, all points wit
 `c` (the support function of the difference body `K−K = [−1,1]⁴` is `h_{K−K}(n) = ‖n‖₁`).
 Since `n·v = δ·v = 0`, Lemma 1(a) applies. ∎
 
-This makes the algorithm's equal-depth **skip** exact rather than merely convenient — and
-it covers the same-parent case (`A = B`) for free: a convex body never occludes itself
-(its front cells' hulls tile its shadow with disjoint interiors).
+This makes the algorithm's equal-depth **skip** exact rather than merely convenient for
+*distinct* tesseracts. The same-parent case (`A = B`, equal depth by construction) is
+skipped between front cells for the same reason — a convex body's front cells' hulls tile
+its shadow with disjoint interiors, so front never occludes front — but front-over-back
+is a real occlusion within one tesseract; see "Backfaces" below.
 
 ## Lemma 3 (chord order = parent-center order)
 
@@ -144,6 +146,44 @@ boundaries (silhouettes), fibers through the 2-skeleton, edge-on cells (`v·n = 
 into the same epsilon regime that the cut arithmetic already handles with `AOP.ERR`
 snapping; they can misclassify only sets of zero projected area.
 
+## Backfaces (`cullBackFaces = false`)
+
+With culling off the renderer also draws the camera-averted boundary cells (`v·n > 0`) —
+all of which are *hidden* surface in the sense above (they are chord **exit** points; the
+same fiber enters `S` strictly nearer). Since 2026-08 the sweep removes them exactly, via
+one extension: **at equal depth, a front cell cuts the back cells of its own parent
+tesseract** (`OccludePieceCells`; `SortFarToNear` orders averted cells before facing ones
+within an equal-depth group so the back cell is already enqueued as occludee when its
+front sibling arrives). Parent identity is decided in exact integer arithmetic
+(`SameParentTesseract`), never by depth comparison.
+
+*Soundness:* a point cut by the new rule lies (strictly, generically) inside a front hull
+of its own parent `B` — the fiber enters `B` strictly before `P` (entry < exit on every
+fiber of a convex body), so `P` is hidden. Cuts of back-cell points by *other* parents'
+front cells are the old Lemma 3 argument (the occluder's whole chord precedes `B`'s chord,
+and `v·P` is now the exit rather than the entry — even later). Front cells are never cut
+by the new rule (it requires an averted occludee), so the front surface is untouched.
+
+*Completeness:* let `P` be a rendered back-cell point (parent `B`), generic fiber. The
+fiber enters `S̄` first at some `r` on a front-facing boundary cell `c` (parent `C`) with
+`v·r ≤ entry_B < exit_B = v·P` and `π(P) ∈ int hull(c)`. If `C = B`, `c` is a front cell
+of `P`'s own parent — the new same-parent rule cuts `P`. If `C ≠ B`, `C`'s chord starts at
+or before `B`'s entry and chords are disjoint, so `C`'s chord precedes `B`'s and Lemma 3
+gives `depth(c) < depth(c_B)` — the ordinary sweep cuts `P`. (Note the case split is
+exactly why the rule is needed: the nearer-parent argument covers every hidden back-cell
+point *except* those whose entering cell belongs to the same tesseract — e.g. all of them,
+for a single-tesseract piece.) Equal-depth back-back and front-front pairs of one parent
+are shadow-disjoint tilings of the same shadow (projection restricted to the front resp.
+back surface of a convex body is injective), so skipping them stays exact. ∎
+
+Hence with occlusion ON the rendered result is the same visible surface **regardless of
+`cullBackFaces`** — backfaces are simply removed by cutting instead of never being built
+(verified per sweep in `Scene4dBackfaceRemovalTests`). Two practical notes: the mixed
+mode does strictly more work for the same picture (it builds, cuts and discards every
+back cell), and averted cells enqueued as *occluders* are silent no-ops (their
+`DefiningHalfSpaces` windings invert under the orientation-reversing projection, leaving
+an empty hull test — harmless, since their front siblings cover the same shadow).
+
 ## Corollaries and scope
 
 - **Multi-piece scenes** are covered as long as all pieces sit interior-disjoint on one
@@ -155,11 +195,12 @@ snapping; they can misclassify only sets of zero projected area.
 - **`Scene3d`** is the same statement one dimension down (unit cubes in ℝ³, boundary
   2-cells, `K = [0,1]³`): every proof step is dimension-agnostic. Its depth key uses the
   parent cube center accordingly.
+- **`cullBackFaces = false` combined with occlusion** is covered by the "Backfaces"
+  section above (2026-08; it used to be out of scope, which is why the game once coupled
+  the two toggles).
 - **Not covered:** non-lattice poses (freely rotated bodies — the Geometry2/Geometry3d
-  pairwise pipelines have their own ordering arguments), perspective cameras
-  (`Camera4dCentral`: fibers are not parallel), and `cullBackFaces = false` combined with
-  occlusion (back faces are exit points, for which the entry-depth argument does not
-  apply; the engine never uses that combination — the drag ghost runs without occlusion).
+  pairwise pipelines have their own ordering arguments) and perspective cameras
+  (`Camera4dCentral`: fibers are not parallel).
 
 ## Implementation map
 
@@ -168,6 +209,7 @@ snapping; they can misclassify only sets of zero projected area.
 | Occluder completeness (every front-facing boundary cell) | `Piece.boundaryCells`; `Scene4d.ComputeOccluders`, `Scene4d.BuildPieceCells` role (b) |
 | Parent-center depth key | `Scene4d.Depth`, `Scene3d.Depth` (`Center() − ½·Normal()`) |
 | Equal-depth skip = Lemma 2 | `Scene4d.OccludePieceCells` (`depth != occ.depth`), `Scene3d.ApplyCameraOcclusion` |
+| Same-parent front-over-back ("Backfaces") | `Scene4d.OccludePieceCells` + `SameParentTesseract`; averted-first tiebreak in `Scene4d.SortFarToNear` (Scene4d only — `Scene3d` still culls unconditionally) |
 | Cut volume = projected hull | `Scene4d.DefiningHalfSpaces`, `Scene3d.DefiningHalfSpaces2d` |
 | Fibers along `viewNormal` | `Camera4dParallel` (`v[i]·v[3] = 0` for `SetCavalier`/`SetIsometric`) |
 | Empirical guards | `Scene4dParityTests`, `OcclusionSoundnessTests`, `Scene4dOcclusionSoundnessTests` (both pipelines checked against the pipeline-independent under-cut invariant, with the parent-center key) |

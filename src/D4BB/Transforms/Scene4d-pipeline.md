@@ -111,53 +111,41 @@ cells, cheap relative to IBC. On top of that, the drag re-occludes only the *ove
 `ReoccludePiece`) instead of all of them (#2) — so a snap touches just the dragged piece and whatever it
 overlaps.
 
-## `cullBackFaces` × `enable4dOcclusion`: the mixed mode is out of contract
+## `cullBackFaces` × `enable4dOcclusion`: all four combinations are in contract (2026-08)
 
-Only `cullBackFaces=true` is covered by the correctness suites (`Scene4dParityTests`,
-`Scene4dOcclusionSoundnessTests`, `Scene4dMultiPieceSoundnessTests`, `Scene4dIncrementalTests` pin it;
-`MarkStampingTests` runs culling-off but asserts only mark stamping), and the scalar-depth-sort proof
-(`OCCLUSION-PROOF.md`) is a statement about *front* surfaces of solids. **Occlusion ON + culling OFF**
-is not a supported view: the game layer forbids it outright — `Game.SetOcclusion4d` /
-`Game.SetBackfaceCulling` are the single enforcement point of the invariant "occlusion ⇒ culling"
-(occlusion ON drags culling ON, culling OFF drags occlusion OFF), and both the GameMenu toggles and the
-dev controller keys go through them. The mixed state remains constructible on a raw `Scene4d`
-(tests, e.g. `MarkStampingTests`, do). Findings of the 2026-08-03 analysis of that mode:
+Since the **same-parent front-over-back rule** (2026-08) every flag combination is well-defined and
+artifact-free; the game layer's former "occlusion ⇒ culling" invariant in `Game.SetOcclusion4d` /
+`Game.SetBackfaceCulling` is gone and the two GameMenu toggles are independent again. The rule: at
+equal parent depth, `OccludePieceCells` lets a front cell cut the back cells of its **own parent
+tesseract** (`SameParentTesseract`, exact integer identity; `SortFarToNear` orders averted cells first
+within an equal-depth group so the back cell is already enqueued when its front sibling arrives).
+Distinct-parent equal-depth pairs are still skipped (provably shadow-disjoint), and same-parent
+front-front/back-back pairs never overlap (each surface tiles the parent's shadow injectively).
+Correctness: `OCCLUSION-PROOF.md` "Backfaces"; pinned by `Scene4dBackfaceRemovalTests`.
 
-Historical note: before the depth key moved from the 3-cell center to the **parent tesseract center**
-(the change that made the scalar sort provably exact), a cell's own backface was *deeper* than its
-front cells, so a tesseract cut its own backface and the mixed mode looked clean (backfaces simply
-vanished). The parent-center key gives front and back cells of one tesseract equal depth, the
-equal-depth skip then keeps the backface — which is what surfaced the artifacts below.
+Consequence: **occlusion ON + culling OFF renders the same picture as culling ON** — every backface is
+hidden surface and is now fully cut away (by its own parent's front cells, or by strictly nearer
+tesseracts as before) instead of never being built. The mode just does strictly more work for the same
+result (it builds, cuts and discards every back cell), so culling stays the sensible default; to
+actually *see* backfaces, turn occlusion OFF.
 
-- **Averted occluder cells never cut** (silent no-op). `DefiningHalfSpaces` derives its halfspace
-  normals from `ClockwiseFromOutsideVertices2d` windings; the 4D→3D projection restricted to a cell's
-  hyperplane is orientation-*reversing* exactly for camera-averted cells, so their six halfspace normals
-  all point inward and the hull-intersection test is empty. Verified empirically: a front-facing cell's
-  own projected center passes `StrictlyInside` of its own hull 4/4, an averted cell's 0/4. This
-  contradicts the role-(b) comment in `BuildPieceCells` ("with culling off, every boundary cell
-  [occludes]") — but it is geometrically **masked for complete pieces**: a solid's front cells alone
-  cover its full silhouette, so nothing that should be cut escapes. An under-/over-cut census
-  (occlusion-off oracle vs. nearer-front-hull model; box3d / tunnel1d / L3 with camera sweeps,
-  multi-piece stacked/touching/overlap configs) found **zero** violations, and the incremental
-  `ReoccludePiece` path stays byte-identical to a full rebuild in this mode too.
-- **The visible weirdness is mostly the mode's semantics, not miscuts.** The equal-parent-depth skip in
-  `OccludePieceCells` (`depth != occ.depth`) means a tesseract's own backface is *never* cut by its own
-  front cells — the skip is the correctness guard derived from the depth-order theorem (which orders
-  *distinct* solids and says nothing about a solid vs. itself; equal-depth distinct solids are provably
-  shadow-disjoint), and with culling off it is what makes backfaces visible at all. But sibling
-  tesseracts of the same piece (and other pieces) have *different* parent depths, so their front-cell
-  hulls — unit-cell-sized, grid-aligned, shear-offset parallelepipeds — **do** carve their occlusion
-  holes into a visible backface. On a flat multi-tesseract back wall this yields regular grid-patterned
-  jagged cuts that *look like* the piece's interior grid cells were doing the cutting. They are not:
-  interior shared 3-cells are cancelled in `IntegerBoundaryComplex.ConnectCell` (both oriented copies
-  are removed — `OrientedIntegerCell` hashes orientation-insensitively, so the two copies match) and
-  never render nor occlude; the cutters are the per-tesseract *parceling* of the outer boundary.
-  Verified empirically: a single-tesseract piece loses **zero** area in this mode (all cells share one
-  parent depth → every pair skips), a two-tesseract piece loses area on exactly the far tesseract's
-  backface cells.
+Historical notes, kept because the geometry facts still hold:
+
+- Before the depth key moved to the **parent tesseract center**, a cell's own backface was *deeper*
+  than its front cells and the mixed mode looked accidentally clean. The parent-center key gave front
+  and back cells of one tesseract equal depth; the equal-depth skip then kept backfaces alive, and
+  sibling tesseracts' front-cell hulls carved grid-patterned holes into them — the 2026-08-03 artifact
+  analysis that led first to the toggle coupling, now to the same-parent rule.
+- **Averted occluder cells never cut** (silent no-op, still true). `DefiningHalfSpaces` derives its
+  halfspace normals from `ClockwiseFromOutsideVertices2d` windings; the 4D→3D projection restricted to
+  a cell's hyperplane is orientation-*reversing* exactly for camera-averted cells, so their six
+  halfspace normals all point inward and the hull-intersection test is empty. Harmless: a solid's
+  front cells alone cover its full silhouette (and now also cut its own backfaces), so nothing that
+  should be cut escapes. The 2026-08-03 under-/over-cut census found zero violations, and the
+  incremental `ReoccludePiece` path stays byte-identical to a full rebuild in this mode too.
 - **Exactly-coplanar faces are routed by an orientation test calibrated to front-wound faces**
   (`Split()`'s `isContained` branch: co-oriented with the cutter ⇒ removed). Faces owned by averted
-  cells (ownership pass 2 in `BuildPieceCells`) are deliberately back-wound — noted there as "harmless
-  to a single-sided raycast", which considered picking, not this routing — so on exactly-coplanar
-  contact planes their keep/remove decision inverts relative to a front-wound twin. Did not manifest in
-  the census configs, but is unproven in general.
+  cells (ownership pass 2 in `BuildPieceCells`) are deliberately back-wound, so on exactly-coplanar
+  contact planes their keep/remove decision inverts relative to a front-wound twin. Less load-bearing
+  now that back-owned faces are cut away entirely, and it never manifested in the census or the
+  backface-removal sweeps — but it remains unproven in general (epsilon regime).

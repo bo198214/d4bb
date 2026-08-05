@@ -238,21 +238,50 @@ namespace D4BB.Transforms
 
             // p-cells seen so far in the far→near sweep, i.e. candidates farther than the current
             // occluder. Insertion order is far→near, matching the global loop's `back` list.
-            var seen = new List<(CellBoundary cb, double depth, ScreenBounds bounds)>();
+            var seen = new List<(CellBoundary cb, Occluder sOcc)>();
             foreach (var occ in occludersFarToNear)
             {
                 HalfSpace[] hs = null;
-                foreach (var (cb, depth, bounds) in seen)
-                    if (depth != occ.depth && bounds.Overlaps(occ.bounds))
+                foreach (var (cb, sOcc) in seen)
+                {
+                    // Strictly nearer parent ⇒ always cut (Lemma 3). Equal parent depth: DISTINCT
+                    // tesseracts are shadow-disjoint (Lemma 2) ⇒ skip — with one deliberate
+                    // exception: a front cell cuts its OWN parent's back cells (a convex body's
+                    // entry point precedes its exit point on every fiber; OCCLUSION-PROOF.md
+                    // "Backfaces"). Only reachable with cullBackFaces off — with culling on every
+                    // occludee is front-facing. SortFarToNear's averted-first tiebreak guarantees
+                    // the back cell is already in `seen` when its front sibling arrives as `occ`.
+                    bool cuts = sOcc.depth != occ.depth
+                        || (occ.facing && !sOcc.facing && SameParentTesseract(occ.cell, sOcc.cell));
+                    if (cuts && sOcc.bounds.Overlaps(occ.bounds))
                     {
                         hs ??= occ.HalfSpaces(camera);
                         cb.pbc.CutOut(hs);
                     }
+                }
                 // Enqueue this occluder as an occludee only after it has cut the farther ones, so it
                 // never cuts itself. Only p's own cells become occludees here.
                 if (occ.pieceIndex == p && cellByRef.TryGetValue(occ.cell, out var pcb))
-                    seen.Add((pcb, occ.depth, occ.bounds));
+                    seen.Add((pcb, occ));
             }
+        }
+
+        // Exact integer test: do the two boundary 3-cells bound the SAME unit tesseract? The parent
+        // origin equals the cell origin except along the normal axis, where a non-inverted cell
+        // (outward normal +axis) is the parent's UPPER boundary (parent origin = origin − 1) and an
+        // inverted cell its lower one (parent origin = origin). Same parent ⇒ exactly equal Depth
+        // (see Depth's comment), so callers only need this within equal-depth pairs — a rare path,
+        // no precomputation needed.
+        private static bool SameParentTesseract(OrientedIntegerCell a, OrientedIntegerCell b)
+        {
+            int axA = a.NormalAxis(), axB = b.NormalAxis();
+            for (int i = 0; i < a.origin.Length; i++)
+            {
+                int pa = a.origin[i] - (i == axA && !a.inverted ? 1 : 0);
+                int pb = b.origin[i] - (i == axB && !b.inverted ? 1 : 0);
+                if (pa != pb) return false;
+            }
+            return true;
         }
 
         // Pure per-piece builder — returns piece `pieceIndex`'s un-occluded ("clean") cells with
@@ -458,10 +487,11 @@ namespace D4BB.Transforms
             public readonly OrientedIntegerCell cell;
             public readonly int pieceIndex;
             public readonly double depth;
+            public readonly bool facing;   // camera-facing? only false with cullBackFaces off
             public readonly ScreenBounds bounds;
             private HalfSpace[] halfSpaces;
-            public Occluder(OrientedIntegerCell cell, int pieceIndex, double depth, ScreenBounds bounds)
-            { this.cell = cell; this.pieceIndex = pieceIndex; this.depth = depth; this.bounds = bounds; }
+            public Occluder(OrientedIntegerCell cell, int pieceIndex, double depth, ScreenBounds bounds, bool facing)
+            { this.cell = cell; this.pieceIndex = pieceIndex; this.depth = depth; this.bounds = bounds; this.facing = facing; }
             public HalfSpace[] HalfSpaces(ICamera4d cam) => halfSpaces ??= DefiningHalfSpaces(cell, cam);
         }
 
@@ -492,8 +522,9 @@ namespace D4BB.Transforms
             {
                 foreach (var c3 in pieces[p].boundaryCells)
                 {
-                    if (cullBackFaces && !camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()))) continue;
-                    result.Add(new Occluder(c3, p, Depth(c3, viewNormal), ProjectedBounds(c3, camera)));
+                    bool facing = camera.IsFacedBy(new Point(c3.origin), new Point(c3.Normal()));
+                    if (cullBackFaces && !facing) continue;
+                    result.Add(new Occluder(c3, p, Depth(c3, viewNormal), ProjectedBounds(c3, camera), facing));
                 }
             }
             return result;
@@ -531,7 +562,17 @@ namespace D4BB.Transforms
         // i.e. farther from the camera) first, so each occludee is cut by everything strictly nearer.
         private static void SortFarToNear(List<Occluder> occluders)
         {
-            occluders.Sort((a, b) => b.depth.CompareTo(a.depth));
+            occluders.Sort((a, b) =>
+            {
+                int byDepth = b.depth.CompareTo(a.depth);
+                if (byDepth != 0) return byDepth;
+                // Equal parent depth: camera-AVERTED cells first (they count as farther — a convex
+                // body's back surface lies behind its front surface), so a back cell is enqueued as
+                // occludee before its front-facing same-parent sibling arrives as occluder (the
+                // same-parent cut in OccludePieceCells). A no-op with cullBackFaces on (every
+                // occluder is facing then).
+                return a.facing.CompareTo(b.facing);
+            });
         }
         // The depth key is the view depth of the cell's PARENT TESSERACT center (cell center −
         // ½·outward normal), NOT the 3-cell's own center. This is what makes the scalar sort
@@ -541,8 +582,11 @@ namespace D4BB.Transforms
         // depths wherever their shadows overlap. Cell-center depths deviate from the parent depth
         // by an orientation-dependent −½·|v·n| and can order two cells AGAINST their parents'
         // true occlusion order when the parent depths differ by less than the deviation gap.
-        // Ties (equal parent depth) are provably shadow-disjoint (proof, Lemma 2), which is why
-        // OccludePieceCells' equal-depth skip is exact — it also covers the same-parent case.
+        // Ties (equal parent depth) between DISTINCT tesseracts are provably shadow-disjoint
+        // (proof, Lemma 2), which is why OccludePieceCells' equal-depth skip is exact for them.
+        // Same-parent pairs (equal depth by construction — the parent center is the same exact
+        // double sum) get one deliberate exception there: a front cell cuts its own parent's back
+        // cells, which is what removes backfaces when cullBackFaces is off (proof, "Backfaces").
         private static double Depth(OrientedIntegerCell cell, double[] viewNormal)
         {
             var c = cell.Center();
