@@ -159,6 +159,52 @@ public class GameTests
     }
 
     [Test]
+    public void Objective_EnvelopeIsWrittenAsPaddings()
+    {
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
+
+        // The envelope is exported as paddings_lower_upper, never as boundary_min_max...
+        var padded = new Objective("p", goal, pieces, 2);
+        Assert.That(padded.ToJson(), Does.Contain("paddings_lower_upper"));
+        Assert.That(padded.ToJson(), Does.Not.Contain("boundary_min_max"));
+        Assert.That(Objective.FromJson(padded.ToJson()).boundary_min_max,
+                    Is.EqualTo(padded.boundary_min_max));
+
+        // ...also when it was authored as an explicit boundary_min_max that no padding
+        // combination of the scalar form could produce (asymmetric, and cutting into the
+        // bounding box on +x, i.e. a negative padding).
+        var bmm = new int[][] { new int[] { -3,-1,0,0 }, new int[] { 1,5,2,4 } };
+        var explicitBox = new Objective("b", goal, pieces, bmm);
+        Assert.That(explicitBox.ToJson(), Does.Not.Contain("boundary_min_max"));
+        Assert.That(Objective.FromJson(explicitBox.ToJson()).boundary_min_max, Is.EqualTo(bmm));
+    }
+
+    [Test]
+    public void Objective_MetadataJsonRoundTrip()
+    {
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
+
+        // Absent metadata stays absent on round-trip (no empty "description"/"author" noise).
+        var bare = new Objective("bare", goal, pieces);
+        Assert.That(bare.ToJson(), Does.Not.Contain("description"));
+        Assert.That(bare.ToJson(), Does.Not.Contain("author"));
+        Assert.That(Objective.FromJson(bare.ToJson()).description, Is.Null);
+        Assert.That(Objective.FromJson(bare.ToJson()).author, Is.Null);
+
+        // Present metadata is emitted and parsed back.
+        var meta = new Objective("meta", goal, pieces)
+        {
+            description = "Slide the <b>bar</b> home.",
+            author = "bo",
+        };
+        var round = Objective.FromJson(meta.ToJson());
+        Assert.That(round.description, Is.EqualTo("Slide the <b>bar</b> home."));
+        Assert.That(round.author, Is.EqualTo("bo"));
+    }
+
+    [Test]
     public void GameLevel_CombineAndReach()
     {
         // Two single cells, goal is their union

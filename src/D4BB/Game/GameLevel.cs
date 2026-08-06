@@ -142,7 +142,9 @@ namespace D4BB.Game
         {
             return new Objective(Objective.name, goal, PieceOrigins, Objective.boundary_min_max)
             {
-                mode = Objective.mode
+                mode = Objective.mode,
+                description = Objective.description,
+                author = Objective.author,
             };
         }
 

@@ -21,6 +21,11 @@ namespace D4BB.Game
     public class Objective
     {
         public string name;
+        // Optional metadata (null when the level JSON has none). The description is player-facing:
+        // the game shows it as a briefing page before the level starts (Unity rich-text, like the
+        // tutorial pages). Both round-trip through ToJson/FromJson so a re-exported level keeps them.
+        public string description;
+        public string author;
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
@@ -40,16 +45,23 @@ namespace D4BB.Game
             return FromJson(File.ReadAllText(filePath));
         }
         // Serialize back to the same JSON shape FromJson reads (name / goal / pieces /
-        // boundary_min_max). boundary_min_max is written explicitly rather than padding, so the
-        // round-trip is exact regardless of how this Objective was originally constructed.
+        // paddings_lower_upper). The envelope is written as paddings_lower_upper — the form the
+        // hand-written level files use — rather than the absolute boundary_min_max or the scalar
+        // padding, so an exported level stays readable and keeps following its pieces if they are
+        // later edited. The round-trip is still exact regardless of how this Objective was
+        // constructed: PaddingsLowerUpper() is the exact inverse of BoundaryMinMax(paddings).
         // InlineIntArrayConverter keeps each coordinate tuple on one line ([0, 0, 0, 0]) while the
         // surrounding structure stays indented — matches the hand-written level files.
         public string ToJson() {
             var data = new ObjectiveData {
                 Name = name,
+                // Absent and empty collapse to "not emitted" (NullValueHandling.Ignore below), so
+                // metadata-free level files stay free of the fields on round-trip.
+                Description = string.IsNullOrEmpty(description) ? null : description,
+                Author = string.IsNullOrEmpty(author) ? null : author,
                 Goal = goal,
                 Pieces = pieces,
-                BoundaryMinMax = boundary_min_max,
+                PaddingsLowerUpper = PaddingsLowerUpper(),
                 // Only emit "mode" when it deviates from the Shape default, keeping
                 // shape-mode level files free of a redundant field on round-trip.
                 Mode = mode == GoalMode.Shape ? null : "absolute",
@@ -87,6 +99,8 @@ namespace D4BB.Game
             else
                 obj = new Objective(data.Name, data.Goal, data.Pieces);
             obj.mode = ParseMode(data.Mode);
+            obj.description = data.Description;
+            obj.author = data.Author;
             return obj;
         }
 
@@ -101,18 +115,24 @@ namespace D4BB.Game
         private class ObjectiveData {
             [JsonProperty("name")]
             public string Name { get; set; }
+            [JsonProperty("description")]
+            public string Description { get; set; }
+            [JsonProperty("author")]
+            public string Author { get; set; }
             [JsonProperty("goal")]
             public int[][] Goal { get; set; }
             [JsonProperty("pieces")]
             public int[][][] Pieces { get; set; }
+            // Declaration order is emission order: paddings_lower_upper (the only envelope form
+            // ToJson writes) sits right after "pieces", matching the hand-written level files.
+            [JsonProperty("paddings_lower_upper")]
+            public int[][] PaddingsLowerUpper { get; set; }
             [JsonProperty("boundary_min_max")]
             public int[][] BoundaryMinMax { get; set; }
             [JsonProperty("mode")]
             public string Mode { get; set; }
             [JsonProperty("padding")]
             public int? Padding { get; set; }
-            [JsonProperty("paddings_lower_upper")]
-            public int[][] PaddingsLowerUpper { get; set; }
         }
 
         // Spatial dimension of the puzzle, inferred from the piece coordinates (4 for the
@@ -136,6 +156,24 @@ namespace D4BB.Game
                     }
                 }
                 res[1][k] += 1;
+            }
+            return res;
+        }
+        // Inverse of BoundaryMinMax(pieces, goal, paddingsLowerUpper): the per-axis, per-side
+        // distance between this Objective's envelope and the tight bounding box of pieces+goal.
+        // Exact by construction — BoundingBox() already carries the +1 half-open offset on the
+        // upper side, the same one BoundaryMinMax adds — so feeding the result back through
+        // BoundaryMinMax reproduces boundary_min_max bit for bit. Values may be negative if the
+        // envelope cuts into the bounding box (an explicitly authored boundary_min_max can do
+        // that); the round-trip stays exact, since the padding form has no sign restriction.
+        public int[][] PaddingsLowerUpper()
+        {
+            var bb = BoundingBox();
+            int dim = bb[0].Length;
+            var res = new int[2][] { new int[dim], new int[dim] };
+            for (int k = 0; k < dim; k++) {
+                res[0][k] = bb[0][k] - boundary_min_max[0][k];
+                res[1][k] = boundary_min_max[1][k] - bb[1][k];
             }
             return res;
         }
