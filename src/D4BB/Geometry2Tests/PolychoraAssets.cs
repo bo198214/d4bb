@@ -12,12 +12,15 @@ namespace D4BB.Geometry2Tests {
     public static class PolychoraAssets {
 
         static readonly string[] CandidateDirs = {
-            Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "Resources", "polychora"),
+            // The uniform polychora (pen/tes/ico/…). Deliberately OUTSIDE Resources since the
+            // PolychoronCatalog bake — nothing parses them at runtime, they are bake input only.
+            Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "PolychoraJson"),
             // Nonconvex complexes (L piece, excavated polychora) — Complex-mode assets.
             Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "Resources", "complexes"),
             // Surface knots (pure 2-complexes, e.g. klein-bottle.json) live with the demo.
             Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "surface-knots"),
             // Legacy probe paths, kept for older checkouts/layouts.
+            Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "Resources", "polychora"),
             Path.Combine("Assets", "_Tesserian", "Common", "Resources", "polychora"),
             Path.Combine("Assets", "tesserian", "Resources", "polychora"),
         };

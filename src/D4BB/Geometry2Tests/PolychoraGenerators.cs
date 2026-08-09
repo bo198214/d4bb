@@ -27,6 +27,10 @@ namespace D4BB.Geometry2Tests {
             string outPath = null;
             while (dir != null && outPath == null) {
                 foreach (var rel in new[] {
+                        // Where the generated L.json actually lives: the nonconvex Complex-mode
+                        // assets, which — unlike the uniform polychora — stay inside Resources.
+                        Path.Combine("Assets", "_Tesserian", "RotatingPolychoron", "Resources", "complexes"),
+                        // Legacy layouts.
                         Path.Combine("Assets", "_Tesserian", "Common", "Resources", "polychora"),
                         Path.Combine("Assets", "tesserian", "Resources", "polychora") }) {
                     var candidate = Path.Combine(dir.FullName, rel);
