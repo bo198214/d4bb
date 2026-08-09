@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using D4BB.Comb;
 using D4BB.Transforms;
@@ -202,6 +203,29 @@ public class GameTests
         var round = Objective.FromJson(meta.ToJson());
         Assert.That(round.description, Is.EqualTo("Slide the <b>bar</b> home."));
         Assert.That(round.author, Is.EqualTo("bo"));
+    }
+
+    [Test]
+    public void Objective_PointsJsonRoundTrip()
+    {
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
+
+        // The default weight 1 stays absent on round-trip (same policy as "mode"): unrated level
+        // files carry no "points" field.
+        var unrated = new Objective("u", goal, pieces);
+        Assert.That(unrated.points, Is.EqualTo(1));
+        Assert.That(unrated.ToJson(), Does.Not.Contain("points"));
+        Assert.That(Objective.FromJson(unrated.ToJson()).points, Is.EqualTo(1));
+
+        // A non-default weight is emitted and parsed back.
+        var weighted = new Objective("w", goal, pieces) { points = 3 };
+        Assert.That(weighted.ToJson(), Does.Contain("\"points\": 3"));
+        Assert.That(Objective.FromJson(weighted.ToJson()).points, Is.EqualTo(3));
+
+        // A zero/negative weight would corrupt the point-based progression — fail fast on parse.
+        Assert.Throws<ArgumentException>(() =>
+            Objective.FromJson(weighted.ToJson().Replace("\"points\": 3", "\"points\": 0")));
     }
 
     [Test]

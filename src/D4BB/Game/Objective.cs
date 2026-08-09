@@ -26,6 +26,11 @@ namespace D4BB.Game
         // tutorial pages). Both round-trip through ToJson/FromJson so a re-exported level keeps them.
         public string description;
         public string author;
+        // The level's score weight in the game's progression (points earned by solving it; the
+        // currency that unlocks chapters and Polychoron Watch exhibits). Default 1 = "unrated
+        // easy" — level files without the field are worth one point, so the field is optional
+        // metadata like description/author and generators only emit it for harder levels.
+        public int points = 1;
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
@@ -59,6 +64,9 @@ namespace D4BB.Game
                 // metadata-free level files stay free of the fields on round-trip.
                 Description = string.IsNullOrEmpty(description) ? null : description,
                 Author = string.IsNullOrEmpty(author) ? null : author,
+                // Only emit "points" when it deviates from the default 1, keeping unrated level
+                // files free of the field on round-trip (same policy as "mode").
+                Points = points == 1 ? (int?)null : points,
                 Goal = goal,
                 Pieces = pieces,
                 PaddingsLowerUpper = PaddingsLowerUpper(),
@@ -101,6 +109,12 @@ namespace D4BB.Game
             obj.mode = ParseMode(data.Mode);
             obj.description = data.Description;
             obj.author = data.Author;
+            // A zero/negative weight would silently corrupt the point-based progression
+            // (unlock thresholds are sums of these) — loud, per fail fast.
+            if (data.Points.HasValue && data.Points.Value < 1)
+                throw new ArgumentException(
+                    $"Level '{data.Name}': \"points\" must be >= 1 (got {data.Points.Value}).");
+            obj.points = data.Points ?? 1;
             return obj;
         }
 
@@ -119,6 +133,8 @@ namespace D4BB.Game
             public string Description { get; set; }
             [JsonProperty("author")]
             public string Author { get; set; }
+            [JsonProperty("points")]
+            public int? Points { get; set; }
             [JsonProperty("goal")]
             public int[][] Goal { get; set; }
             [JsonProperty("pieces")]
