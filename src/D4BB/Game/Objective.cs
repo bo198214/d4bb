@@ -31,6 +31,11 @@ namespace D4BB.Game
         // easy" — level files without the field are worth one point, so the field is optional
         // metadata like description/author and generators only emit it for harder levels.
         public int points = 1;
+        // The level's default 3D display scale: the 4D→3D projection zoom (Camera4dParallel.zoom3d)
+        // the level starts at (and "Reset Zoom" returns to). Default 1 = one grid unit per world
+        // unit, so the field is optional metadata like points — level files without it stay free of
+        // it. Purely a display hint; the geometry itself is untouched.
+        public double scale = 1;
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
@@ -67,6 +72,8 @@ namespace D4BB.Game
                 // Only emit "points" when it deviates from the default 1, keeping unrated level
                 // files free of the field on round-trip (same policy as "mode").
                 Points = points == 1 ? (int?)null : points,
+                // Same only-when-non-default policy as "points".
+                Scale = scale == 1 ? (double?)null : scale,
                 Goal = goal,
                 Pieces = pieces,
                 PaddingsLowerUpper = PaddingsLowerUpper(),
@@ -115,6 +122,11 @@ namespace D4BB.Game
                 throw new ArgumentException(
                     $"Level '{data.Name}': \"points\" must be >= 1 (got {data.Points.Value}).");
             obj.points = data.Points ?? 1;
+            // A non-positive scale would render the level invisible or mirrored — loud, per fail fast.
+            if (data.Scale.HasValue && data.Scale.Value <= 0)
+                throw new ArgumentException(
+                    $"Level '{data.Name}': \"scale\" must be > 0 (got {data.Scale.Value}).");
+            obj.scale = data.Scale ?? 1;
             return obj;
         }
 
@@ -135,6 +147,8 @@ namespace D4BB.Game
             public string Author { get; set; }
             [JsonProperty("points")]
             public int? Points { get; set; }
+            [JsonProperty("scale")]
+            public double? Scale { get; set; }
             [JsonProperty("goal")]
             public int[][] Goal { get; set; }
             [JsonProperty("pieces")]

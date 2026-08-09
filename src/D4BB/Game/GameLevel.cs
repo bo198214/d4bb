@@ -145,6 +145,8 @@ namespace D4BB.Game
                 mode = Objective.mode,
                 description = Objective.description,
                 author = Objective.author,
+                points = Objective.points,
+                scale = Objective.scale,
             };
         }
 
