@@ -224,10 +224,13 @@ namespace D4BB.Game
                     }
                 }
                 // Cavalier world_z = z + pz·w (pz > 0): the viewer-facing surface of
-                // the play volume sits at (min z, min w). Front-padding on the depth
-                // axes (2 and up) would let pieces drift into the viewer; we only pad
-                // the far side. Axes 0/1 (the projection plane) are padded both sides.
-                if (k < 2) res[0][k] -= padding;
+                // the play volume sits at (min z, min w). Padding the depth axes (2 and
+                // up) on the near side lets pieces drift towards the viewer, so those get
+                // a fixed one-cell margin regardless of `padding`, while axes 0/1 (the
+                // projection plane) take the full padding on both sides. The far side is
+                // always padded in full. For per-axis, per-side control (incl. a zero or
+                // negative near margin) use the paddings_lower_upper form instead.
+                res[0][k] -= k < 2 ? padding : 1;
                 res[1][k] += 1+padding;
             }
             return res;
