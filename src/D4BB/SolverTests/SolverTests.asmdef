@@ -1,0 +1,15 @@
+{
+    "name": "SolverTests",
+    "references": [ "General", "Comb", "Geometry", "Transforms", "Game", "Solver" ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "autoReferenced": false
+}

@@ -1,0 +1,5 @@
+{
+	"name": "Solver",
+	"references": [ "Comb", "General", "Geometry", "Transforms", "Game" ],
+	"includePlatforms": [ "Editor" ]
+}
