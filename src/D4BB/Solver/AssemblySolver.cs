@@ -198,9 +198,13 @@ namespace D4BB.Solver
             }
             if (piecesAreConnected && !RegionsFeasible()) return;
 
-            // Fill the lowest uncovered cell. Every tiling must cover it, so branching only over
-            // placements that do cover it is complete AND kills all permutation duplicates.
-            int c = LowestUncovered();
+            // Fill the most constrained uncovered cell (Knuth's S heuristic). Every tiling must
+            // cover whichever cell we pick, so branching only over placements that do cover it is
+            // complete AND kills all permutation duplicates; picking the cell with the fewest
+            // candidates keeps the tree narrow. The count also prunes for free — and unlike
+            // RegionsFeasible this prune is sound for disconnected pieces.
+            int c = MostConstrainedUncovered();
+            if (c < 0) return;   // some uncovered cell has no candidate placement left
             for (int p = 0; p < pieces.Length; p++)
             {
                 if (used[p] || IsRedundantDuplicate(p)) continue;
@@ -433,6 +437,33 @@ namespace D4BB.Solver
         {
             for (int i = 0; i < nCells; i++) if (!GetBit(covered, i)) return i;
             return -1;
+        }
+
+        /// <summary>
+        /// The uncovered goal cell with the fewest placements still able to cover it, or -1 when
+        /// some uncovered cell has none at all (a dead branch). Counting stops as soon as a cell
+        /// ties the best so far, so the counts are only exact where it matters — the argmin and
+        /// the zero.
+        /// </summary>
+        int MostConstrainedUncovered()
+        {
+            int best = -1, bestCount = int.MaxValue;
+            for (int cell = 0; cell < nCells; cell++)
+            {
+                if (GetBit(covered, cell)) continue;
+                int count = 0;
+                for (int p = 0; p < pieces.Length && count < bestCount; p++)
+                {
+                    if (used[p] || IsRedundantDuplicate(p)) continue;
+                    var list = byCell[p][cell];
+                    for (int j = 0; j < list.Count && count < bestCount; j++)
+                        if (!Intersects(masks[p][list[j]])) count++;
+                }
+                if (count == 0) return -1;
+                if (count < bestCount) { bestCount = count; best = cell; }
+                if (bestCount == 1) break;
+            }
+            return best;
         }
         /// <summary>sums |= sums &lt;&lt; shift — the subset-sum DP step.</summary>
         static void ShiftOrInto(ulong[] sums, int shift)

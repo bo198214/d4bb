@@ -95,6 +95,30 @@ confirms; its "not found" says nothing about the level. In shape mode the compou
 anywhere, so each tiling is tried in every proper global rotation, shifted as close to where the
 pieces already are as the envelope allows, and the nearest few are searched.
 
+## Two traps this hit already
+
+Both were caught only because a result looked implausible — worth knowing before touching this code.
+
+**Pieces are not necessarily face-connected.** The exact cover's region prune ("every connected
+component of the uncovered region must be a subset sum of the remaining piece sizes") is false for a
+disconnected piece, which can fill parts of two components at once. There are levels built on
+exactly that (one is named *"2 congruent pieces, consisting of 4 separate parts"*). Applying the
+prune unconditionally cut valid branches; the search then completed empty and reported it as a
+*proof* of unsolvability — for **114 perfectly solvable levels**. The prune is now gated on a
+per-level connectivity check (`piecesAreConnected`), and the cell-selection prune that replaced most
+of its value (a cell no remaining placement can cover) is sound either way. Regression:
+`Assembly_HandlesDisconnectedPieces`.
+
+**`,` has two jobs in the notation.** It separates moves *and* the coordinates inside a pivot
+(`@3,0,0,0`). Splitting a move list on commas tears every generated rotation into four unparsable
+fragments — 80 freshly written, freshly verified solution files were unreadable on the next run.
+The list is tokenised now, and a pivot is capped at 3–4 coordinates so a comma-separated list stays
+unambiguous. Regressions: `Notation_PivotCommasAreNotMoveSeparators`,
+`SolutionFile_SurvivesTheRoundTripItIsWrittenFor`.
+
+The shared moral: the *reasoned* verdicts are the fragile ones. Nothing false ever reached the
+"solved" side, because that side never reasons — it replays.
+
 ## Running it
 
 ```
