@@ -78,6 +78,11 @@ namespace D4BB.Game
                 ? new IntegerCenter(pivotOrigin)
                 : new IntegerCenter(c.origins, asCubes: true);
 
+            // Unless the level allows "quantum rotation", the SWEPT quarter turn must be
+            // collision-free too (step 4) — that check needs the pre-rotation origins, so
+            // they are captured before the move mutates them.
+            int[][] preOrigins = Objective.quantumRotation ? null : IntegerOps.Clone(c.origins);
+
             // 1. Apply rotation (origins + topology) via the unified Piece move.
             c.Rotate(v, w, pivot);
 
@@ -97,7 +102,22 @@ namespace D4BB.Game
                 return false;
             }
 
-            // 4. Success: Commit and notify
+            // 4. Swept collisions: the motion between start and (already validated) end pose.
+            // Runs last so the end-pose reasons above keep precedence.
+            if (preOrigins != null)
+            {
+                var sweptBlock = RotationSweep.Check(preOrigins, v, w, pivot,
+                    pieces.Where(p => p != c).SelectMany(p => p.origins),
+                    Objective.boundary_min_max);
+                if (sweptBlock != MoveBlockReason.None)
+                {
+                    c.Rotate(w, v, pivot);
+                    LastBlockReason = sweptBlock;
+                    return false;
+                }
+            }
+
+            // 5. Success: Commit and notify
             LastBlockReason = MoveBlockReason.None;
             PropagateStatus();
             OnRotate?.Invoke(idx, v, w, pivotOrigin);
@@ -147,6 +167,7 @@ namespace D4BB.Game
                 author = Objective.author,
                 points = Objective.points,
                 scale = Objective.scale,
+                quantumRotation = Objective.quantumRotation,
             };
         }
 

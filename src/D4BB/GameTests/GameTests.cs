@@ -302,12 +302,16 @@ public class GameTests
     {
         var obj = new Objective("test",
             new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } },
-            new int[][][] { 
+            new int[][][] {
                 new int[][] { new int[] { 0,0,0,0 } },
                 new int[][] { new int[] { 2,0,0,0 } }
             });
+        // This test is about events firing, not rotation legality — the in-place turn of
+        // piece 1 sweeps through piece 0's side-neighbor cell and would be (correctly)
+        // blocked under the default swept-rotation rules (see RotationSweepTests).
+        obj.quantumRotation = true;
         var level = new GameLevel(obj);
-        
+
         bool translateFired = false;
         bool rotateFired = false;
         bool combineFired = false;

@@ -36,6 +36,12 @@ namespace D4BB.Game
         // unit, so the field is optional metadata like points — level files without it stay free of
         // it. Purely a display hint; the geometry itself is untouched.
         public double scale = 1;
+        // Whether "quantum rotation" is allowed: with true, a 90° rotation is legal whenever
+        // its END pose is free, even if the swept quarter turn would pass through other
+        // pieces or leave the boundary (tunneling — the pre-2026-08 behavior). Default false:
+        // the whole swept motion must be collision-free (see RotationSweep for the exact
+        // semantics). Level JSON: "quantum_rotation": true — only emitted when set, like "mode".
+        public bool quantumRotation = false;
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
@@ -80,6 +86,8 @@ namespace D4BB.Game
                 // Only emit "mode" when it deviates from the Shape default, keeping
                 // shape-mode level files free of a redundant field on round-trip.
                 Mode = mode == GoalMode.Shape ? null : "absolute",
+                // Same only-when-non-default policy: absent means false (swept rotations).
+                QuantumRotation = quantumRotation ? (bool?)true : null,
             };
             return JsonConvert.SerializeObject(data, new JsonSerializerSettings {
                 Formatting = Formatting.Indented,
@@ -127,6 +135,7 @@ namespace D4BB.Game
                 throw new ArgumentException(
                     $"Level '{data.Name}': \"scale\" must be > 0 (got {data.Scale.Value}).");
             obj.scale = data.Scale ?? 1;
+            obj.quantumRotation = data.QuantumRotation ?? false;
             return obj;
         }
 
@@ -161,6 +170,8 @@ namespace D4BB.Game
             public int[][] BoundaryMinMax { get; set; }
             [JsonProperty("mode")]
             public string Mode { get; set; }
+            [JsonProperty("quantum_rotation")]
+            public bool? QuantumRotation { get; set; }
             [JsonProperty("padding")]
             public int? Padding { get; set; }
         }
