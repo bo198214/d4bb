@@ -79,8 +79,9 @@ namespace D4BB.Game
                 : new IntegerCenter(c.origins, asCubes: true);
 
             // Unless the level allows "quantum rotation", the SWEPT quarter turn must be
-            // collision-free too (step 4) — that check needs the pre-rotation origins, so
-            // they are captured before the move mutates them.
+            // collision-free too (step 4; inscribed-disk semantics — face grazing is legal,
+            // see RotationSweep) — that check needs the pre-rotation origins, so they are
+            // captured before the move mutates them.
             int[][] preOrigins = Objective.quantumRotation ? null : IntegerOps.Clone(c.origins);
 
             // 1. Apply rotation (origins + topology) via the unified Piece move.

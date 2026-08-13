@@ -20,7 +20,9 @@ solvable exactly when a player could solve it:
 - 90° turns in any coordinate plane about the centre of **any of the piece's own cells** (the game's
   pivot is the cube under the grabbed facet, so every cell is a legal pivot),
 - no piece overlap, nothing outside `boundary_min_max`, and — unless the level sets
-  `quantum_rotation` — no collision *during* the swept quarter turn (`RotationSweep`),
+  `quantum_rotation` — no collision *during* the swept quarter turn (`RotationSweep`; the moving
+  body is each cell's inscribed disk, so mere face contact with a neighbor or wall tolerates the
+  turn while genuine pass-throughs block),
 - `shape` mode: the pieces must end as **one compound** (combine merges only across shared 3-cells)
   congruent to the goal under a proper rotation; `absolute` mode: the union must be exactly the
   goal cells.

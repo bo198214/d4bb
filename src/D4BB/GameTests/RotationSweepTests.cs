@@ -11,18 +11,16 @@ public class RotationSweepTests
     // were derived by hand from the sweep geometry (see the RotationSweep class doc).
 
     [Test]
-    public void Footprint_InPlaceRotation_IsSelfPlusSideNeighbors()
+    public void Footprint_InPlaceRotation_IsJustTheCellItself()
     {
-        // Square centered on the pivot (origin twice-offset (−1,−1)): during the turn the
-        // corners (radius √2/2) bulge across all four edges into the side neighbors, while
-        // the diagonal neighbors are only grazed (their nearest corner sits at exactly √2/2).
+        // Square centered on the pivot (origin twice-offset (−1,−1)): the inscribed disk
+        // spins in place — its distance to all four side neighbors is exactly ½ (legal open
+        // contact) for the whole turn. The corner lenses that bulge √2/2 − 1/2 into the side
+        // neighbors are forgiven by design; under the retired full-square sweep this
+        // footprint additionally contained all four side neighbors, making any face contact
+        // in the rotation plane block even an in-place turn.
         var fp = RotationSweep.Footprint2d(-1, -1);
-        var expected = new[] {
-            (-1, -1),          // itself (start == end pose)
-            (1, -1), (-3, -1), // right, left
-            (-1, 1), (-1, -3), // top, bottom
-        };
-        Assert.That(fp, Is.EquivalentTo(expected));
+        Assert.That(fp, Is.EquivalentTo(new[] { (-1, -1) }));
     }
 
     [Test]
@@ -30,16 +28,23 @@ public class RotationSweepTests
     {
         // Pivot = center of the cell diagonally below-left of the rotating square
         // (origin twice-offset (1,1), i.e. the square is [1/2,3/2]² relative to the pivot),
-        // rotating CCW. Hand-derived footprint:
+        // rotating CCW: the center orbits at radius √2 from 45° to 135°, carrying the
+        // ½-disk. Hand-derived footprint:
         //  - (1,1)  itself, (−3,1) end pose,
-        //  - (1,3)  top neighbor (leading side: the outer corner at radius √4.5 crosses y=3/2),
-        //  - (−1,1) the inner corner (radius √2/2) crosses x=1/2 on its way,
-        //  - (−1,3), (−3,3) the outer corner's arc passes through them,
-        //  - NOT (3,1) right / (1,−1) bottom neighbor: trailing side — every point moves
-        //    away from the shared edge for the whole turn (contact only at θ=0),
-        //  - NOT (3,3): the far diagonal's nearest corner sits at exactly the outer corner
-        //    radius √4.5 — grazing, no interior overlap,
-        //  - NOT (−3,−1): the end pose's trailing neighbor (contact only at θ=90°).
+        //  - (−1,1) the center passes straight through it (at 90° it sits at (0, √2)),
+        //  - (1,3)  its near corner (1/2,3/2) lies at radius √2.5, only √2.5 − √2 ≈ 0.17
+        //    from the arc — the disk dips in (leading side),
+        //  - (−1,3) at 90° the center is only 3/2 − √2 ≈ 0.086 below its bottom edge,
+        //  - (−3,3) mirror image of (1,3) around the 90° mid-turn,
+        //  - NOT (3,1) right / (1,−1) bottom neighbor: trailing side — distance exactly ½
+        //    at θ=0 and growing (contact only in the start instant),
+        //  - NOT (−3,−1): the end pose's trailing neighbor (tangent only at θ=90°),
+        //  - NOT (3,3): its nearest corner sits at radius √4.5, a full √4.5 − √2 ≈ 0.71
+        //    from the arc,
+        //  - NOT (−1,−1) pivot cell: its farthest corner sits at radius √2/2, again
+        //    √2 − √2/2 ≈ 0.71 from the arc.
+        // (Same set as the retired full-square sweep produced here: each member is a
+        // genuine pass, and every graze was already excluded by exact-radius contact.)
         var fp = RotationSweep.Footprint2d(1, 1);
         var expected = new[] {
             (1, 1), (-3, 1),
@@ -51,14 +56,16 @@ public class RotationSweepTests
     [Test]
     public void GameLevel_SweptCollision_Blocks_QuantumRotationAllows()
     {
-        // Piece 0: single cube at the origin; piece 1 sits on its +y neighbor cell — in the
-        // (x,y) rotation plane exactly a side neighbor of the in-place quarter turn. The end
-        // pose is free (identical to the start pose), so only the sweep can object.
+        // Piece 0: single cube at (1,0), rotating CCW in (x,y) about the center of the
+        // origin cell — it swings through the diagonal cell (1,1), where piece 1 sits, into
+        // the free end pose (0,1). Start and end poses are legal, so only the sweep can
+        // object; the cube's CENTER passes through the obstacle cell (at 45° it sits at
+        // (1.21, 1.21)), a genuine pass-through that no corner-lens tolerance forgives.
         Objective MakeObj() => new Objective("t",
             new int[][] { new int[] { 5, 5, 0, 0 } },
             new int[][][] {
-                new int[][] { new int[] { 0, 0, 0, 0 } },
-                new int[][] { new int[] { 0, 1, 0, 0 } },
+                new int[][] { new int[] { 1, 0, 0, 0 } },
+                new int[][] { new int[] { 1, 1, 0, 0 } },
             },
             new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } });
 
@@ -68,13 +75,33 @@ public class RotationSweepTests
         Assert.That(level.RotateSelected(0, 1, new int[] { 0, 0, 0, 0 }), Is.False);
         Assert.That(level.LastBlockReason, Is.EqualTo(MoveBlockReason.Overlap));
         Assert.That(IntegerOps.SetEqual(level.pieces[0].origins,
-            new int[][] { new int[] { 0, 0, 0, 0 } }), Is.True, "blocked rotation must revert");
+            new int[][] { new int[] { 1, 0, 0, 0 } }), Is.True, "blocked rotation must revert");
 
         var quantumObj = MakeObj();
         quantumObj.quantumRotation = true;
         var level2 = new GameLevel(quantumObj);
         level2.SelectPiece(0);
         Assert.That(level2.RotateSelected(0, 1, new int[] { 0, 0, 0, 0 }), Is.True);
+    }
+
+    [Test]
+    public void GameLevel_InPlaceTurnAgainstFaceNeighbor_IsAllowed()
+    {
+        // Piece 1 sits flush on piece 0's +y face in the (x,y) rotation plane. The in-place
+        // quarter turn only pushes the corner lenses (≤ √2/2 − 1/2 ≈ 0.207 deep) across the
+        // shared face — exactly the face-contact tolerance the inscribed-disk semantics
+        // grants. Under the retired full-square sweep this was blocked, which froze every
+        // piece that touched anything in the rotation plane.
+        var obj = new Objective("t",
+            new int[][] { new int[] { 5, 5, 0, 0 } },
+            new int[][][] {
+                new int[][] { new int[] { 0, 0, 0, 0 } },
+                new int[][] { new int[] { 0, 1, 0, 0 } },
+            },
+            new int[][] { new int[] { -5, -5, -5, -5 }, new int[] { 5, 5, 5, 5 } });
+        var level = new GameLevel(obj);
+        level.SelectPiece(0);
+        Assert.That(level.RotateSelected(0, 1, new int[] { 0, 0, 0, 0 }), Is.True);
     }
 
     [Test]
@@ -118,7 +145,9 @@ public class RotationSweepTests
     public void GameLevel_LeadingNeighbor_Blocks()
     {
         // Same geometry, opposite sense: rotating CW ((v,w) swapped) turns the +x neighbor
-        // into the leading side — the outer corner crosses the shared face plane mid-turn.
+        // into the leading side — mid-turn the cube's center comes within √2.5 − √2 ≈ 0.17
+        // of the neighbor's near corner, so even the inscribed disk dips in: not a face
+        // graze but a genuine swing-through.
         var obj = new Objective("t",
             new int[][] { new int[] { 5, 5, 0, 0 } },
             new int[][][] {
@@ -133,21 +162,41 @@ public class RotationSweepTests
     }
 
     [Test]
-    public void GameLevel_SweepOutOfBoundary_Blocks()
+    public void GameLevel_InPlaceTurnInTightBoundary_IsAllowed()
     {
-        // Boundary exactly one cell: the end pose of the in-place turn is inside, but the
-        // corners sweep across all four faces of the envelope mid-turn.
+        // Boundary exactly one cell: the inscribed disk spins flush inside the envelope
+        // (distance to every wall exactly ½ throughout — legal open contact). Only the
+        // forgiven corner lenses cross the walls; under the retired full-square sweep this
+        // was blocked, so a piece could never turn inside a snug envelope.
         var obj = new Objective("t",
             new int[][] { new int[] { 0, 0, 0, 0 } },
             new int[][][] { new int[][] { new int[] { 0, 0, 0, 0 } } },
             new int[][] { new int[] { 0, 0, 0, 0 }, new int[] { 1, 1, 1, 1 } });
         var level = new GameLevel(obj);
         level.SelectPiece(0);
+        Assert.That(level.RotateSelected(0, 1, new int[] { 0, 0, 0, 0 }), Is.True);
+    }
+
+    [Test]
+    public void GameLevel_SweepOutOfBoundary_Blocks()
+    {
+        // Single cube at (1,−1) swings CCW in (x,y) about the center of the origin cell up
+        // to (1,1). Both end poses keep x ≤ 2, but mid-turn (at 0°) the center passes
+        // (1/2 + √2, 1/2) and the disk reaches x = √2 + 1 ≈ 2.41 — through the x-wall at 2.
+        // A genuine swing beyond the envelope, not a flush graze.
+        Objective MakeObj() => new Objective("t",
+            new int[][] { new int[] { 0, 0, 0, 0 } },
+            new int[][][] { new int[][] { new int[] { 1, -1, 0, 0 } } },
+            new int[][] { new int[] { 0, -1, 0, 0 }, new int[] { 2, 2, 1, 1 } });
+
+        var level = new GameLevel(MakeObj());
+        level.SelectPiece(0);
         Assert.That(level.RotateSelected(0, 1, new int[] { 0, 0, 0, 0 }), Is.False);
         Assert.That(level.LastBlockReason, Is.EqualTo(MoveBlockReason.OutOfBoundary));
 
-        obj.quantumRotation = true;
-        var level2 = new GameLevel(obj);
+        var quantumObj = MakeObj();
+        quantumObj.quantumRotation = true;
+        var level2 = new GameLevel(quantumObj);
         level2.SelectPiece(0);
         Assert.That(level2.RotateSelected(0, 1, new int[] { 0, 0, 0, 0 }), Is.True);
     }

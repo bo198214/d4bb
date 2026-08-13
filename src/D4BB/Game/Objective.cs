@@ -39,8 +39,11 @@ namespace D4BB.Game
         // Whether "quantum rotation" is allowed: with true, a 90° rotation is legal whenever
         // its END pose is free, even if the swept quarter turn would pass through other
         // pieces or leave the boundary (tunneling — the pre-2026-08 behavior). Default false:
-        // the whole swept motion must be collision-free (see RotationSweep for the exact
-        // semantics). Level JSON: "quantum_rotation": true — only emitted when set, like "mode".
+        // the swept motion is checked too, with each cell's INSCRIBED DISK as the moving
+        // body — face-touching neighbors and flush walls tolerate the turn (only the corner
+        // lenses cross them), while genuine pass-throughs block (see RotationSweep for the
+        // exact semantics). Level JSON: "quantum_rotation": true — only emitted when set,
+        // like "mode".
         public bool quantumRotation = false;
         public int[][] goal;
         public int[][][] pieces;

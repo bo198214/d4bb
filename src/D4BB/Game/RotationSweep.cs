@@ -10,20 +10,30 @@ namespace D4BB.Game
     /// not just in its end pose? Guards against "quantum rotation" (tunneling through blocked
     /// intermediate poses); enabled per level via <see cref="Objective.quantumRotation"/> = false.
     ///
-    /// The test is exact, not sampled. A 90° rotation acts in the (v,w) coordinate plane and
-    /// leaves the complementary axes pointwise fixed, so a rotating unit cell can only ever
-    /// collide with obstacle cells in the same complementary-axes "fiber" (identical
-    /// coordinates on all axes outside {v,w}); what remains is a 2D question: does a unit
-    /// square, rotating by 90° around the pivot, overlap a static unit square at some
-    /// intermediate angle? The truth value of that predicate changes only at contact events
-    /// (a corner of one square crossing an edge line of the other), all of which are
-    /// closed-form circle/line intersections; one strict separating-axis test between each
-    /// pair of consecutive events decides the whole interval.
+    /// A 90° rotation acts in the (v,w) coordinate plane and leaves the complementary axes
+    /// pointwise fixed, so a rotating unit cell can only ever collide with obstacle cells in
+    /// the same complementary-axes "fiber" (identical coordinates on all axes outside {v,w});
+    /// what remains is a 2D question about the rotating unit square.
     ///
-    /// Collision means overlapping INTERIORS. Boundary contact of any extent or duration is
-    /// legal, matching the end-pose semantics: a face-to-face neighbor in the fixed plane
-    /// slides along the rotating piece for the entire turn without blocking it, and a
-    /// touching in-plane neighbor on the trailing side is only grazed in the start instant.
+    /// The moving body is deliberately NOT the full square but its INSCRIBED DISK (radius ½
+    /// around the cell center). A rotating unit square reaches √2/2 from its center, so its
+    /// corners unavoidably sweep √2/2 − 1/2 ≈ 0.207 deep into every face-touching in-plane
+    /// neighbor and across a flush play-field wall — with the full square, a piece touching
+    /// anything in the rotation plane could never turn, not even in place. The inscribed disk
+    /// forgives exactly those corner lenses and nothing more: wherever the disk stays out of
+    /// a cell, the square's penetration is provably ≤ √2/2 − 1/2, while a genuine pass-through
+    /// brings the disk in and still blocks. Equivalently: during (only) the turn, pieces
+    /// behave as if their in-plane cross-section had fully rounded corners; the end pose is
+    /// the exact square and is checked separately by the caller.
+    ///
+    /// The test is exact, not sampled: the minimal distance from the center's arc to a cell
+    /// is attained at one of finitely many closed-form candidate angles — the arc endpoints,
+    /// the crossings of the cell's four grid lines (the boundaries of its nearest-feature
+    /// regions), the center path's axis extrema, and the radial alignments with the cell's
+    /// corners. Contact semantics stay open, matching the end-pose checks: a disk grazing a
+    /// cell or sliding flush along a wall (distance exactly ½) is legal — so a face-to-face
+    /// neighbor in the fixed plane slides along the rotating piece for the entire turn
+    /// without blocking it, and any face-touching in-plane neighbor tolerates the turn.
     /// </summary>
     public static class RotationSweep
     {
@@ -90,11 +100,13 @@ namespace D4BB.Game
         }
 
         /// <summary>
-        /// The 2D footprint of one quarter turn: every lattice cell whose interior the unit
-        /// square with origin twice-offset (tox, toy) to the pivot passes through while
-        /// rotating CCW by 90° around the pivot — start and end cell included. Cells are
-        /// returned as origin twice-offsets to the pivot. The result is cached and shared;
-        /// do not mutate.
+        /// The 2D footprint of one quarter turn: every lattice cell whose interior the
+        /// INSCRIBED DISK (radius ½ around the center) of the unit square with origin
+        /// twice-offset (tox, toy) to the pivot passes through while rotating CCW by 90°
+        /// around the pivot — start and end cell included. Cells the square meets only with
+        /// its corner lenses outside the disk are deliberately absent (see the class doc).
+        /// Cells are returned as origin twice-offsets to the pivot. The result is cached and
+        /// shared; do not mutate.
         /// </summary>
         public static HashSet<(int, int)> Footprint2d(int tox, int toy)
         {
@@ -104,24 +116,23 @@ namespace D4BB.Game
             }
 
             double ax = tox * 0.5, ay = toy * 0.5; // square [ax,ax+1]×[ay,ay+1], pivot at 0
-            double rmaxSq = 0;
-            for (int i = 0; i <= 1; i++)
-                for (int j = 0; j <= 1; j++)
-                    rmaxSq = Math.Max(rmaxSq, (ax + i) * (ax + i) + (ay + j) * (ay + j));
-            double rmax = Math.Sqrt(rmaxSq);
+            double cx = ax + 0.5, cy = ay + 0.5;   // its center — the disk's carrier
+            double rc = Math.Sqrt(cx * cx + cy * cy);
+            double phi = Math.Atan2(cy, cx);
+            double reach = rc + 0.5;
 
             var result = new HashSet<(int, int)>();
-            int mLo = (int)Math.Floor(-rmax - ax) - 1, mHi = (int)Math.Ceiling(rmax - ax) + 1;
-            int nLo = (int)Math.Floor(-rmax - ay) - 1, nHi = (int)Math.Ceiling(rmax - ay) + 1;
+            int mLo = (int)Math.Floor(-reach - ax) - 1, mHi = (int)Math.Ceiling(reach - ax) + 1;
+            int nLo = (int)Math.Floor(-reach - ay) - 1, nHi = (int)Math.Ceiling(reach - ay) + 1;
             for (int m = mLo; m <= mHi; m++)
                 for (int n = nLo; n <= nHi; n++)
                 {
                     double bx = ax + m, by = ay + n;
-                    // Cells whose nearest point is at or beyond the outermost corner's radius
+                    // Cells whose nearest point is at or beyond the disk's outermost reach
                     // are at most grazed (measure-zero contact) — never interior-overlapped.
                     double dx = AxisDistToZero(bx, bx + 1), dy = AxisDistToZero(by, by + 1);
-                    if (dx * dx + dy * dy >= rmaxSq) continue;
-                    if (SweptInteriorOverlap(ax, ay, bx, by))
+                    if (dx * dx + dy * dy >= reach * reach) continue;
+                    if (SweptDiskMeetsCell(rc, phi, bx, by))
                         result.Add((tox + 2 * m, toy + 2 * n));
                 }
 
@@ -129,100 +140,73 @@ namespace D4BB.Game
             return result;
         }
 
+        // Distance of the interval [lo, hi] to 0 — equivalently, of a point to an interval.
         private static double AxisDistToZero(double lo, double hi)
             => lo > 0 ? lo : (hi < 0 ? -hi : 0);
 
-        // Does the open interior of [ax,ax+1]×[ay,ay+1], rotating CCW around the origin by
-        // θ ∈ [0, π/2], meet the open interior of the static [bx,bx+1]×[by,by+1] at some θ?
-        private static bool SweptInteriorOverlap(double ax, double ay, double bx, double by)
+        // Does the open disk of radius ½ around c(θ) = rc·(cos(phi+θ), sin(phi+θ)), θ ∈ [0, π/2],
+        // meet the open interior of [bx,bx+1]×[by,by+1] at some θ? Equivalently: does the
+        // center's arc come strictly closer than ½ to the cell? The distance function
+        // θ ↦ dist(c(θ), cell) is piecewise smooth; its pieces live in the cell's
+        // nearest-feature regions (delimited by the four extended grid lines) and are, per
+        // piece, a distance to a fixed corner point or edge line. Its global minimum over the
+        // closed interval is therefore attained at one of: the interval endpoints, a grid-line
+        // crossing, an axis extremum of the arc, or a radial alignment with a corner — all
+        // closed-form; evaluating the distance at those candidates decides exactly.
+        private static bool SweptDiskMeetsCell(double rc, double phi, double bx, double by)
         {
-            var events = new List<double> { 0, HalfPi };
+            var thetas = new List<double> { 0, HalfPi };
+            // Crossings of the cell's four (extended) grid lines:
+            // x(θ) = rc·cos(φ+θ), y(θ) = rc·cos(φ−π/2+θ).
+            AddCosEvents(thetas, rc, phi, bx);
+            AddCosEvents(thetas, rc, phi, bx + 1);
+            AddCosEvents(thetas, rc, phi - HalfPi, by);
+            AddCosEvents(thetas, rc, phi - HalfPi, by + 1);
+            // Axis extrema of the arc (minimum candidates inside an edge-line region).
+            for (int k = 0; k < 4; k++)
+            {
+                double t = (k * HalfPi - phi) % TwoPi;
+                if (t < 0) t += TwoPi;
+                if (t > 0 && t < HalfPi) thetas.Add(t);
+            }
+            // Radial alignments with the cell's corners (minimum candidates inside a
+            // corner region: there dist(c(θ), P) is extremal where c(θ) is radially in
+            // line with P).
             for (int i = 0; i <= 1; i++)
                 for (int j = 0; j <= 1; j++)
                 {
-                    // Corner of the rotating square crossing a grid line of the static one:
-                    // x(θ) = r·cos(φ+θ), y(θ) = r·cos(φ−π/2+θ).
-                    double cx = ax + i, cy = ay + j;
-                    double r = Math.Sqrt(cx * cx + cy * cy);
-                    if (r >= 1e-9)
-                    {
-                        double phi = Math.Atan2(cy, cx);
-                        AddCosEvents(events, r, phi, +1, bx);
-                        AddCosEvents(events, r, phi, +1, bx + 1);
-                        AddCosEvents(events, r, phi - HalfPi, +1, by);
-                        AddCosEvents(events, r, phi - HalfPi, +1, by + 1);
-                    }
-                    // Corner of the static square crossing an edge line of the rotating one
-                    // (in the rotating frame the static corner turns by −θ).
-                    double qx = bx + i, qy = by + j;
-                    double s = Math.Sqrt(qx * qx + qy * qy);
-                    if (s >= 1e-9)
-                    {
-                        double psi = Math.Atan2(qy, qx);
-                        AddCosEvents(events, s, psi, -1, ax);
-                        AddCosEvents(events, s, psi, -1, ax + 1);
-                        AddCosEvents(events, s, psi - HalfPi, -1, ay);
-                        AddCosEvents(events, s, psi - HalfPi, -1, ay + 1);
-                    }
+                    double px = bx + i, py = by + j;
+                    if (px * px + py * py < 1e-18) continue;
+                    double t = (Math.Atan2(py, px) - phi) % TwoPi;
+                    if (t < 0) t += TwoPi;
+                    if (t > 0 && t < HalfPi) thetas.Add(t);
                 }
-            events.Sort();
-            for (int k = 0; k + 1 < events.Count; k++)
+            foreach (var t in thetas)
             {
-                if (events[k + 1] - events[k] < 1e-12) continue;
-                if (InteriorOverlapAt(ax, ay, bx, by, (events[k] + events[k + 1]) * 0.5))
-                    return true;
+                double x = rc * Math.Cos(phi + t), y = rc * Math.Sin(phi + t);
+                double dx = AxisDistToZero(bx - x, bx + 1 - x);
+                double dy = AxisDistToZero(by - y, by + 1 - y);
+                // Strictly closer than ½ blocks; exact tangency (flush wall/neighbor
+                // contact, distance exactly ½) is legal open-contact — the epsilon only
+                // absorbs float rounding of the exactly-representable tangency cases.
+                if (dx * dx + dy * dy < 0.25 - 1e-9) return true;
             }
             return false;
         }
 
-        // Solutions θ ∈ (0, π/2) of r·cos(phi0 + sign·θ) = line.
-        private static void AddCosEvents(List<double> events, double r, double phi0, int sign, double line)
+        // Solutions θ ∈ (0, π/2) of r·cos(phi0 + θ) = line.
+        private static void AddCosEvents(List<double> events, double r, double phi0, double line)
         {
             double c = line / r;
             if (c < -1 || c > 1) return;
             double alpha = Math.Acos(c);
             for (int u = 0; u <= 1; u++)
             {
-                // phi0 + sign·θ ≡ ±alpha (mod 2π)  →  θ ≡ sign·(±alpha − phi0) (mod 2π)
-                double t = sign * ((u == 0 ? alpha : -alpha) - phi0) % TwoPi;
+                // phi0 + θ ≡ ±alpha (mod 2π)  →  θ ≡ ±alpha − phi0 (mod 2π)
+                double t = ((u == 0 ? alpha : -alpha) - phi0) % TwoPi;
                 if (t < 0) t += TwoPi;
                 if (t > 0 && t < HalfPi) events.Add(t);
             }
-        }
-
-        // Strict separating-axis test: do the open interiors of the CCW-by-θ-rotated square
-        // [ax,ax+1]×[ay,ay+1] and the static square [bx,bx+1]×[by,by+1] intersect? Axes are
-        // the two squares' edge normals; on the rotating square's own axes its projection is
-        // just the original [ax,ax+1] / [ay,ay+1]. Strict inequalities implement the
-        // open-interior semantics (touching does not count).
-        private static bool InteriorOverlapAt(double ax, double ay, double bx, double by, double theta)
-        {
-            double c = Math.Cos(theta), s = Math.Sin(theta);
-            double minRx = double.MaxValue, maxRx = double.MinValue;
-            double minRy = double.MaxValue, maxRy = double.MinValue;
-            double minBu = double.MaxValue, maxBu = double.MinValue;
-            double minBv = double.MaxValue, maxBv = double.MinValue;
-            for (int i = 0; i <= 1; i++)
-                for (int j = 0; j <= 1; j++)
-                {
-                    double x = (ax + i) * c - (ay + j) * s;
-                    double y = (ax + i) * s + (ay + j) * c;
-                    if (x < minRx) minRx = x;
-                    if (x > maxRx) maxRx = x;
-                    if (y < minRy) minRy = y;
-                    if (y > maxRy) maxRy = y;
-                    double bu = (bx + i) * c + (by + j) * s;
-                    double bv = -(bx + i) * s + (by + j) * c;
-                    if (bu < minBu) minBu = bu;
-                    if (bu > maxBu) maxBu = bu;
-                    if (bv < minBv) minBv = bv;
-                    if (bv > maxBv) maxBv = bv;
-                }
-            if (!(minRx < bx + 1 && bx < maxRx)) return false;
-            if (!(minRy < by + 1 && by < maxRy)) return false;
-            if (!(ax < maxBu && minBu < ax + 1)) return false;
-            if (!(ay < maxBv && minBv < ay + 1)) return false;
-            return true;
         }
     }
 }
