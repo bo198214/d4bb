@@ -160,6 +160,30 @@ public class GameTests
     }
 
     [Test]
+    public void Objective_ScalarPaddingKeepsTotalSlackPerAxis()
+    {
+        // One cell at the origin: bounding box [0,1) on every axis.
+        var goal = new int[][] { new int[] { 0,0,0,0 } };
+        var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
+
+        // x/y: padding on both sides. z/w: a fixed one-cell near margin (the pinned viewer-facing
+        // front; distance is z0's job), the rest of the 2·padding slack on the far side.
+        var p3 = new Objective("p3", goal, pieces, 3);
+        Assert.That(p3.boundary_min_max[0], Is.EqualTo(new int[] { -3, -3, -1, -1 }));
+        Assert.That(p3.boundary_min_max[1], Is.EqualTo(new int[] {  4,  4,  6,  6 }));
+        Assert.That(p3.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 3, 3, 1, 1 }));
+        Assert.That(p3.PaddingsLowerUpper()[1], Is.EqualTo(new int[] { 3, 3, 5, 5 }));
+
+        // padding 1 is symmetric everywhere; padding 0 adds nothing (no negative far side).
+        var p1 = new Objective("p1", goal, pieces, 1);
+        Assert.That(p1.boundary_min_max[0], Is.EqualTo(new int[] { -1, -1, -1, -1 }));
+        Assert.That(p1.boundary_min_max[1], Is.EqualTo(new int[] {  2,  2,  2,  2 }));
+        var p0 = new Objective("p0", goal, pieces, 0);
+        Assert.That(p0.boundary_min_max[0], Is.EqualTo(new int[] { 0, 0, 0, 0 }));
+        Assert.That(p0.boundary_min_max[1], Is.EqualTo(new int[] { 1, 1, 1, 1 }));
+    }
+
+    [Test]
     public void Objective_EnvelopeIsWrittenAsPaddings()
     {
         var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };

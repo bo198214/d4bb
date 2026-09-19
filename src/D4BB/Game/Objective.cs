@@ -256,15 +256,20 @@ namespace D4BB.Game
                         if (o[j][k] > res[1][k]) { res[1][k] = o[j][k]; }
                     }
                 }
-                // Cavalier world_z = z + pz·w (pz > 0): the viewer-facing surface of
-                // the play volume sits at (min z, min w). Padding the depth axes (2 and
-                // up) on the near side lets pieces drift towards the viewer, so those get
-                // a fixed one-cell margin regardless of `padding`, while axes 0/1 (the
-                // projection plane) take the full padding on both sides. The far side is
-                // always padded in full. For per-axis, per-side control (incl. a zero or
-                // negative near margin) use the paddings_lower_upper form instead.
-                res[0][k] -= k < 2 ? padding : 1;
-                res[1][k] += 1+padding;
+                // Every axis gets the same total slack of 2·padding cells, but the depth
+                // axes distribute it asymmetrically. Cavalier world_z = z + pz·w (pz > 0):
+                // the viewer-facing surface of the play volume sits at (min z, min w), and
+                // the game pins that front at a fixed viewer distance (z0), so near-side
+                // padding on axes 2 and up pushes the content away from the player. Those
+                // axes therefore get a one-cell near margin regardless of `padding` (a
+                // workbench cell, not a distance knob — distance is z0), and the cells
+                // taken from the near side go to the far side instead: 1 near /
+                // 2·padding−1 far (padding 0 stays 0/0). Axes 0/1 (the projection plane)
+                // take the full padding on both sides. For per-axis, per-side control
+                // (incl. a zero or negative near margin) use paddings_lower_upper.
+                int near = k < 2 ? padding : Math.Min(padding, 1);
+                res[0][k] -= near;
+                res[1][k] += 1 + 2 * padding - near;
             }
             return res;
         }
