@@ -229,6 +229,29 @@ public class GameTests
     }
 
     [Test]
+    public void Objective_Z0JsonRoundTrip()
+    {
+        var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
+        var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
+
+        // Unset stays unset on round-trip: the game falls back to its global default, and level
+        // files without the override stay free of the field.
+        var inherit = new Objective("i", goal, pieces);
+        Assert.That(inherit.z0, Is.Null);
+        Assert.That(inherit.ToJson(), Does.Not.Contain("z0"));
+        Assert.That(Objective.FromJson(inherit.ToJson()).z0, Is.Null);
+
+        // An explicit viewer distance is emitted and parsed back.
+        var near = new Objective("n", goal, pieces) { z0 = 2.5 };
+        Assert.That(near.ToJson(), Does.Contain("\"z0\": 2.5"));
+        Assert.That(Objective.FromJson(near.ToJson()).z0, Is.EqualTo(2.5));
+
+        // Zero/negative would place the play volume's front at or behind the eyes — fail fast.
+        Assert.Throws<ArgumentException>(() =>
+            Objective.FromJson(near.ToJson().Replace("\"z0\": 2.5", "\"z0\": 0")));
+    }
+
+    [Test]
     public void GameLevel_CombineAndReach()
     {
         // Two single cells, goal is their union

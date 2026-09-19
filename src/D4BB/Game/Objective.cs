@@ -36,6 +36,15 @@ namespace D4BB.Game
         // unit, so the field is optional metadata like points — level files without it stay free of
         // it. Purely a display hint; the geometry itself is untouched.
         public double scale = 1;
+        // The level's viewer distance override (JSON "z0", meters): where the play volume's
+        // viewer-facing front is placed in front of the player's eyes. null = not set — the game
+        // then uses its global default (Game.zOffset, the authored prefab value), so the field is
+        // an override layer on that one default, not a second one. Purely a display hint like
+        // scale: the geometry and the movement envelope are untouched. It exists because the
+        // envelope's near padding is the wrong unit for distance (cells × scale), and because the
+        // front — not the content — is what the placement pins, so nothing can ever be moved
+        // closer to the viewer than z0 (see Game.ResetView).
+        public double? z0;
         // Whether "quantum rotation" is allowed: with true, a 90° rotation is legal whenever
         // its END pose is free, even if the swept quarter turn would pass through other
         // pieces or leave the boundary (tunneling — the pre-2026-08 behavior). Default false:
@@ -83,6 +92,8 @@ namespace D4BB.Game
                 Points = points == 1 ? (int?)null : points,
                 // Same only-when-non-default policy as "points".
                 Scale = scale == 1 ? (double?)null : scale,
+                // null = inherit the game's default; only an explicit override is emitted.
+                Z0 = z0,
                 Goal = goal,
                 Pieces = pieces,
                 PaddingsLowerUpper = PaddingsLowerUpper(),
@@ -138,6 +149,12 @@ namespace D4BB.Game
                 throw new ArgumentException(
                     $"Level '{data.Name}': \"scale\" must be > 0 (got {data.Scale.Value}).");
             obj.scale = data.Scale ?? 1;
+            // A non-positive viewer distance would put the play volume's front at or behind the
+            // player's eyes — loud, per fail fast.
+            if (data.Z0.HasValue && data.Z0.Value <= 0)
+                throw new ArgumentException(
+                    $"Level '{data.Name}': \"z0\" must be > 0 (got {data.Z0.Value}).");
+            obj.z0 = data.Z0;
             obj.quantumRotation = data.QuantumRotation ?? false;
             return obj;
         }
@@ -161,6 +178,8 @@ namespace D4BB.Game
             public int? Points { get; set; }
             [JsonProperty("scale")]
             public double? Scale { get; set; }
+            [JsonProperty("z0")]
+            public double? Z0 { get; set; }
             [JsonProperty("goal")]
             public int[][] Goal { get; set; }
             [JsonProperty("pieces")]
