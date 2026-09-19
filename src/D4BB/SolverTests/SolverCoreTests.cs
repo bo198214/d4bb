@@ -196,6 +196,31 @@ namespace D4BB.SolverTests
         }
 
         [Test]
+        public void Validator_ProvesUnsolvableWhenOnlyAReflectionWouldTile()
+        {
+            // A chiral tetracube (the Soma "screw") and its mirror image. In 4-space the two are
+            // properly congruent — turn through w — but with the envelope one cell thick along w
+            // no such turn exists, so the tiling that the full 4D rotation group would find is
+            // unreachable and the level is provably unsolvable. Give w one cell of room and the
+            // very same level stops being unsolvable.
+            var screw = new[] { C(0, 0, 0, 0), C(1, 0, 0, 0), C(1, 1, 0, 0), C(1, 1, 1, 0) };
+            var mirror = new[] { C(5, 0, 0, 0), C(6, 0, 0, 0), C(6, 1, 0, 0), C(6, 1, -1, 0) };
+            var pieces = new[] { screw };
+
+            var pinned = new Objective("wrong-hand-3d", mirror, pieces,
+                Objective.BoundaryMinMax(pieces, mirror,
+                    new[] { new[] { 2, 2, 2, 0 }, new[] { 2, 2, 2, 0 } }));
+            var report = LevelValidator.Check(pinned, null, new ValidatorOptions { WriteSolutions = false });
+            Assert.That(report.Verdict, Is.EqualTo(LevelVerdict.Unsolvable), report.Detail);
+
+            var free = new Objective("wrong-hand-4d", mirror, pieces,
+                Objective.BoundaryMinMax(pieces, mirror,
+                    new[] { new[] { 2, 2, 2, 1 }, new[] { 2, 2, 2, 1 } }));
+            report = LevelValidator.Check(free, null, new ValidatorOptions { WriteSolutions = false });
+            Assert.That(report.Verdict, Is.Not.EqualTo(LevelVerdict.Unsolvable), report.Detail);
+        }
+
+        [Test]
         public void Assembly_HandlesDisconnectedPieces()
         {
             // A piece need not be face-connected in this game, and levels are built on that. Here

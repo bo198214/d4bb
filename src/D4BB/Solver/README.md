@@ -47,7 +47,8 @@ asymmetric in what they claim:
    pieces starting outside the envelope, duplicate cells).
 2. **Solution file** (`SolutionFile`, see below). If `<level>.moves` exists it is replayed — the
    strongest verdict available, for the cost of a few hundred move applications.
-3. **Search.** `AssemblySolver` (exact cover: can the pieces tile the goal in *any* orientation?)
+3. **Search.** `AssemblySolver` (exact cover: can the pieces tile the goal in *any* reachable
+   orientation?)
    then `PathSearch` (can they be manoeuvred there?). A found sequence is verified, shortened
    (`SolutionPolish`), verified again, and written out as the level's solution file — so the
    expensive search happens once per level, ever.
@@ -90,6 +91,16 @@ milliseconds and never searches that level again.
 enumerates placements over the proper rotation group only — a mirrored tiling is correctly rejected,
 the game has no reflection move). Symmetry breaking over congruent pieces and a subset-sum pruning
 of the uncovered region keep it fast; the pentomino-sized levels are milliseconds.
+
+The rotation group is **cut down by the envelope**: along any axis where `boundary_min_max` is
+exactly one cell thick, no quarter turn through that axis can be executed, so only proper rotations
+that fix the axis count (`AssemblySolver.FrozenAxes` / `ReachableRotations`; `PathSearch` uses the
+same set for its shape-mode target rotations). A level pinned to one w layer therefore gets the 24
+proper rotations of 3-space, not the 192 of 4-space — the latter contain w-flips that act as 3D
+reflections. This is what makes a 3D level with a wrong-handed piece **provably** unsolvable
+rather than "the pieces tile, no path found" (the 2026-09 case: after the polycube levels were
+pinned to w-thickness 1, *Sinister Screws* — a puzzle that by design needs the 4D flip — showed
+up as `AssemblyOnly`, and *Mikusiński*'s path search spent its budget on mirrored targets).
 
 `PathSearch` is **incomplete by design**: weighted best-first, budget-capped, aimed at a handful of
 candidate target assemblies rather than all of them. Its "found" is a lead that the verifier

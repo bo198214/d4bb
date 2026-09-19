@@ -46,6 +46,17 @@ namespace D4BB.Solver
     /// same group <see cref="IntegerOps.MotionEqual"/> uses for the win check. A mirrored tiling is
     /// correctly NOT accepted: the game has no reflection move.</para>
     ///
+    /// <para>The group is further cut down by the movement envelope (<c>frozenAxes</c>, see
+    /// <see cref="FrozenAxes"/>): along an axis where the envelope is exactly one cell thick, no
+    /// quarter turn involving that axis can ever be executed (every cell off the pivot's line
+    /// would leave the slab), so the orientations a player can reach are exactly the proper
+    /// rotations that fix that axis. For a level pinned to one w layer that is the 24 proper
+    /// rotations of 3-space — and NOT the 4D rotations that flip w and mirror the 3D shape. Without
+    /// this cut a 3D level whose pieces are the wrong hand would still "tile" (via an unreachable
+    /// reflection), turning a provable <see cref="AssemblyVerdict.None"/> into a vacuous
+    /// <see cref="AssemblyVerdict.Exists"/> and feeding <see cref="PathSearch"/> targets it can
+    /// never reach — the 2026-09 Sinister Screws / Mikusiński case.</para>
+    ///
     /// <para>Shape mode vs absolute mode need no distinction here. Tiling the goal where it lies is
     /// equivalent to tiling any congruent copy of it (apply the global motion to every piece), so
     /// covering the goal cells in place answers both.</para>
@@ -70,6 +81,7 @@ namespace D4BB.Solver
         readonly string[] shapeKey;     // congruence class per piece (for symmetry breaking)
         readonly int[] pieceSize;
         readonly bool piecesAreConnected;   // gate for RegionsFeasible — see its remarks
+        readonly bool[] frozenAxes;         // envelope one cell thick along these axes (may be null)
 
         // Search state.
         ulong[] covered;
@@ -83,11 +95,12 @@ namespace D4BB.Solver
         Stopwatch watch;
         TimeSpan budget;
 
-        public AssemblySolver(int[][] goal, int[][][] pieces)
+        public AssemblySolver(int[][] goal, int[][][] pieces, bool[] frozenAxes = null)
         {
             this.goal = goal;
             this.pieces = pieces;
             dim = goal[0].Length;
+            this.frozenAxes = frozenAxes;
             nCells = goal.Length;
             nWords = (nCells + 63) / 64;
 
@@ -107,7 +120,7 @@ namespace D4BB.Solver
             byCell = new List<int>[pieces.Length][];
             shapeKey = new string[pieces.Length];
             pieceSize = new int[pieces.Length];
-            var rotations = IntegerOps.Rotations(dim);
+            var rotations = ReachableRotations(dim, frozenAxes);
             piecesAreConnected = true;
             for (int p = 0; p < pieces.Length; p++)
             {
@@ -138,6 +151,56 @@ namespace D4BB.Solver
         /// <summary>Number of distinct legal placements of piece <paramref name="p"/> inside the goal.</summary>
         public int PlacementCount(int p) => masks[p].Count;
 
+        /// <summary>
+        /// Which axes the movement envelope pins to a single cell: <c>true</c> where
+        /// <c>boundaryMinMax[1][k] - boundaryMinMax[0][k] == 1</c>. Null envelope, or nothing
+        /// frozen = null (the full rotation group).
+        /// </summary>
+        public static bool[] FrozenAxes(int[][] boundaryMinMax)
+        {
+            if (boundaryMinMax == null) return null;
+            int dim = boundaryMinMax[0].Length;
+            var frozen = new bool[dim];
+            bool any = false;
+            for (int k = 0; k < dim; k++)
+            {
+                frozen[k] = boundaryMinMax[1][k] - boundaryMinMax[0][k] == 1;
+                any |= frozen[k];
+            }
+            return any ? frozen : null;
+        }
+
+        /// <summary>
+        /// The proper lattice rotations a piece can actually reach inside the envelope: those that
+        /// map every frozen axis onto itself (matrix entry <c>[k][k] == 1</c> — for a signed
+        /// permutation matrix that pins the whole row and column). No frozen axes = the full group.
+        /// </summary>
+        public static int[][][] ReachableRotations(int dim, bool[] frozenAxes)
+        {
+            var all = IntegerOps.Rotations(dim);
+            if (frozenAxes == null) return all;
+            var kept = new List<int[][]>();
+            foreach (var rot in all)
+            {
+                bool ok = true;
+                for (int k = 0; k < dim && ok; k++)
+                    if (frozenAxes[k] && rot[k][k] != 1) ok = false;
+                if (ok) kept.Add(rot);
+            }
+            return kept.ToArray();
+        }
+
+        string OrientationScope()
+        {
+            if (frozenAxes == null) return "orientation";
+            var axes = new List<string>();
+            for (int k = 0; k < dim; k++)
+                if (frozenAxes[k]) axes.Add(k < 4 ? "xyzw"[k].ToString() : k.ToString());
+            return "orientation reachable inside the envelope (one cell thick along " +
+                   string.Join(",", axes) + " — no turn through that axis, hence no reflection " +
+                   "of the remaining space)";
+        }
+
         public AssemblyResult Solve(int maxAssemblies = 1, TimeSpan? budget = null)
         {
             var result = new AssemblyResult();
@@ -149,7 +212,7 @@ namespace D4BB.Solver
                 if (masks[p].Count == 0)
                 {
                     result.Verdict = AssemblyVerdict.None;
-                    result.Reason = $"piece {p + 1} does not fit inside the goal in any orientation";
+                    result.Reason = $"piece {p + 1} does not fit inside the goal in any {OrientationScope()}";
                     result.Elapsed = watch.Elapsed;
                     return result;
                 }
@@ -170,7 +233,7 @@ namespace D4BB.Solver
                            : timedOut ? AssemblyVerdict.Unknown
                            : AssemblyVerdict.None;
             if (result.Verdict == AssemblyVerdict.None)
-                result.Reason = "the pieces cannot tile the goal in any orientation " +
+                result.Reason = $"the pieces cannot tile the goal in any {OrientationScope()} " +
                                 $"(exhaustive: {nodes} nodes)";
             else if (result.Verdict == AssemblyVerdict.Unknown)
                 result.Reason = $"exact-cover search hit its {this.budget.TotalSeconds:0.#}s budget " +

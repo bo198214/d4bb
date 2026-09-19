@@ -356,10 +356,13 @@ namespace D4BB.Solver
 
             // Shape mode: the compound may be built anywhere, so score every proper global rotation
             // of the assembly, each shifted as close to the pieces' current position as the envelope
-            // allows, and keep the closest few.
+            // allows, and keep the closest few. Only rotations the envelope lets a piece reach
+            // (AssemblySolver.ReachableRotations): a rotation through a one-cell-thick axis would
+            // hand the search a mirrored, unreachable target that burns its whole budget.
             var scored = new List<(long score, long[][] target)>();
             var startCentroid = Centroid(start, dim);
-            foreach (var rot in IntegerOps.Rotations(dim))
+            var frozen = AssemblySolver.FrozenAxes(obj.boundary_min_max);
+            foreach (var rot in AssemblySolver.ReachableRotations(dim, frozen))
             {
                 var rotated = new int[assembly.cells.Length][][];
                 for (int p = 0; p < assembly.cells.Length; p++)

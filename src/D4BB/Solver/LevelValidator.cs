@@ -120,7 +120,8 @@ namespace D4BB.Solver
                 return report;
             }
 
-            var assemblySolver = new AssemblySolver(obj.goal, obj.pieces);
+            var assemblySolver = new AssemblySolver(obj.goal, obj.pieces,
+                                                    AssemblySolver.FrozenAxes(obj.boundary_min_max));
             var assemblies = assemblySolver.Solve(opt.MaxAssemblies, opt.AssemblyBudget);
             report.Nodes += assemblies.Nodes;
             if (assemblies.Verdict == AssemblyVerdict.None)
