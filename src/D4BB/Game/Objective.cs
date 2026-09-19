@@ -36,15 +36,38 @@ namespace D4BB.Game
         // unit, so the field is optional metadata like points — level files without it stay free of
         // it. Purely a display hint; the geometry itself is untouched.
         public double scale = 1;
-        // The level's viewer distance override (JSON "z0", meters): where the play volume's
-        // viewer-facing front is placed in front of the player's eyes. null = not set — the game
-        // then uses its global default (Game.zOffset, the authored prefab value), so the field is
-        // an override layer on that one default, not a second one. Purely a display hint like
-        // scale: the geometry and the movement envelope are untouched. It exists because the
-        // envelope's near padding is the wrong unit for distance (cells × scale), and because the
-        // front — not the content — is what the placement pins, so nothing can ever be moved
-        // closer to the viewer than z0 (see Game.ResetView).
-        public double? z0;
+        // ---- Viewer placement ----------------------------------------------------------------
+        // The level's facade distance (JSON "dist", meters): how far the viewer-facing front of
+        // the CONTENT — the nearest projected corner of the pieces+goal bounding box — sits in
+        // front of the player's eyes. null = DefaultDist. This is the ONE authored placement
+        // quantity; the game pins the facade at Dist (Game.ResetView), and the scalar-padding
+        // envelope derives its near z margin from it (see BoundaryMinMax): the room between the
+        // MinFrontDistance comfort line and the facade is filled with workbench cells rather
+        // than left empty. In meters on purpose — padding is in cells × scale, the wrong unit
+        // for a distance, and Dist stays put when the player zooms (zoom scales about the facade).
+        public double? dist;
+        public double Dist => dist ?? DefaultDist;
+        // Facade distance of levels without "dist" — where most authored levels stand.
+        public const double DefaultDist = 3.5;
+        // Closest the play volume's front (and thus any movable piece) may come to the eyes.
+        // The scalar-padding derivation never lets the envelope front cross it, and every
+        // parsed level is checked against it (an explicit envelope can violate it — fail fast).
+        public const double MinFrontDistance = 1.0;
+        // The canonical cavalier projection's w→z shear (azimuth 45°, elevation 45°, length 1):
+        // one w cell of near padding moves the facade this many cells further back. The envelope
+        // must be deterministic for the solver, so the derivation uses this design-time value,
+        // not the live (player-adjustable) projection length.
+        public const double CavalierShearZ = 0.5;
+        // Where the play volume's front lands when the facade is at Dist: the near z/w padding
+        // (whatever form it came from) projected back toward the viewer. >= MinFrontDistance for
+        // every valid level; the game reads Dist and this only through the placement pivot.
+        public double EnvelopeFrontDistance {
+            get {
+                var lo = PaddingsLowerUpper()[0];
+                double z = lo.Length > 2 ? lo[2] : 0, w = lo.Length > 3 ? lo[3] : 0;
+                return Dist - scale * (z + CavalierShearZ * w);
+            }
+        }
         // Whether "quantum rotation" is allowed: with true, a 90° rotation is legal whenever
         // its END pose is free, even if the swept quarter turn would pass through other
         // pieces or leave the boundary (tunneling — the pre-2026-08 behavior). Default false:
@@ -59,7 +82,10 @@ namespace D4BB.Game
         public int[][] boundary_min_max;
         public GoalMode mode = GoalMode.Shape;
 
-        public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, goal, padding)) {}
+        // Scalar-padding envelope at scale 1 and DefaultDist (the envelope depends on both via the
+        // near z derivation — see BoundaryMinMax). FromJson computes the envelope with the level's
+        // own scale/dist; this overload serves code-constructed levels and tests.
+        public Objective(string name, int[][] goal, int[][][] pieces, int padding = 1) : this(name, goal, pieces, BoundaryMinMax(pieces, goal, padding, 1, DefaultDist)) {}
         public Objective(string name, int[][] goal, int[][][] pieces, int[][] boundary_min_max)
         {
             this.name = name;
@@ -92,8 +118,8 @@ namespace D4BB.Game
                 Points = points == 1 ? (int?)null : points,
                 // Same only-when-non-default policy as "points".
                 Scale = scale == 1 ? (double?)null : scale,
-                // null = inherit the game's default; only an explicit override is emitted.
-                Z0 = z0,
+                // null = DefaultDist; only an explicit facade distance is emitted.
+                Dist = dist,
                 Goal = goal,
                 Pieces = pieces,
                 PaddingsLowerUpper = PaddingsLowerUpper(),
@@ -125,16 +151,34 @@ namespace D4BB.Game
         }
         public static Objective FromJson(string json) {
             var data = JsonConvert.DeserializeObject<ObjectiveData>(json);
+            // scale and dist first: the scalar-padding envelope is derived from both.
+            // A non-positive scale would render the level invisible or mirrored — loud, per fail fast.
+            if (data.Scale.HasValue && data.Scale.Value <= 0)
+                throw new ArgumentException(
+                    $"Level '{data.Name}': \"scale\" must be > 0 (got {data.Scale.Value}).");
+            double scale = data.Scale ?? 1;
+            if (data.Dist.HasValue && data.Dist.Value <= 0)
+                throw new ArgumentException(
+                    $"Level '{data.Name}': \"dist\" must be > 0 (got {data.Dist.Value}).");
             Objective obj;
             if (data.BoundaryMinMax != null)
                 obj = new Objective(data.Name, data.Goal, data.Pieces, data.BoundaryMinMax);
             else if (data.PaddingsLowerUpper != null)
                 obj = new Objective(data.Name, data.Goal, data.Pieces,
                                     BoundaryMinMax(data.Pieces, data.Goal, data.PaddingsLowerUpper));
-            else if (data.Padding.HasValue)
-                obj = new Objective(data.Name, data.Goal, data.Pieces, data.Padding.Value);
             else
-                obj = new Objective(data.Name, data.Goal, data.Pieces);
+                obj = new Objective(data.Name, data.Goal, data.Pieces,
+                                    BoundaryMinMax(data.Pieces, data.Goal, data.Padding ?? 1, scale, data.Dist ?? DefaultDist));
+            obj.scale = scale;
+            obj.dist = data.Dist;
+            // The play volume's front must stay behind the comfort line. The scalar form guarantees
+            // it by construction; an explicit envelope with a large near margin and a small dist
+            // does not — loud, per fail fast.
+            if (obj.EnvelopeFrontDistance < MinFrontDistance - 1e-9)
+                throw new ArgumentException(
+                    $"Level '{data.Name}': dist {obj.Dist} m puts the play volume's front at " +
+                    $"{obj.EnvelopeFrontDistance:0.##} m, closer than the {MinFrontDistance} m minimum — " +
+                    "raise \"dist\" or reduce the near z/w padding.");
             obj.mode = ParseMode(data.Mode);
             obj.description = data.Description;
             obj.author = data.Author;
@@ -144,17 +188,6 @@ namespace D4BB.Game
                 throw new ArgumentException(
                     $"Level '{data.Name}': \"points\" must be >= 1 (got {data.Points.Value}).");
             obj.points = data.Points ?? 1;
-            // A non-positive scale would render the level invisible or mirrored — loud, per fail fast.
-            if (data.Scale.HasValue && data.Scale.Value <= 0)
-                throw new ArgumentException(
-                    $"Level '{data.Name}': \"scale\" must be > 0 (got {data.Scale.Value}).");
-            obj.scale = data.Scale ?? 1;
-            // A non-positive viewer distance would put the play volume's front at or behind the
-            // player's eyes — loud, per fail fast.
-            if (data.Z0.HasValue && data.Z0.Value <= 0)
-                throw new ArgumentException(
-                    $"Level '{data.Name}': \"z0\" must be > 0 (got {data.Z0.Value}).");
-            obj.z0 = data.Z0;
             obj.quantumRotation = data.QuantumRotation ?? false;
             return obj;
         }
@@ -178,8 +211,8 @@ namespace D4BB.Game
             public int? Points { get; set; }
             [JsonProperty("scale")]
             public double? Scale { get; set; }
-            [JsonProperty("z0")]
-            public double? Z0 { get; set; }
+            [JsonProperty("dist")]
+            public double? Dist { get; set; }
             [JsonProperty("goal")]
             public int[][] Goal { get; set; }
             [JsonProperty("pieces")]
@@ -240,9 +273,23 @@ namespace D4BB.Game
             }
             return res;
         }
-        public static int[][] BoundaryMinMax(int[][][] pieces, int[][] goal, int padding)
+        // The near z margin of a scalar-padding envelope, derived from the facade distance: the
+        // room between MinFrontDistance and the facade, in whole cells (after the near w margin's
+        // share of the depth), clamped to [min(padding,1), padding]. So dist raises the near z
+        // margin above the one workbench cell but never past the level's own padding — beyond
+        // that the remainder is pure distance (EnvelopeFrontDistance > MinFrontDistance). A
+        // fraction of a cell always goes into distance, never into a partial cell.
+        public static int NearZPadding(int padding, double scale, double dist, int nearW)
+        {
+            int min = Math.Min(padding, 1);
+            int fill = (int)Math.Floor((dist - MinFrontDistance) / scale - CavalierShearZ * nearW + 1e-9);
+            return Math.Max(min, Math.Min(padding, fill));
+        }
+        public static int[][] BoundaryMinMax(int[][][] pieces, int[][] goal, int padding, double scale, double dist)
         {
             int dim = pieces.Length > 0 ? pieces[0][0].Length : goal[0].Length;
+            int nearW = dim > 3 ? Math.Min(padding, 1) : 0;
+            int nearZ = NearZPadding(padding, scale, dist, nearW);
             int[][] res = new int[2][];
             res[0] = new int[dim];
             res[1] = new int[dim];
@@ -258,16 +305,17 @@ namespace D4BB.Game
                 }
                 // Every axis gets the same total slack of 2·padding cells, but the depth
                 // axes distribute it asymmetrically. Cavalier world_z = z + pz·w (pz > 0):
-                // the viewer-facing surface of the play volume sits at (min z, min w), and
-                // the game pins that front at a fixed viewer distance (z0), so near-side
-                // padding on axes 2 and up pushes the content away from the player. Those
-                // axes therefore get a one-cell near margin regardless of `padding` (a
-                // workbench cell, not a distance knob — distance is z0), and the cells
-                // taken from the near side go to the far side instead: 1 near /
-                // 2·padding−1 far (padding 0 stays 0/0). Axes 0/1 (the projection plane)
-                // take the full padding on both sides. For per-axis, per-side control
-                // (incl. a zero or negative near margin) use paddings_lower_upper.
-                int near = k < 2 ? padding : Math.Min(padding, 1);
+                // the viewer-facing surface of the play volume sits at (min z, min w), so
+                // near-side padding on the depth axes is room BETWEEN the player and the
+                // content. Axes 0/1 (the projection plane) take the full padding on both
+                // sides. w gets a one-cell near margin (padding 0 stays 0: a w-slice is a
+                // puzzle property) — never more, since every w layer changes the depth
+                // palette. z gets its near margin from the facade distance (NearZPadding):
+                // as many workbench cells as fit between MinFrontDistance and dist, capped
+                // at `padding`. Whatever the near side does not take goes to the far side,
+                // keeping the sum at 2·padding. For per-axis, per-side control use
+                // paddings_lower_upper (literal; dist then only places the facade).
+                int near = k < 2 ? padding : k == 2 ? nearZ : nearW;
                 res[0][k] -= near;
                 res[1][k] += 1 + 2 * padding - near;
             }

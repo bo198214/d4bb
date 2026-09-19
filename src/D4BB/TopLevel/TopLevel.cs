@@ -36,11 +36,12 @@ namespace D4BB.TopLevel
             var min_max = objective.BoundingBox();
             var x = (min_max[0][0] + min_max[1][0])/2.0;
             var y = (min_max[0][1] + min_max[1][1])/2.0;
-            // Z: project the full 4D movement envelope through the camera and take
-            // the smallest world-z. Accounts for cavalier w-shear so z_offset=0
-            // really places the front of the play volume on world Z=0.
-            var bmm4d = objective.boundary_min_max ?? min_max;
-            var box3d = fieldBoundary3d(bmm4d, camera);
+            // Z: project the pieces+goal bounding box through the camera and take
+            // the smallest world-z — the facade, the point Objective.dist refers to.
+            // Accounts for cavalier w-shear so z_offset=0 really places the facade on
+            // world Z=0. (The movement envelope's front then lands wherever the near
+            // padding puts it — Objective.EnvelopeFrontDistance, >= MinFrontDistance.)
+            var box3d = fieldBoundary3d(min_max, camera);
             var z = box3d[0][2];
             return new double[] { x, y-y_offset, z-z_offset};
         }

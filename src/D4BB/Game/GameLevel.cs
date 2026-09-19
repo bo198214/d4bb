@@ -168,6 +168,7 @@ namespace D4BB.Game
                 author = Objective.author,
                 points = Objective.points,
                 scale = Objective.scale,
+                dist = Objective.dist,
                 quantumRotation = Objective.quantumRotation,
             };
         }

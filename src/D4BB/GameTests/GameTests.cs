@@ -162,25 +162,16 @@ public class GameTests
     [Test]
     public void Objective_ScalarPaddingKeepsTotalSlackPerAxis()
     {
-        // One cell at the origin: bounding box [0,1) on every axis.
+        // One cell at the origin: bounding box [0,1) on every axis. The code-constructed form
+        // uses scale 1 and DefaultDist, so z gets two near cells (see the dist tests); every axis
+        // still carries 2·padding cells of slack in total.
         var goal = new int[][] { new int[] { 0,0,0,0 } };
         var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
-
-        // x/y: padding on both sides. z/w: a fixed one-cell near margin (the pinned viewer-facing
-        // front; distance is z0's job), the rest of the 2·padding slack on the far side.
         var p3 = new Objective("p3", goal, pieces, 3);
-        Assert.That(p3.boundary_min_max[0], Is.EqualTo(new int[] { -3, -3, -1, -1 }));
-        Assert.That(p3.boundary_min_max[1], Is.EqualTo(new int[] {  4,  4,  6,  6 }));
-        Assert.That(p3.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 3, 3, 1, 1 }));
-        Assert.That(p3.PaddingsLowerUpper()[1], Is.EqualTo(new int[] { 3, 3, 5, 5 }));
-
-        // padding 1 is symmetric everywhere; padding 0 adds nothing (no negative far side).
-        var p1 = new Objective("p1", goal, pieces, 1);
-        Assert.That(p1.boundary_min_max[0], Is.EqualTo(new int[] { -1, -1, -1, -1 }));
-        Assert.That(p1.boundary_min_max[1], Is.EqualTo(new int[] {  2,  2,  2,  2 }));
-        var p0 = new Objective("p0", goal, pieces, 0);
-        Assert.That(p0.boundary_min_max[0], Is.EqualTo(new int[] { 0, 0, 0, 0 }));
-        Assert.That(p0.boundary_min_max[1], Is.EqualTo(new int[] { 1, 1, 1, 1 }));
+        Assert.That(p3.boundary_min_max[0], Is.EqualTo(new int[] { -3, -3, -2, -1 }));
+        Assert.That(p3.boundary_min_max[1], Is.EqualTo(new int[] {  4,  4,  5,  6 }));
+        for (int k = 0; k < 4; k++)
+            Assert.That(p3.PaddingsLowerUpper()[0][k] + p3.PaddingsLowerUpper()[1][k], Is.EqualTo(6));
     }
 
     [Test]
@@ -253,26 +244,84 @@ public class GameTests
     }
 
     [Test]
-    public void Objective_Z0JsonRoundTrip()
+    public void Objective_DistJsonRoundTrip()
     {
         var goal = new int[][] { new int[] { 0,0,0,0 }, new int[] { 1,0,0,0 } };
         var pieces = new int[][][] { new int[][] { new int[] { 0,0,0,0 } } };
 
-        // Unset stays unset on round-trip: the game falls back to its global default, and level
-        // files without the override stay free of the field.
+        // Unset stays unset on round-trip (Dist reads DefaultDist), and level files without the
+        // field stay free of it.
         var inherit = new Objective("i", goal, pieces);
-        Assert.That(inherit.z0, Is.Null);
-        Assert.That(inherit.ToJson(), Does.Not.Contain("z0"));
-        Assert.That(Objective.FromJson(inherit.ToJson()).z0, Is.Null);
+        Assert.That(inherit.dist, Is.Null);
+        Assert.That(inherit.Dist, Is.EqualTo(Objective.DefaultDist));
+        Assert.That(inherit.ToJson(), Does.Not.Contain("dist"));
+        Assert.That(Objective.FromJson(inherit.ToJson()).dist, Is.Null);
 
-        // An explicit viewer distance is emitted and parsed back.
-        var near = new Objective("n", goal, pieces) { z0 = 2.5 };
-        Assert.That(near.ToJson(), Does.Contain("\"z0\": 2.5"));
-        Assert.That(Objective.FromJson(near.ToJson()).z0, Is.EqualTo(2.5));
+        // An explicit facade distance is emitted and parsed back.
+        var far = new Objective("f", goal, pieces) { dist = 4.5 };
+        Assert.That(far.ToJson(), Does.Contain("\"dist\": 4.5"));
+        Assert.That(Objective.FromJson(far.ToJson()).dist, Is.EqualTo(4.5));
 
-        // Zero/negative would place the play volume's front at or behind the eyes — fail fast.
+        // Zero/negative is meaningless — fail fast.
         Assert.Throws<ArgumentException>(() =>
-            Objective.FromJson(near.ToJson().Replace("\"z0\": 2.5", "\"z0\": 0")));
+            Objective.FromJson(far.ToJson().Replace("\"dist\": 4.5", "\"dist\": 0")));
+    }
+
+    static string ScalarLevel(int padding, string extra = "") =>
+        "{ \"name\": \"s\", \"goal\": [[0,0,0,0]], \"pieces\": [[[0,0,0,0]]], \"padding\": " + padding + extra + " }";
+
+    [Test]
+    public void Objective_DistDerivesNearZPaddingUpToTheCap()
+    {
+        // Default dist 3.5 at scale 1: the gap to the 1 m front line is 2.5 m; the near w cell
+        // takes 0.5 of it, so two whole z cells fit — up to the cap (padding 2 → 2, padding 3 → 2
+        // as well, since only two fit). The far side takes the rest of the 2·padding slack.
+        var p2 = Objective.FromJson(ScalarLevel(2));
+        Assert.That(p2.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 2, 2, 2, 1 }));
+        Assert.That(p2.PaddingsLowerUpper()[1], Is.EqualTo(new int[] { 2, 2, 2, 3 }));
+        Assert.That(p2.EnvelopeFrontDistance, Is.EqualTo(1.0).Within(1e-9));
+        var p3 = Objective.FromJson(ScalarLevel(3));
+        Assert.That(p3.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 3, 3, 2, 1 }));
+        Assert.That(p3.PaddingsLowerUpper()[1], Is.EqualTo(new int[] { 3, 3, 4, 5 }));
+
+        // A smaller dist fills fewer cells: 2.5 m leaves exactly one z cell.
+        var near = Objective.FromJson(ScalarLevel(3, ", \"dist\": 2.5"));
+        Assert.That(near.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 3, 3, 1, 1 }));
+        Assert.That(near.EnvelopeFrontDistance, Is.EqualTo(1.0).Within(1e-9));
+
+        // Beyond the cap the remainder is pure distance: padding 2 at 5 m → two cells, front at 2.5 m.
+        var far = Objective.FromJson(ScalarLevel(2, ", \"dist\": 5"));
+        Assert.That(far.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 2, 2, 2, 1 }));
+        Assert.That(far.EnvelopeFrontDistance, Is.EqualTo(2.5).Within(1e-9));
+
+        // A cell fraction goes into distance, never into a partial cell (3.2 m → 1 cell, front 1.7 m).
+        var frac = Objective.FromJson(ScalarLevel(2, ", \"dist\": 3.2"));
+        Assert.That(frac.PaddingsLowerUpper()[0][2], Is.EqualTo(1));
+        Assert.That(frac.EnvelopeFrontDistance, Is.EqualTo(1.7).Within(1e-9));
+
+        // Scale counts: at 0.5 the same 3.5 m holds four z cells, capped at padding 3.
+        var small = Objective.FromJson(ScalarLevel(3, ", \"scale\": 0.5"));
+        Assert.That(small.PaddingsLowerUpper()[0][2], Is.EqualTo(3));
+
+        // padding 1 keeps its single workbench cell; padding 0 adds nothing (no negative far side).
+        Assert.That(Objective.FromJson(ScalarLevel(1)).PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 1, 1, 1, 1 }));
+        Assert.That(Objective.FromJson(ScalarLevel(1)).PaddingsLowerUpper()[1], Is.EqualTo(new int[] { 1, 1, 1, 1 }));
+        Assert.That(Objective.FromJson(ScalarLevel(0)).PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 0, 0, 0, 0 }));
+        Assert.That(Objective.FromJson(ScalarLevel(0)).PaddingsLowerUpper()[1], Is.EqualTo(new int[] { 0, 0, 0, 0 }));
+    }
+
+    [Test]
+    public void Objective_EnvelopeFrontMustStayBehindTheComfortLine()
+    {
+        // Scalar form: a dist too small for even the fixed near cells fails.
+        Assert.Throws<ArgumentException>(() => Objective.FromJson(ScalarLevel(1, ", \"dist\": 1.2")));
+        // Explicit form is literal: dist only places the facade, so a large near margin with a
+        // small dist would pull the envelope front through the player — fail fast.
+        const string explicitNear = "{ \"name\": \"e\", \"goal\": [[0,0,0,0]], \"pieces\": [[[0,0,0,0]]], " +
+                                    "\"paddings_lower_upper\": [[1,1,3,1],[1,1,1,1]], \"dist\": 3 }";
+        Assert.Throws<ArgumentException>(() => Objective.FromJson(explicitNear));
+        Assert.That(Objective.FromJson(explicitNear.Replace("\"dist\": 3", "\"dist\": 4.5")).EnvelopeFrontDistance,
+                    Is.EqualTo(1.0).Within(1e-9));
     }
 
     [Test]
