@@ -55,7 +55,7 @@ namespace D4BB.Solver
     /// this cut a 3D level whose pieces are the wrong hand would still "tile" (via an unreachable
     /// reflection), turning a provable <see cref="AssemblyVerdict.None"/> into a vacuous
     /// <see cref="AssemblyVerdict.Exists"/> and feeding <see cref="PathSearch"/> targets it can
-    /// never reach — the 2026-09 Sinister Screws / Mikusiński case.</para>
+    /// never reach — the 2026-09 Six Left Hands / Mikusiński case.</para>
     ///
     /// <para>Shape mode vs absolute mode need no distinction here. Tiling the goal where it lies is
     /// equivalent to tiling any congruent copy of it (apply the global motion to every piece), so

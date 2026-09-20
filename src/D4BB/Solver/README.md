@@ -99,7 +99,7 @@ same set for its shape-mode target rotations). A level pinned to one w layer the
 proper rotations of 3-space, not the 192 of 4-space — the latter contain w-flips that act as 3D
 reflections. This is what makes a 3D level with a wrong-handed piece **provably** unsolvable
 rather than "the pieces tile, no path found" (the 2026-09 case: after the polycube levels were
-pinned to w-thickness 1, *Sinister Screws* — a puzzle that by design needs the 4D flip — showed
+pinned to w-thickness 1, *Six Left Hands* (`SinisterScrews.json`) — a puzzle that by design needs the 4D flip — showed
 up as `AssemblyOnly`, and *Mikusiński*'s path search spent its budget on mirrored targets).
 
 `PathSearch` is **incomplete by design**: weighted best-first, budget-capped, aimed at a handful of
