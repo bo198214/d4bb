@@ -49,10 +49,18 @@ namespace D4BB.Game
         public double Dist => dist ?? DefaultDist;
         // Facade distance of levels without "dist" — where most authored levels stand.
         public const double DefaultDist = 3.5;
-        // Closest the play volume's front (and thus any movable piece) may come to the eyes.
-        // The scalar-padding derivation never lets the envelope front cross it, and every
-        // parsed level is checked against it (an explicit envelope can violate it — fail fast).
-        public const double MinFrontDistance = 1.0;
+        // Closest the play volume's front (and thus any movable piece) may come to the eyes:
+        // the physical eye-comfort floor (focus + convergence), deliberately zoom-independent —
+        // a miniature and a full-size field get the same floor. ONE constant, two enforcement
+        // points: at load, the scalar-padding derivation never lets the envelope front cross it
+        // and every parsed level is checked against it (an explicit envelope can violate it —
+        // fail fast); at runtime, the game's stop plane (Tesserian SceneGrabController) rejects
+        // every pose change — grab, zoom, distance slider — that would carry an envelope corner
+        // across the world plane this far in front of the origin (the recentered head). 0.3 m
+        // since 2026-09-20 (was 1 m; lowering it changed no catalog envelope — the fill rounds to
+        // the same whole cells for every authored dist/padding — and the authored placement of
+        // every catalog level still starts at ≥ 1 m; anything closer is the player's own doing).
+        public const double MinFrontDistance = 0.3;
         // The canonical cavalier projection's w→z shear (azimuth 45°, elevation 45°, length 1):
         // one w cell of near padding moves the facade this many cells further back. The envelope
         // must be deterministic for the solver, so the derivation uses this design-time value,

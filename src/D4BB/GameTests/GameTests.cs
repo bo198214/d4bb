@@ -273,7 +273,7 @@ public class GameTests
     [Test]
     public void Objective_DistDerivesNearZPaddingUpToTheCap()
     {
-        // Default dist 3.5 at scale 1: the gap to the 1 m front line is 2.5 m; the near w cell
+        // Default dist 3.5 at scale 1: the gap to the 0.3 m front line is 3.2 m; the near w cell
         // takes 0.5 of it, so two whole z cells fit — up to the cap (padding 2 → 2, padding 3 → 2
         // as well, since only two fit). The far side takes the rest of the 2·padding slack.
         var p2 = Objective.FromJson(ScalarLevel(2));
@@ -294,10 +294,11 @@ public class GameTests
         Assert.That(far.PaddingsLowerUpper()[0], Is.EqualTo(new int[] { 2, 2, 2, 1 }));
         Assert.That(far.EnvelopeFrontDistance, Is.EqualTo(2.5).Within(1e-9));
 
-        // A cell fraction goes into distance, never into a partial cell (3.2 m → 1 cell, front 1.7 m).
+        // A cell fraction goes into distance, never into a partial cell (3.2 m: 2.9 m of room
+        // minus the w cell's 0.5 holds two whole cells, the 0.4 m remainder is distance → front 0.7 m).
         var frac = Objective.FromJson(ScalarLevel(2, ", \"dist\": 3.2"));
-        Assert.That(frac.PaddingsLowerUpper()[0][2], Is.EqualTo(1));
-        Assert.That(frac.EnvelopeFrontDistance, Is.EqualTo(1.7).Within(1e-9));
+        Assert.That(frac.PaddingsLowerUpper()[0][2], Is.EqualTo(2));
+        Assert.That(frac.EnvelopeFrontDistance, Is.EqualTo(0.7).Within(1e-9));
 
         // Scale counts: at 0.5 the same 3.5 m holds four z cells, capped at padding 3.
         var small = Objective.FromJson(ScalarLevel(3, ", \"scale\": 0.5"));
