@@ -54,10 +54,11 @@ namespace D4BB.Game
         // a miniature and a full-size field get the same floor. ONE constant, two enforcement
         // points: at load, the scalar-padding derivation never lets the envelope front cross it
         // and every parsed level is checked against it (an explicit envelope can violate it —
-        // fail fast); at runtime, the game's stop plane (Tesserian SceneGrabController) rejects
-        // every pose change — grab, zoom, distance slider — that would carry a PIECE across the
-        // world plane this far in front of the origin (the recentered head; the pieces, not the
-        // envelope, since its padding cells are invisible and clamped far too early). 0.3 m
+        // fail fast); at runtime, the game's collision guard (Tesserian SceneGrabController)
+        // rejects every pose change — grab, zoom, distance slider — that would bring a piece
+        // closer to the eyes than its clearance (Game's Inspector field minPiecesClearance, seeded
+        // from this constant; the guard's body is an Inspector experiment: plane, cylinder, ball,
+        // the whole envelope, or off). 0.3 m
         // since 2026-09-20 (was 1 m; lowering it changed no catalog envelope — the fill rounds to
         // the same whole cells for every authored dist/padding — and the authored placement of
         // every catalog level still starts at ≥ 1 m; anything closer is the player's own doing).
