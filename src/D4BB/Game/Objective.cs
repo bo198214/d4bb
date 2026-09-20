@@ -213,14 +213,15 @@ namespace D4BB.Game
             public double? Scale { get; set; }
             [JsonProperty("dist")]
             public double? Dist { get; set; }
+            // Declaration order is emission order: paddings_lower_upper (the only envelope form
+            // ToJson writes) sits with the short header fields, right before the bulky "goal" /
+            // "pieces" arrays, so the envelope is visible at the top of a dumped level file.
+            [JsonProperty("paddings_lower_upper")]
+            public int[][] PaddingsLowerUpper { get; set; }
             [JsonProperty("goal")]
             public int[][] Goal { get; set; }
             [JsonProperty("pieces")]
             public int[][][] Pieces { get; set; }
-            // Declaration order is emission order: paddings_lower_upper (the only envelope form
-            // ToJson writes) sits right after "pieces", matching the hand-written level files.
-            [JsonProperty("paddings_lower_upper")]
-            public int[][] PaddingsLowerUpper { get; set; }
             [JsonProperty("boundary_min_max")]
             public int[][] BoundaryMinMax { get; set; }
             [JsonProperty("mode")]
