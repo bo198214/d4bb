@@ -32,9 +32,20 @@ namespace D4BB.SolverTests
         }
 
         /// <summary>
-        /// Every level file, recursively. Excludes the JSON schema and the <c>test/</c> subtree,
+        /// Levels that are unsolvable by design, relative to the levels folder.
+        /// <c>mirror-staircase.json</c>: the goal is the mirror image of the chiral 4D staircase
+        /// piece, which no proper rotation reaches.
+        /// </summary>
+        static readonly HashSet<string> IntentionallyUnsolvable =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                Path.Combine("rotations", "mirror-staircase.json"),
+            };
+
+        /// <summary>
+        /// Every level file, recursively. Excludes the JSON schema, the <c>test/</c> subtree,
         /// whose files are render/colour fixtures rather than puzzles (a one-cell goal with four
-        /// one-cell pieces is unsolvable on purpose).
+        /// one-cell pieces is unsolvable on purpose), and <see cref="IntentionallyUnsolvable"/>.
         /// </summary>
         public static IEnumerable<string> All()
         {
@@ -45,6 +56,7 @@ namespace D4BB.SolverTests
                 .Where(p => Path.GetFileName(p) != "level.schema.json")
                 .Where(p => !RelativeTo(dir, p).Split(Path.DirectorySeparatorChar)
                                               .Contains("test", StringComparer.OrdinalIgnoreCase))
+                .Where(p => !IntentionallyUnsolvable.Contains(RelativeTo(dir, p)))
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase);
         }
 
