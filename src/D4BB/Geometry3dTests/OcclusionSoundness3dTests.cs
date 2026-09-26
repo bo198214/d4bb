@@ -112,6 +112,48 @@ namespace D4BB.Geometry3dTests {
             }
         }
 
+        // Replay of the LAssembleCubesBeat AxisScrew choreography: the corner sinks unrotated,
+        // the arms screw in about their own axes while sinking. The late samples put the arms
+        // within hundredths of a cube of each other and of the corner, still turned.
+        [Test] public void AxisScrewChoreographyReplay() {
+            var cube = IntegerComplex3dBuilder.Boundary(Polycube3dFigures.ByName("single"));
+            var posed = PosedComplexes.Merge(new List<PolyhedralComplex3d> { cube, cube, cube });
+            for (int p = 0; p < 3; p++)
+                posed.BakeOriginalTransform(p, 1.0, new double[] { -0.5, -0.5, -0.5 });
+            var cam = new Camera3dParallel(new Point(0.35, 0.30));
+
+            // Mirrors the beat's constants (cubeSize = 1): dock offsets, outward arm axes
+            // (corner = cube 0: none), start height, axial start, twist per cube length.
+            var dock = new[] {
+                new double[] { 0.5, -0.5, 0 },
+                new double[] { -0.5, -0.5, 0 },
+                new double[] { 0.5, 0.5, 0 },
+            };
+            var outward = new[] {
+                new double[] { 0, 0, 0 },
+                new double[] { -1, 0, 0 },
+                new double[] { 0, 1, 0 },
+            };
+            const double height = 3.0, axialStart = 4.0, twistPerCube = 1.8;
+
+            var us = new List<double>();
+            for (int step = 0; step <= 20; step++) us.Add(step / 20.0);
+            us.AddRange(new[] { 0.93, 0.97, 0.99, 0.997 });
+            foreach (double u in us) {
+                double rem = 1.0 - SmoothStep(u);
+                for (int p = 0; p < 3; p++) {
+                    double axial = p == 0 ? 0.0 : rem * axialStart;
+                    var off = new double[3];
+                    for (int c = 0; c < 3; c++) off[c] = dock[p][c] + outward[p][c] * axial;
+                    off[2] += rem * height;
+                    var rot = p == 0 ? PosedComplexes.IdentityRot
+                                     : PosedComplexes.AxisAngleRot(outward[p], twistPerCube * axial);
+                    posed.SetPose(p, rot, null, off);
+                }
+                AssertSound(posed.complex, cam, $"AxisScrew u={u:F3}");
+            }
+        }
+
         // ── the invariant checker ────────────────────────────────────────────────
 
         static void AssertSound(PolyhedralComplex3d complex, ICamera3d cam, string label) {
