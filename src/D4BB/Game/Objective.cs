@@ -87,6 +87,12 @@ namespace D4BB.Game
         // exact semantics). Level JSON: "quantum_rotation": true — only emitted when set,
         // like "mode".
         public bool quantumRotation = false;
+        // The level is unsolvable by design (e.g. a goal that is the mirror image of a chiral
+        // piece). The solver tests skip it, and it does not count towards completing its chapter.
+        // Level JSON: "unsolvable": true. Read-only like "boundary_min_max": ToJson never writes
+        // it, because ToJson feeds the player-visible Custom-Level page, and the level should not
+        // give away that it cannot be solved.
+        public bool unsolvable = false;
         public int[][] goal;
         public int[][][] pieces;
         public int[][] boundary_min_max;
@@ -199,6 +205,7 @@ namespace D4BB.Game
                     $"Level '{data.Name}': \"points\" must be >= 1 (got {data.Points.Value}).");
             obj.points = data.Points ?? 1;
             obj.quantumRotation = data.QuantumRotation ?? false;
+            obj.unsolvable = data.Unsolvable ?? false;
             return obj;
         }
 
@@ -238,6 +245,8 @@ namespace D4BB.Game
             public string Mode { get; set; }
             [JsonProperty("quantum_rotation")]
             public bool? QuantumRotation { get; set; }
+            [JsonProperty("unsolvable")]
+            public bool? Unsolvable { get; set; }
             [JsonProperty("padding")]
             public int? Padding { get; set; }
         }
