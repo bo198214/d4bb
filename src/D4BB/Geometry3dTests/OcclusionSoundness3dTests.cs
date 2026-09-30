@@ -57,10 +57,10 @@ namespace D4BB.Geometry3dTests {
             }
         }
 
-        // Replay of the LAssembleCubesBeat FromZ choreography poses (tumbling approach in
-        // disjoint z-lanes, hover, simultaneous descent into the L slots) — certifies the
-        // exact flight the beat renders, including any mutual-straddle fallback activations.
-        [Test] public void FromZChoreographyReplay() {
+        // Replay of the LAssembleCubesBeat fly-in: the cubes fall along −y from different heights
+        // and moments while the arms screw in along their axes, the whole L turned about y. The
+        // late samples put the still-turning arms within hundredths of a cube of their neighbours.
+        [Test] public void FallScrewChoreographyReplay() {
             var cube = IntegerComplex3dBuilder.Boundary(Polycube3dFigures.ByName("single"));
             var posed = PosedComplexes.Merge(new List<PolyhedralComplex3d> { cube, cube, cube });
             for (int p = 0; p < 3; p++)
@@ -68,91 +68,54 @@ namespace D4BB.Geometry3dTests {
             var cam = new Camera3dParallel(new Point(0.35, 0.30));
 
             // Mirrors the beat's constants (cubeSize = 1): dock offsets of the L cells
-            // (0,-1,0)/(-1,-1,0)/(0,0,0) about the L's bbox center, z-lanes, lateral spread.
+            // (0,0,0)/(−1,0,0)/(0,0,1) about their bounding-box centre, outward arm axes
+            // (corner: none), fall heights and starts, screw distance and pitch, yaw 25°.
             var dock = new[] {
-                new double[] { 0.5, -0.5, 0 },
-                new double[] { -0.5, -0.5, 0 },
-                new double[] { 0.5, 0.5, 0 },
-            };
-            double[] laneZ = { 2.2, 4.4, 6.6 };
-            var lateral = new[] {
-                new double[] { 2.4, -1.2 },
-                new double[] { -2.4, -1.2 },
-                new double[] { 0.0, 2.0 },
-            };
-            const double approachEnd = 0.60, descentStart = 0.65;
-            const float flyInSeconds = 9f, tumbleSpeed = 50f;
-            double tumbleTotalRad = tumbleSpeed * (approachEnd * flyInSeconds) * Math.PI / 180.0;
-            var rng = new Random(42);
-            var axes = new double[3][];
-            for (int p = 0; p < 3; p++) axes[p] = RandomUnitAxis(rng);
-
-            for (int step = 0; step <= 20; step++) {
-                double u = step / 20.0;
-                for (int p = 0; p < 3; p++) {
-                    double[] off;
-                    double[] rot;
-                    if (u < approachEnd) {
-                        double a = u / approachEnd;
-                        double rem = Math.Pow(1.0 - a, 3.0);   // 1 − easeOutCubic(a)
-                        off = new[] {
-                            dock[p][0] + rem * lateral[p][0],
-                            dock[p][1] + rem * lateral[p][1],
-                            dock[p][2] + laneZ[p] };
-                        rot = PosedComplexes.AxisAngleRot(axes[p], rem * tumbleTotalRad);
-                    } else {
-                        double d = u < descentStart ? 0.0
-                            : SmoothStep((u - descentStart) / (1.0 - descentStart));
-                        off = new[] { dock[p][0], dock[p][1], dock[p][2] + laneZ[p] * (1.0 - d) };
-                        rot = PosedComplexes.IdentityRot;
-                    }
-                    posed.SetPose(p, rot, null, off);
-                }
-                AssertSound(posed.complex, cam, $"FromZ u={u:F2}");
-            }
-        }
-
-        // Replay of the LAssembleCubesBeat AxisScrew choreography: the corner sinks unrotated,
-        // the arms screw in about their own axes while sinking. The late samples put the arms
-        // within hundredths of a cube of each other and of the corner, still turned.
-        [Test] public void AxisScrewChoreographyReplay() {
-            var cube = IntegerComplex3dBuilder.Boundary(Polycube3dFigures.ByName("single"));
-            var posed = PosedComplexes.Merge(new List<PolyhedralComplex3d> { cube, cube, cube });
-            for (int p = 0; p < 3; p++)
-                posed.BakeOriginalTransform(p, 1.0, new double[] { -0.5, -0.5, -0.5 });
-            var cam = new Camera3dParallel(new Point(0.35, 0.30));
-
-            // Mirrors the beat's constants (cubeSize = 1): dock offsets, outward arm axes
-            // (corner = cube 0: none), start height, axial start, twist per cube length.
-            var dock = new[] {
-                new double[] { 0.5, -0.5, 0 },
-                new double[] { -0.5, -0.5, 0 },
-                new double[] { 0.5, 0.5, 0 },
+                new double[] { 0.5, 0, -0.5 },
+                new double[] { -0.5, 0, -0.5 },
+                new double[] { 0.5, 0, 0.5 },
             };
             var outward = new[] {
                 new double[] { 0, 0, 0 },
                 new double[] { -1, 0, 0 },
-                new double[] { 0, 1, 0 },
+                new double[] { 0, 0, 1 },
             };
-            const double height = 3.0, axialStart = 4.0, twistPerCube = 1.8;
+            double[] fallHeight = { 5.5, 2.5, 4.0 }, fallStart = { 0.30, 0.00, 0.12 };
+            const double screwAxial = 4.0, twistPerCube = 1.8;
+            var yaw = PosedComplexes.AxisAngleRot(new double[] { 0, 1, 0 }, 25.0 * Math.PI / 180.0);
 
             var us = new List<double>();
             for (int step = 0; step <= 20; step++) us.Add(step / 20.0);
             us.AddRange(new[] { 0.93, 0.97, 0.99, 0.997 });
             foreach (double u in us) {
-                double rem = 1.0 - SmoothStep(u);
+                double axial = screwAxial * (1.0 - SmoothStep(u));
                 for (int p = 0; p < 3; p++) {
-                    double axial = p == 0 ? 0.0 : rem * axialStart;
-                    var off = new double[3];
-                    for (int c = 0; c < 3; c++) off[c] = dock[p][c] + outward[p][c] * axial;
-                    off[2] += rem * height;
+                    double a = p == 0 ? 0.0 : axial;
+                    double fall = SmoothStep((u - fallStart[p]) / (1.0 - fallStart[p]));
+                    var local = new double[3];
+                    for (int c = 0; c < 3; c++) local[c] = dock[p][c] + outward[p][c] * a;
+                    local[1] += fallHeight[p] * (1.0 - fall);
                     var rot = p == 0 ? PosedComplexes.IdentityRot
-                                     : PosedComplexes.AxisAngleRot(outward[p], twistPerCube * axial);
-                    posed.SetPose(p, rot, null, off);
+                                     : PosedComplexes.AxisAngleRot(outward[p], twistPerCube * a);
+                    posed.SetPose(p, MatMul3(yaw, rot), null, MatVec3(yaw, local));
                 }
-                AssertSound(posed.complex, cam, $"AxisScrew u={u:F3}");
+                AssertSound(posed.complex, cam, $"FallScrew u={u:F3}");
             }
         }
+
+        static double[] MatMul3(double[] a, double[] b) {
+            var m = new double[9];
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    m[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+            return m;
+        }
+
+        static double[] MatVec3(double[] m, double[] v) => new[] {
+            m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+            m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+            m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+        };
 
         // ── the invariant checker ────────────────────────────────────────────────
 
